@@ -9,12 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "qrcode.react": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",
+    "socket.io": "^4.8.3",
     "socket.io-client": "^4.7.5"
   },
   "devDependencies": {

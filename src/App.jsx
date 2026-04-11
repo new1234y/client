@@ -11,6 +11,45 @@ import { BASEMAPS } from "./lib/map/basemaps.js";
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
+// Cles localStorage pour la persistance de session
+const LS_SESSION_KEY = "chase_gps_session";
+const LS_ROOM_KEY = "chase_gps_room";
+const LS_NICKNAME_KEY = "chase_gps_nickname";
+
+function saveSession(sessionId, roomCode, nickname) {
+  try {
+    localStorage.setItem(LS_SESSION_KEY, sessionId);
+    localStorage.setItem(LS_ROOM_KEY, roomCode);
+    localStorage.setItem(LS_NICKNAME_KEY, nickname);
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+}
+
+function loadSession() {
+  try {
+    const sessionId = localStorage.getItem(LS_SESSION_KEY);
+    const roomCode = localStorage.getItem(LS_ROOM_KEY);
+    const nickname = localStorage.getItem(LS_NICKNAME_KEY);
+    if (sessionId && roomCode) {
+      return { sessionId, roomCode, nickname: nickname || "Joueur" };
+    }
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+  return null;
+}
+
+function clearSession() {
+  try {
+    localStorage.removeItem(LS_SESSION_KEY);
+    localStorage.removeItem(LS_ROOM_KEY);
+    localStorage.removeItem(LS_NICKNAME_KEY);
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+}
+
 function roleBadgeText(p) {
   if (p.spectator) return "Spectateur";
   if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
@@ -39,6 +78,41 @@ function HuntTimeLeft({ endsAt }) {
     <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
       ⏱ {m}:{String(s).padStart(2, "0")}
     </span>
+  );
+}
+
+function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError }) {
+  if (!isReconnecting) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reconnexion en cours"
+    >
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-slate-900">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+        <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
+          Reconnexion en cours...
+        </h2>
+        <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">
+          Tentative {reconnectAttempt}
+        </p>
+        {lastError && (
+          <p className="mb-4 text-xs text-red-500">{lastError}</p>
+        )}
+        <p className="mb-4 text-xs text-slate-500 dark:text-slate-500">
+          La connexion a ete perdue. Nous essayons de vous reconnecter automatiquement.
+        </p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="w-full rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+        >
+          Annuler et quitter
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -89,7 +163,10 @@ export default function App() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [stage, setStage] = useState("entry");
-  const [nickname, setNickname] = useState("");
+  const [nickname, setNickname] = useState(() => {
+    const saved = loadSession();
+    return saved?.nickname || "";
+  });
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
   const [isHost, setIsHost] = useState(false);
@@ -106,13 +183,24 @@ export default function App() {
   const [mapBasemap, setMapBasemap] = useState("osm");
   const [recenterTick, setRecenterTick] = useState(0);
   const [summary, setSummary] = useState(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [reconnectError, setReconnectError] = useState(null);
+  const reconnectTimeoutRef = useRef(null);
+  const lastPingRef = useRef(Date.now());
+  const socketRef = useRef(null);
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
 
   const geoEnabled =
     stage === "lobby" || stage === "role_reveal" || stage === "game";
   const { position, error: geoError } = useGeolocation(geoEnabled);
   const lastEmit = useRef(0);
 
-  const resetToEntry = useCallback(() => {
+  const resetToEntry = useCallback((clearStorage = true) => {
+    if (clearStorage) {
+      clearSession();
+    }
     setStage("entry");
     setLobby(null);
     setRolesReveal(null);
@@ -125,51 +213,191 @@ export default function App() {
     setMapBasemap("osm");
     setRecenterTick(0);
     setSummary(null);
+    setIsReconnecting(false);
+    setReconnectAttempt(0);
+    setReconnectError(null);
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
   }, []);
+
+  // Fonction de reconnexion avec exponential backoff
+  const attemptReconnect = useCallback((s, attempt = 1) => {
+    const saved = loadSession();
+    if (!saved) {
+      setIsReconnecting(false);
+      return;
+    }
+
+    setReconnectAttempt(attempt);
+    
+    s.emit("reconnect_session", { 
+      sessionId: saved.sessionId, 
+      roomCode: saved.roomCode 
+    }, (res) => {
+      if (res?.ok) {
+        setIsReconnecting(false);
+        setReconnectAttempt(0);
+        setReconnectError(null);
+        setSessionId(res.sessionId);
+        setIsHost(res.isHost);
+        
+        if (res.phase === "lobby" && res.lobby) {
+          setLobby(res.lobby);
+          setStage("lobby");
+        } else if (res.phase === "role_reveal" && res.rolesReveal) {
+          setRolesReveal(res.rolesReveal);
+          setStage("role_reveal");
+        } else if (res.phase === "playing" && res.gameState) {
+          setGameState(res.gameState);
+          setRole(res.gameState.me?.role ?? null);
+          setStage("game");
+        } else if (res.phase === "finished") {
+          clearSession();
+          resetToEntry(false);
+        }
+      } else {
+        setReconnectError(res?.error || "Echec de reconnexion");
+        
+        // Si la session/salle n'existe plus, on arrete
+        if (res?.error?.includes("expirée") || res?.error?.includes("n'existe plus")) {
+          clearSession();
+          setIsReconnecting(false);
+          resetToEntry(false);
+          return;
+        }
+        
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s max
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (s.connected) {
+            attemptReconnect(s, attempt + 1);
+          }
+        }, delay);
+      }
+    });
+  }, [resetToEntry]);
 
   useEffect(() => {
     const s = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 16000,
     });
     setSocket(s);
-    s.on("connect", () => setConnected(true));
-    s.on("disconnect", () => setConnected(false));
+    socketRef.current = s;
+
+    s.on("connect", () => {
+      setConnected(true);
+      lastPingRef.current = Date.now();
+      
+      // Si on a une session sauvegardee et qu'on n'est pas deja dans un stage actif
+      const saved = loadSession();
+      if (saved && stageRef.current === "entry") {
+        setIsReconnecting(true);
+        attemptReconnect(s);
+      }
+    });
+
+    s.on("disconnect", (reason) => {
+      setConnected(false);
+      
+      // Si on etait dans une partie, afficher la modal de reconnexion
+      if (stageRef.current !== "entry" && stageRef.current !== "summary") {
+        setIsReconnecting(true);
+      }
+    });
+
+    // Heartbeat: repondre au ping du serveur
+    s.on("server_ping", ({ t }) => {
+      lastPingRef.current = Date.now();
+      s.emit("client_pong", { t });
+    });
+
     s.on("lobby_update", (payload) => {
+      setIsReconnecting(false);
       setLobby(payload);
       if (payload.phase === "lobby") setStage("lobby");
     });
+
     s.on("roles_reveal", (payload) => {
+      setIsReconnecting(false);
       setRolesReveal(payload);
       setStage("role_reveal");
     });
+
     s.on("game_state", (payload) => {
+      setIsReconnecting(false);
       setGameState(payload);
       setRole((r) => payload.me?.role ?? r);
       if (payload.phase === "playing") setStage("game");
     });
+
     s.on("game_finished", (data) => {
+      clearSession();
       setSummary(data);
       setStage("summary");
       setGameState(null);
     });
+
     s.on("capture_ok", (data) => {
-      setToast(`${data.preyNickname} a été capturé·e !`);
+      setToast(`${data.preyNickname} a ete capture !`);
       setTimeout(() => setToast(null), 4000);
     });
+
     s.on("kicked", () => {
-      alert("Vous avez été expulsé de la partie.");
+      clearSession();
+      alert("Vous avez ete expulse de la partie.");
       resetToEntry();
     });
+
     s.on("admin_role_changed", (data) => {
-      setToast(`Rôle mis à jour : ${data.nickname} → ${data.role}`);
+      setToast(`Role mis a jour : ${data.nickname} -> ${data.role}`);
       setTimeout(() => setToast(null), 3500);
     });
+
+    // Visibility API: verifier la connexion quand l'onglet redevient visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Verifier si la connexion est toujours active
+        if (!s.connected) {
+          s.connect();
+        } else if (Date.now() - lastPingRef.current > 60000) {
+          // Pas de ping depuis 60s, forcer reconnexion
+          s.disconnect();
+          s.connect();
+        } else {
+          // Demander un refresh de l'etat
+          s.emit("refresh_state");
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Verifier periodiquement si on recoit des pings (heartbeat check)
+    const heartbeatCheck = setInterval(() => {
+      if (s.connected && Date.now() - lastPingRef.current > 90000) {
+        // Pas de ping depuis 90s, forcer reconnexion
+        s.disconnect();
+        s.connect();
+      }
+    }, 30000);
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(heartbeatCheck);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       s.removeAllListeners();
       s.close();
     };
-  }, [resetToEntry]);
+  }, [resetToEntry, attemptReconnect]);
 
   useEffect(() => {
     if (!socket || !position) return;
@@ -200,9 +428,11 @@ export default function App() {
     setErrorBanner(null);
     socket.emit("create_room", { nickname: nickname.trim() }, (res) => {
       if (!res?.ok) {
-        setErrorBanner(res?.error || "Impossible de créer la salle.");
+        setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
+      // Sauvegarder la session pour la reconnexion
+      saveSession(res.sessionId, res.code, nickname.trim());
       setSessionId(res.sessionId);
       setIsHost(true);
       setLobby(res.lobby);
@@ -224,6 +454,8 @@ export default function App() {
           setErrorBanner(res?.error || "Impossible de rejoindre.");
           return;
         }
+        // Sauvegarder la session pour la reconnexion
+        saveSession(res.sessionId, res.code, nickname.trim());
         setSessionId(res.sessionId);
         setIsHost(res.isHost);
         setLobby(res.lobby);
@@ -324,9 +556,20 @@ export default function App() {
     if (me) setRole(me.role);
   }, [rolesReveal, sessionId]);
 
+  // Afficher la modal de reconnexion si necessaire
+  const reconnectModal = (
+    <ReconnectModal
+      isReconnecting={isReconnecting}
+      reconnectAttempt={reconnectAttempt}
+      lastError={reconnectError}
+      onCancel={() => resetToEntry()}
+    />
+  );
+
   if (stage === "entry") {
     return (
       <div className="flex min-h-full flex-col p-4 pb-8">
+        {reconnectModal}
         <header className="mb-4 flex items-start justify-between gap-3 pt-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -440,6 +683,7 @@ export default function App() {
   if (stage === "lobby" && lobby) {
     return (
       <div className="flex min-h-full flex-col p-4 text-slate-900 dark:text-slate-100">
+        {reconnectModal}
         <header className="mb-4 flex shrink-0 items-start justify-between gap-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500">
@@ -685,6 +929,7 @@ export default function App() {
   if (stage === "role_reveal" && rolesReveal) {
     return (
       <div className="flex min-h-full flex-col p-4">
+        {reconnectModal}
         <header className="mb-4">
           <p className="font-mono text-xl text-indigo-400">{rolesReveal.code}</p>
           <h1 className="text-xl font-bold text-white">Rôles de la partie</h1>
@@ -798,6 +1043,7 @@ export default function App() {
 
     return (
       <div className="flex h-full min-h-0 flex-col">
+        {reconnectModal}
         {toast && (
           <div className="absolute left-1/2 top-2 z-[1500] mt-2 w-[90%] max-w-sm -translate-x-1/2 rounded-xl bg-emerald-800 px-4 py-3 text-center text-sm text-white shadow-lg">
             {toast}
@@ -844,6 +1090,11 @@ export default function App() {
               >
                 Admin
               </button>
+            )}
+            {!connected && (
+              <span className="text-[10px] text-red-500 animate-pulse">
+                Deconnecte
+              </span>
             )}
             {geoError && (
               <span className="max-w-[100px] text-right text-[10px] text-amber-600 dark:text-amber-400">
