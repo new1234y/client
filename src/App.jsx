@@ -11,6 +11,7 @@ import PlayerSheet from "./components/game/PlayerSheet.jsx";
 import GameTimer from "./components/game/GameTimer.jsx";
 import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
+import LobbyShareModal from "./components/game/LobbyShareModal.jsx";
 import { BASEMAPS } from "./lib/map/basemaps.js";
 
 const SOCKET_URL =
@@ -237,6 +238,7 @@ export default function App() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [gameHistory, setGameHistory] = useState(() => loadGameHistory());
+  const [showShare, setShowShare] = useState(false);
   const reconnectTimeoutRef = useRef(null);
   const lastPingRef = useRef(Date.now());
   const socketRef = useRef(null);
@@ -806,8 +808,25 @@ export default function App() {
               {isHost ? "Vous etes l'hote (admin)" : "En attente de l'hote"}
             </p>
           </div>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowShare(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+              title="Inviter des joueurs"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Inviter
+            </button>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          </div>
         </header>
+
+        {showShare && (
+          <LobbyShareModal code={lobby.code} onClose={() => setShowShare(false)} />
+        )}
 
         {errorBanner && (
           <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
@@ -1039,13 +1058,29 @@ export default function App() {
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
         
-        <header className="mb-4">
-          <p className="font-mono text-xl text-indigo-600 dark:text-indigo-400">{rolesReveal.code}</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Roles de la partie</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Tout le monde voit qui est chat ou joueur.
-          </p>
+        <header className="mb-4 flex items-start justify-between gap-2">
+          <div>
+            <p className="font-mono text-xl text-indigo-600 dark:text-indigo-400">{rolesReveal.code}</p>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Roles de la partie</h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Tout le monde voit qui est chat ou joueur.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowShare(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            Inviter
+          </button>
         </header>
+
+        {showShare && (
+          <LobbyShareModal code={rolesReveal.code} onClose={() => setShowShare(false)} />
+        )}
 
         {errorBanner && (
           <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
@@ -1188,6 +1223,16 @@ export default function App() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
+            <button
+              type="button"
+              onClick={() => setShowShare(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              title="Inviter / partager le code"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            </button>
             {isHost && (
               <button
                 type="button"
@@ -1375,6 +1420,9 @@ export default function App() {
         </footer>
 
         {/* Modals */}
+        {showShare && (
+          <LobbyShareModal code={currentRoomCode} onClose={() => setShowShare(false)} />
+        )}
         {showQr && (
           <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />
         )}
