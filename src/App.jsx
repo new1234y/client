@@ -6,15 +6,21 @@ import GameMap from "./components/game/GameMap.jsx";
 import GameSummary from "./components/summary/GameSummary.jsx";
 import QRModal from "./components/game/QRModal.jsx";
 import ScannerModal from "./components/game/ScannerModal.jsx";
+import MapControls from "./components/game/MapControls.jsx";
+import PlayerSheet from "./components/game/PlayerSheet.jsx";
+import GameTimer from "./components/game/GameTimer.jsx";
+import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
+import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
 import { BASEMAPS } from "./lib/map/basemaps.js";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
-// Cles localStorage pour la persistance de session
+// localStorage keys for session persistence
 const LS_SESSION_KEY = "chase_gps_session";
 const LS_ROOM_KEY = "chase_gps_room";
 const LS_NICKNAME_KEY = "chase_gps_nickname";
+const LS_HISTORY_KEY = "chase_gps_history";
 
 function saveSession(sessionId, roomCode, nickname) {
   try {
@@ -50,35 +56,48 @@ function clearSession() {
   }
 }
 
+function saveGameHistory(summary) {
+  try {
+    const history = JSON.parse(localStorage.getItem(LS_HISTORY_KEY) || "[]");
+    history.unshift({
+      id: Date.now(),
+      code: summary.code,
+      date: new Date().toISOString(),
+      players: summary.players?.length || 0,
+      duration: summary.endedAt - summary.huntStartedAt,
+      winner: summary.winner,
+    });
+    // Keep only last 20 games
+    localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(history.slice(0, 20)));
+  } catch (e) {
+    console.warn("Could not save history:", e);
+  }
+}
+
+function loadGameHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_HISTORY_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
 function roleBadgeText(p) {
   if (p.spectator) return "Spectateur";
   if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
-  if (p.role === "cat") return "Chat (depuis le départ)";
+  if (p.role === "cat") return "Chat";
   if (p.role === "player" && p.originalRole === "cat") return "Joueur (ex-chat)";
   return "Joueur";
 }
 
-function HuntTimeLeft({ endsAt }) {
-  const [sec, setSec] = useState(null);
-  useEffect(() => {
-    if (!endsAt) {
-      setSec(null);
-      return;
-    }
-    const tick = () =>
-      setSec(Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [endsAt]);
-  if (sec == null) return null;
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return (
-    <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
-      ⏱ {m}:{String(s).padStart(2, "0")}
-    </span>
-  );
+// Parse URL for room code
+function getCodeFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("code") || "";
+  } catch {
+    return "";
+  }
 }
 
 function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError }) {
@@ -99,7 +118,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError 
           Tentative {reconnectAttempt}
         </p>
         {lastError && (
-          <p className="mb-4 text-xs text-red-500">{lastError}</p>
+          <p className="mb-4 text-xs text-red-600 dark:text-red-400">{lastError}</p>
         )}
         <p className="mb-4 text-xs text-slate-500 dark:text-slate-500">
           La connexion a ete perdue. Nous essayons de vous reconnecter automatiquement.
@@ -148,17 +167,45 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
         {mm}:{String(ss).padStart(2, "0")}
       </p>
       <p className="max-w-xs text-lg text-slate-800 dark:text-slate-200">
-        Les chats n&apos;ont pas encore accès à la carte.
+        Les chats n&apos;ont pas encore acces a la carte.
       </p>
-      <p className="text-sm text-slate-600 dark:text-slate-500">
-        Préparez-vous… La carte s&apos;ouvrira automatiquement.
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Preparez-vous... La carte s&apos;ouvrira automatiquement.
       </p>
     </div>
   );
 }
 
+// Theme toggle button component
+function ThemeToggle({ theme, onToggle, size = "md" }) {
+  const sizeClasses = size === "sm" 
+    ? "h-9 w-9 text-sm" 
+    : "px-3 py-2 text-xs";
+  
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 ${sizeClasses}`}
+      title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+    >
+      {theme === "dark" ? (
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+        </svg>
+      ) : (
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+        </svg>
+      )}
+      {size !== "sm" && (theme === "dark" ? "Clair" : "Sombre")}
+    </button>
+  );
+}
+
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const { notifications, addNotification, removeNotification } = useNotifications();
   const [entryMode, setEntryMode] = useState("create");
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -167,7 +214,7 @@ export default function App() {
     const saved = loadSession();
     return saved?.nickname || "";
   });
-  const [roomCodeInput, setRoomCodeInput] = useState("");
+  const [roomCodeInput, setRoomCodeInput] = useState(() => getCodeFromUrl());
   const [sessionId, setSessionId] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [lobby, setLobby] = useState(null);
@@ -175,22 +222,36 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [errorBanner, setErrorBanner] = useState(null);
-  const [toast, setToast] = useState(null);
   const [showQr, setShowQr] = useState(false);
   const [showScan, setShowScan] = useState(false);
   const [gameTab, setGameTab] = useState("map");
   const [adminOpen, setAdminOpen] = useState(false);
   const [mapBasemap, setMapBasemap] = useState("osm");
   const [recenterTick, setRecenterTick] = useState(0);
+  const [zoomInTick, setZoomInTick] = useState(0);
+  const [zoomOutTick, setZoomOutTick] = useState(0);
   const [summary, setSummary] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectError, setReconnectError] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [gameHistory, setGameHistory] = useState(() => loadGameHistory());
   const reconnectTimeoutRef = useRef(null);
   const lastPingRef = useRef(Date.now());
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
+  const mapRef = useRef(null);
   stageRef.current = stage;
+
+  // Auto-switch to join mode if URL has code
+  useEffect(() => {
+    const urlCode = getCodeFromUrl();
+    if (urlCode) {
+      setEntryMode("join");
+      setRoomCodeInput(urlCode);
+    }
+  }, []);
 
   const geoEnabled =
     stage === "lobby" || stage === "role_reveal" || stage === "game";
@@ -200,6 +261,10 @@ export default function App() {
   const resetToEntry = useCallback((clearStorage = true) => {
     if (clearStorage) {
       clearSession();
+    }
+    // Clear URL code parameter
+    if (window.history.replaceState) {
+      window.history.replaceState({}, "", window.location.pathname);
     }
     setStage("entry");
     setLobby(null);
@@ -216,13 +281,14 @@ export default function App() {
     setIsReconnecting(false);
     setReconnectAttempt(0);
     setReconnectError(null);
+    setSelectedPlayer(null);
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
   }, []);
 
-  // Fonction de reconnexion avec exponential backoff
+  // Reconnection with exponential backoff
   const attemptReconnect = useCallback((s, attempt = 1) => {
     const saved = loadSession();
     if (!saved) {
@@ -260,15 +326,13 @@ export default function App() {
       } else {
         setReconnectError(res?.error || "Echec de reconnexion");
         
-        // Si la session/salle n'existe plus, on arrete
-        if (res?.error?.includes("expirée") || res?.error?.includes("n'existe plus")) {
+        if (res?.error?.includes("expiree") || res?.error?.includes("n'existe plus")) {
           clearSession();
           setIsReconnecting(false);
           resetToEntry(false);
           return;
         }
         
-        // Exponential backoff: 1s, 2s, 4s, 8s, 16s max
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
         reconnectTimeoutRef.current = setTimeout(() => {
           if (s.connected) {
@@ -295,7 +359,6 @@ export default function App() {
       setConnected(true);
       lastPingRef.current = Date.now();
       
-      // Si on a une session sauvegardee et qu'on n'est pas deja dans un stage actif
       const saved = loadSession();
       if (saved && stageRef.current === "entry") {
         setIsReconnecting(true);
@@ -303,16 +366,14 @@ export default function App() {
       }
     });
 
-    s.on("disconnect", (reason) => {
+    s.on("disconnect", () => {
       setConnected(false);
       
-      // Si on etait dans une partie, afficher la modal de reconnexion
       if (stageRef.current !== "entry" && stageRef.current !== "summary") {
         setIsReconnecting(true);
       }
     });
 
-    // Heartbeat: repondre au ping du serveur
     s.on("server_ping", ({ t }) => {
       lastPingRef.current = Date.now();
       s.emit("client_pong", { t });
@@ -339,39 +400,51 @@ export default function App() {
 
     s.on("game_finished", (data) => {
       clearSession();
+      saveGameHistory(data);
+      setGameHistory(loadGameHistory());
       setSummary(data);
       setStage("summary");
       setGameState(null);
     });
 
     s.on("capture_ok", (data) => {
-      setToast(`${data.preyNickname} a ete capture !`);
-      setTimeout(() => setToast(null), 4000);
+      addNotification(`${data.preyNickname} a ete capture!`, "success");
     });
 
     s.on("kicked", () => {
       clearSession();
-      alert("Vous avez ete expulse de la partie.");
+      addNotification("Vous avez ete expulse de la partie.", "error");
       resetToEntry();
     });
 
     s.on("admin_role_changed", (data) => {
-      setToast(`Role mis a jour : ${data.nickname} -> ${data.role}`);
-      setTimeout(() => setToast(null), 3500);
+      addNotification(`Role mis a jour : ${data.nickname} -> ${data.role}`, "info");
     });
 
-    // Visibility API: verifier la connexion quand l'onglet redevient visible
+    s.on("player_left", (data) => {
+      addNotification(`${data.nickname} a quitte la partie`, "player_left");
+    });
+
+    s.on("player_joined", (data) => {
+      addNotification(`${data.nickname} a rejoint la partie`, "player_joined");
+    });
+
+    s.on("player_disconnected", (data) => {
+      addNotification(`${data.nickname} s'est deconnecte`, "warning");
+    });
+
+    s.on("player_reconnected", (data) => {
+      addNotification(`${data.nickname} s'est reconnecte`, "success");
+    });
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        // Verifier si la connexion est toujours active
         if (!s.connected) {
           s.connect();
         } else if (Date.now() - lastPingRef.current > 60000) {
-          // Pas de ping depuis 60s, forcer reconnexion
           s.disconnect();
           s.connect();
         } else {
-          // Demander un refresh de l'etat
           s.emit("refresh_state");
         }
       }
@@ -379,10 +452,8 @@ export default function App() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Verifier periodiquement si on recoit des pings (heartbeat check)
     const heartbeatCheck = setInterval(() => {
       if (s.connected && Date.now() - lastPingRef.current > 90000) {
-        // Pas de ping depuis 90s, forcer reconnexion
         s.disconnect();
         s.connect();
       }
@@ -397,7 +468,7 @@ export default function App() {
       s.removeAllListeners();
       s.close();
     };
-  }, [resetToEntry, attemptReconnect]);
+  }, [resetToEntry, attemptReconnect, addNotification]);
 
   useEffect(() => {
     if (!socket || !position) return;
@@ -431,7 +502,6 @@ export default function App() {
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
-      // Sauvegarder la session pour la reconnexion
       saveSession(res.sessionId, res.code, nickname.trim());
       setSessionId(res.sessionId);
       setIsHost(true);
@@ -454,7 +524,6 @@ export default function App() {
           setErrorBanner(res?.error || "Impossible de rejoindre.");
           return;
         }
-        // Sauvegarder la session pour la reconnexion
         saveSession(res.sessionId, res.code, nickname.trim());
         setSessionId(res.sessionId);
         setIsHost(res.isHost);
@@ -468,7 +537,7 @@ export default function App() {
     (partial) => {
       if (!socket) return;
       socket.emit("update_settings", partial, (res) => {
-        if (!res?.ok) setErrorBanner(res?.error || "Mise à jour refusée.");
+        if (!res?.ok) setErrorBanner(res?.error || "Mise a jour refusee.");
         else if (res.lobby) setLobby(res.lobby);
       });
     },
@@ -478,14 +547,14 @@ export default function App() {
   const onRevealRoles = useCallback(() => {
     if (!socket) return;
     socket.emit("start_roles", {}, (res) => {
-      if (!res?.ok) setErrorBanner(res?.error || "Impossible de révéler les rôles.");
+      if (!res?.ok) setErrorBanner(res?.error || "Impossible de reveler les roles.");
     });
   }, [socket]);
 
   const onBeginHunt = useCallback(() => {
     if (!socket) return;
     socket.emit("begin_hunt", {}, (res) => {
-      if (!res?.ok) setErrorBanner(res?.error || "Impossible de démarrer la chasse.");
+      if (!res?.ok) setErrorBanner(res?.error || "Impossible de demarrer la chasse.");
     });
   }, [socket]);
 
@@ -494,7 +563,7 @@ export default function App() {
       if (!socket || !text) return;
       const id = String(text).trim();
       socket.emit("capture_scan", { targetSessionId: id }, (res) => {
-        if (!res?.ok) setErrorBanner(res?.error || "Capture refusée.");
+        if (!res?.ok) setErrorBanner(res?.error || "Capture refusee.");
         else setShowScan(false);
       });
     },
@@ -505,7 +574,7 @@ export default function App() {
     (targetSessionId) => {
       if (!socket) return;
       socket.emit("admin_kick", { targetSessionId }, (res) => {
-        if (!res?.ok) setErrorBanner(res?.error || "Expulsion refusée.");
+        if (!res?.ok) setErrorBanner(res?.error || "Expulsion refusee.");
       });
     },
     [socket]
@@ -515,7 +584,7 @@ export default function App() {
     (targetSessionId, r) => {
       if (!socket) return;
       socket.emit("admin_set_role", { targetSessionId, role: r }, (res) => {
-        if (!res?.ok) setErrorBanner(res?.error || "Changement refusé.");
+        if (!res?.ok) setErrorBanner(res?.error || "Changement refuse.");
       });
     },
     [socket]
@@ -556,7 +625,8 @@ export default function App() {
     if (me) setRole(me.role);
   }, [rolesReveal, sessionId]);
 
-  // Afficher la modal de reconnexion si necessaire
+  const currentRoomCode = rolesReveal?.code || lobby?.code || gameState?.code || "";
+
   const reconnectModal = (
     <ReconnectModal
       isReconnecting={isReconnecting}
@@ -566,36 +636,32 @@ export default function App() {
     />
   );
 
+  // Entry screen
   if (stage === "entry") {
     return (
-      <div className="flex min-h-full flex-col p-4 pb-8">
+      <div className="flex min-h-full flex-col bg-slate-50 p-4 pb-8 dark:bg-slate-950">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
-        <header className="mb-4 flex items-start justify-between gap-3 pt-2">
+        
+        <header className="mb-6 flex items-start justify-between gap-3 pt-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               Chase GPS
             </h1>
             <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
-              Les <strong>chats</strong> traquent les <strong>joueurs</strong>{" "}
-              sur une carte. Crée une salle et partage le code, ou rejoins-en
-              une avec le code reçu.
+              Les <strong className="text-slate-800 dark:text-slate-200">chats</strong> traquent les{" "}
+              <strong className="text-slate-800 dark:text-slate-200">joueurs</strong> sur une carte.
             </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Socket : {connected ? "connecté" : "connexion…"}
+            <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+              <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+              {connected ? "Connecte" : "Connexion..."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            title="Thème"
-          >
-            {theme === "dark" ? "Mode clair" : "Mode sombre"}
-          </button>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </header>
 
         {errorBanner && (
-          <div className="mb-4 rounded-xl bg-red-100 p-3 text-sm text-red-900 ring-1 ring-red-300 dark:bg-red-950/90 dark:text-red-100 dark:ring-red-800">
+          <div className="mb-4 rounded-xl bg-red-100 p-3 text-sm text-red-900 ring-1 ring-red-200 dark:bg-red-950/80 dark:text-red-100 dark:ring-red-900">
             {errorBanner}
           </div>
         )}
@@ -607,13 +673,13 @@ export default function App() {
               setEntryMode("create");
               setErrorBanner(null);
             }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold ${
+            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
               entryMode === "create"
                 ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
                 : "text-slate-600 dark:text-slate-400"
             }`}
           >
-            Créer une partie
+            Creer une partie
           </button>
           <button
             type="button"
@@ -621,7 +687,7 @@ export default function App() {
               setEntryMode("join");
               setErrorBanner(null);
             }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold ${
+            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
               entryMode === "join"
                 ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
                 : "text-slate-600 dark:text-slate-400"
@@ -663,63 +729,101 @@ export default function App() {
           <button
             type="button"
             onClick={onCreate}
-            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white active:bg-indigo-700"
+            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
           >
-            Créer ma partie
+            Creer ma partie
           </button>
         ) : (
           <button
             type="button"
             onClick={onJoin}
-            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white active:bg-indigo-700"
+            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
           >
             Rejoindre la partie
           </button>
+        )}
+
+        {/* Game history section */}
+        {gameHistory.length > 0 && (
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex w-full items-center justify-between rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              <span>Historique des parties ({gameHistory.length})</span>
+              <svg
+                className={`h-4 w-4 transition-transform ${showHistory ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showHistory && (
+              <div className="mt-2 space-y-2">
+                {gameHistory.map((game) => (
+                  <div
+                    key={game.id}
+                    className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                        {game.code}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {new Date(game.date).toLocaleDateString("fr-FR")}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      {game.players} joueurs - {Math.floor(game.duration / 60000)} min
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
   }
 
+  // Lobby screen
   if (stage === "lobby" && lobby) {
     return (
-      <div className="flex min-h-full flex-col p-4 text-slate-900 dark:text-slate-100">
+      <div className="flex min-h-full flex-col bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
+        
         <header className="mb-4 flex shrink-0 items-start justify-between gap-2">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-500">
-              Salle
-            </p>
-            <p className="text-3xl font-mono font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
+            <p className="text-xs uppercase tracking-wide text-slate-500">Salle</p>
+            <p className="font-mono text-3xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
               {lobby.code}
             </p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              {isHost ? "Vous êtes l'hôte (admin)" : "En attente de l'hôte"}
+              {isHost ? "Vous etes l'hote (admin)" : "En attente de l'hote"}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-[10px] font-bold dark:border-slate-600 dark:bg-slate-800"
-          >
-            {theme === "dark" ? "Clair" : "Sombre"}
-          </button>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </header>
 
         {errorBanner && (
-          <div className="mb-3 rounded-xl bg-red-950/90 p-3 text-sm text-red-100">
+          <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
             {errorBanner}
           </div>
         )}
 
         {geoError && (
-          <div className="mb-3 rounded-xl bg-amber-950/90 p-3 text-sm text-amber-100">
+          <div className="mb-3 rounded-xl bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-950/80 dark:text-amber-100">
             {geoError.message}
           </div>
         )}
 
         {!geoError && !position && (
-          <div className="mb-3 rounded-xl bg-slate-800 p-3 text-sm text-slate-300">
-            Recherche du signal GPS… Autorisez la position.
+          <div className="mb-3 rounded-xl bg-slate-200 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            Recherche du signal GPS... Autorisez la position.
           </div>
         )}
 
@@ -735,7 +839,7 @@ export default function App() {
               >
                 <span>{p.nickname}</span>
                 {p.sessionId === sessionId && (
-                  <span className="text-xs text-indigo-400">vous</span>
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400">vous</span>
                 )}
               </li>
             ))}
@@ -745,10 +849,10 @@ export default function App() {
         {isHost && (
           <div className="mb-4 space-y-4 rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-900/80 dark:ring-slate-700">
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Paramètres
+              Parametres
             </h2>
             <div>
-              <label className="text-xs text-slate-500">
+              <label className="text-xs text-slate-600 dark:text-slate-400">
                 Rayon zone (m) : {settings.globalRadiusM}
               </label>
               <input
@@ -760,11 +864,11 @@ export default function App() {
                 onChange={(e) =>
                   pushSettings({ globalRadiusM: Number(e.target.value) })
                 }
-                className="mt-1 w-full"
+                className="mt-1 w-full accent-indigo-600"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500">
+              <label className="text-xs text-slate-600 dark:text-slate-400">
                 Rayon brouillage (m) : {settings.jamRadiusM}
               </label>
               <input
@@ -776,11 +880,11 @@ export default function App() {
                 onChange={(e) =>
                   pushSettings({ jamRadiusM: Number(e.target.value) })
                 }
-                className="mt-1 w-full"
+                className="mt-1 w-full accent-indigo-600"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500">
+              <label className="text-xs text-slate-600 dark:text-slate-400">
                 Nombre de chats : {settings.catCount}
               </label>
               <input
@@ -795,12 +899,12 @@ export default function App() {
                 onChange={(e) =>
                   pushSettings({ catCount: Number(e.target.value) })
                 }
-                className="mt-1 w-full"
+                className="mt-1 w-full accent-indigo-600"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 dark:text-slate-500">
-                Délai carte chats (min) : {settings.catDelayMinutes ?? 5}{" "}
+              <label className="text-xs text-slate-600 dark:text-slate-400">
+                Delai carte chats (min) : {settings.catDelayMinutes ?? 5}{" "}
                 <span className="text-slate-400">(0 = pas d&apos;attente)</span>
               </label>
               <input
@@ -812,28 +916,29 @@ export default function App() {
                 onChange={(e) =>
                   pushSettings({ catDelayMinutes: Number(e.target.value) })
                 }
-                className="mt-1 w-full"
+                className="mt-1 w-full accent-indigo-600"
               />
             </div>
 
             <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
               <p className="mb-2 text-xs font-bold uppercase text-slate-500">
-                Options avancées
+                Options avancees
               </p>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input
                   type="checkbox"
                   checked={!!settings.shrinkZoneEnabled}
                   onChange={(e) =>
                     pushSettings({ shrinkZoneEnabled: e.target.checked })
                   }
+                  className="accent-indigo-600"
                 />
-                Zone globale qui rétrécit dans le temps
+                Zone globale qui retrecit dans le temps
               </label>
               {settings.shrinkZoneEnabled && (
                 <div className="mt-2 space-y-2 pl-6">
-                  <label className="text-xs text-slate-500">
-                    Durée jusqu&apos;au rayon min (min) :{" "}
+                  <label className="text-xs text-slate-600 dark:text-slate-400">
+                    Duree jusqu&apos;au rayon min (min) :{" "}
                     {settings.shrinkDurationMinutes ?? 15}
                   </label>
                   <input
@@ -847,9 +952,9 @@ export default function App() {
                         shrinkDurationMinutes: Number(e.target.value),
                       })
                     }
-                    className="w-full"
+                    className="w-full accent-indigo-600"
                   />
-                  <label className="text-xs text-slate-500">
+                  <label className="text-xs text-slate-600 dark:text-slate-400">
                     Rayon minimum (m) : {settings.shrinkMinRadiusM ?? 100}
                   </label>
                   <input
@@ -863,24 +968,25 @@ export default function App() {
                         shrinkMinRadiusM: Number(e.target.value),
                       })
                     }
-                    className="w-full"
+                    className="w-full accent-indigo-600"
                   />
                 </div>
               )}
 
-              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input
                   type="checkbox"
                   checked={!!settings.timeLimitEnabled}
                   onChange={(e) =>
                     pushSettings({ timeLimitEnabled: e.target.checked })
                   }
+                  className="accent-indigo-600"
                 />
-                Limite de durée de partie
+                Limite de duree de partie
               </label>
               {settings.timeLimitEnabled && (
                 <div className="mt-2 pl-6">
-                  <label className="text-xs text-slate-500">
+                  <label className="text-xs text-slate-600 dark:text-slate-400">
                     Minutes max : {settings.timeLimitMinutes ?? 30}
                   </label>
                   <input
@@ -894,7 +1000,7 @@ export default function App() {
                         timeLimitMinutes: Number(e.target.value),
                       })
                     }
-                    className="w-full"
+                    className="w-full accent-indigo-600"
                   />
                 </div>
               )}
@@ -907,39 +1013,42 @@ export default function App() {
             type="button"
             onClick={onRevealRoles}
             disabled={!lobby.canStartGps || !lobby.canRevealRoles}
-            className="mt-auto w-full rounded-xl bg-emerald-600 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40 active:bg-emerald-700"
+            className="mt-auto w-full rounded-xl bg-emerald-600 py-4 text-base font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 hover:bg-emerald-700 active:bg-emerald-800"
           >
-            Révéler les rôles
+            Reveler les roles
           </button>
         )}
         {isHost && !lobby.canRevealRoles && (
-          <p className="mt-2 text-center text-xs text-amber-400">
+          <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
             Il faut au moins 2 joueurs dans la salle pour lancer la partie.
           </p>
         )}
         {isHost && lobby.canRevealRoles && !lobby.canStartGps && (
-          <p className="mt-2 text-center text-xs text-amber-400">
-            Au moins une position GPS est nécessaire pour le centre de la zone.
+          <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+            Au moins une position GPS est necessaire pour le centre de la zone.
           </p>
         )}
       </div>
     );
   }
 
+  // Role reveal screen
   if (stage === "role_reveal" && rolesReveal) {
     return (
-      <div className="flex min-h-full flex-col p-4">
+      <div className="flex min-h-full flex-col bg-slate-50 p-4 dark:bg-slate-950">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
+        
         <header className="mb-4">
-          <p className="font-mono text-xl text-indigo-400">{rolesReveal.code}</p>
-          <h1 className="text-xl font-bold text-white">Rôles de la partie</h1>
-          <p className="text-sm text-slate-400">
+          <p className="font-mono text-xl text-indigo-600 dark:text-indigo-400">{rolesReveal.code}</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Roles de la partie</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Tout le monde voit qui est chat ou joueur.
           </p>
         </header>
 
         {errorBanner && (
-          <div className="mb-3 rounded-xl bg-red-950/90 p-3 text-sm text-red-100">
+          <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
             {errorBanner}
           </div>
         )}
@@ -950,22 +1059,22 @@ export default function App() {
               key={p.sessionId}
               className={`rounded-xl p-4 ring-1 ${
                 p.sessionId === sessionId
-                  ? "bg-indigo-950/50 ring-indigo-600"
-                  : "bg-slate-900/80 ring-slate-700"
+                  ? "bg-indigo-50 ring-indigo-300 dark:bg-indigo-950/50 dark:ring-indigo-600"
+                  : "bg-white ring-slate-200 dark:bg-slate-900/80 dark:ring-slate-700"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-white">
+                <span className="font-medium text-slate-900 dark:text-white">
                   {p.nickname}
                   {p.sessionId === sessionId ? (
-                    <span className="ml-2 text-xs text-indigo-400">(vous)</span>
+                    <span className="ml-2 text-xs text-indigo-600 dark:text-indigo-400">(vous)</span>
                   ) : null}
                 </span>
                 <span
                   className={
                     p.role === "cat"
-                      ? "text-orange-400"
-                      : "text-sky-400"
+                      ? "font-semibold text-orange-600 dark:text-orange-400"
+                      : "font-semibold text-sky-600 dark:text-sky-400"
                   }
                 >
                   {p.role === "cat" ? "Chat" : "Joueur"}
@@ -975,21 +1084,21 @@ export default function App() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-white"
+                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     onClick={() => adminSetRole(p.sessionId, "cat")}
                   >
                     Forcer chat
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-white"
+                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
                     onClick={() => adminSetRole(p.sessionId, "player")}
                   >
                     Forcer joueur
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg bg-red-950 px-3 py-1.5 text-xs text-red-200"
+                    className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
                     onClick={() => adminKick(p.sessionId)}
                   >
                     Expulser
@@ -1005,13 +1114,13 @@ export default function App() {
             type="button"
             onClick={onBeginHunt}
             disabled={(rolesReveal?.players?.length ?? 0) < 2}
-            className="w-full rounded-xl bg-orange-600 py-4 text-base font-semibold text-white disabled:opacity-40 active:bg-orange-700"
+            className="w-full rounded-xl bg-orange-600 py-4 text-base font-semibold text-white disabled:opacity-40 hover:bg-orange-700 active:bg-orange-800"
           >
-            Démarrer la chasse
+            Demarrer la chasse
           </button>
         ) : (
           <p className="text-center text-sm text-slate-500">
-            En attente du démarrage par l&apos;hôte…
+            En attente du demarrage par l&apos;hote...
           </p>
         )}
       </div>
@@ -1020,19 +1129,27 @@ export default function App() {
 
   if (stage === "game" && !gameState) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 p-6">
-        <p className="text-slate-400">Synchronisation…</p>
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-slate-50 p-6 dark:bg-slate-950">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+        <p className="text-slate-600 dark:text-slate-400">Synchronisation...</p>
         {geoError && (
-          <p className="text-center text-sm text-amber-400">{geoError.message}</p>
+          <p className="text-center text-sm text-amber-600 dark:text-amber-400">{geoError.message}</p>
         )}
       </div>
     );
   }
 
   if (stage === "summary" && summary) {
-    return <GameSummary summary={summary} onLeave={resetToEntry} />;
+    return (
+      <>
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        <GameSummary summary={summary} onLeave={resetToEntry} />
+      </>
+    );
   }
 
+  // Game screen
   if (stage === "game" && gameState) {
     const me = gameState.me;
     const isPrey =
@@ -1042,63 +1159,47 @@ export default function App() {
     const showMapTab = !catLocked || me?.role !== "cat" || me?.spectator;
 
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-950">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
-        {toast && (
-          <div className="absolute left-1/2 top-2 z-[1500] mt-2 w-[90%] max-w-sm -translate-x-1/2 rounded-xl bg-emerald-800 px-4 py-3 text-center text-sm text-white shadow-lg">
-            {toast}
-          </div>
-        )}
 
-        <header className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-          <div className="min-w-0 pl-1">
-            <p className="truncate font-mono text-sm text-indigo-600 dark:text-indigo-400">
-              {rolesReveal?.code || lobby?.code || gameState.code}
-            </p>
-            <p className="flex flex-wrap items-center gap-x-1 text-xs text-slate-600 dark:text-slate-500">
-              <span>
+        {/* Header */}
+        <header className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="truncate font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                {currentRoomCode}
+              </p>
+              {gameState.timeLimitEndsAt && (
+                <GameTimer endsAt={gameState.timeLimitEndsAt} />
+              )}
+            </div>
+            <p className="flex flex-wrap items-center gap-x-1 text-xs text-slate-600 dark:text-slate-400">
+              <span className={role === "cat" ? "text-orange-600 dark:text-orange-400" : "text-sky-600 dark:text-sky-400"}>
                 {roleLabel}
-                {me?.spectator ? " · Spectateur" : ""}
               </span>
-              {gameState.timeLimitEndsAt ? (
-                <>
-                  <span>·</span>
-                  <HuntTimeLeft endsAt={gameState.timeLimitEndsAt} />
-                </>
-              ) : null}
-              {gameState.settings?.shrinkZoneEnabled ? (
-                <span className="text-[10px] text-violet-600 dark:text-violet-400">
-                  · zone rétrécit
+              {me?.spectator && <span>- Spectateur</span>}
+              {gameState.settings?.shrinkZoneEnabled && (
+                <span className="text-violet-600 dark:text-violet-400">
+                  - Zone retrecit
                 </span>
-              ) : null}
+              )}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="rounded-lg border border-slate-300 bg-slate-100 px-2 py-1.5 text-xs dark:border-slate-600 dark:bg-slate-800"
-              title="Thème"
-            >
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
             {isHost && (
               <button
                 type="button"
                 onClick={() => setAdminOpen(true)}
-                className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 dark:bg-slate-800 dark:text-amber-200"
+                className="rounded-xl bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
               >
                 Admin
               </button>
             )}
             {!connected && (
-              <span className="text-[10px] text-red-500 animate-pulse">
+              <span className="animate-pulse text-xs text-red-500">
                 Deconnecte
-              </span>
-            )}
-            {geoError && (
-              <span className="max-w-[100px] text-right text-[10px] text-amber-600 dark:text-amber-400">
-                GPS
               </span>
             )}
           </div>
@@ -1117,15 +1218,16 @@ export default function App() {
           </div>
         )}
 
+        {/* Tabs */}
         <div className="flex shrink-0 border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90">
           <button
             type="button"
             disabled={!showMapTab}
             onClick={() => setGameTab("map")}
-            className={`flex-1 py-3 text-sm font-semibold ${
+            className={`flex-1 py-3 text-sm font-semibold transition-colors ${
               gameTab === "map" && showMapTab
-                ? "border-b-2 border-indigo-500 text-indigo-700 dark:text-white"
-                : "text-slate-500 dark:text-slate-500"
+                ? "border-b-2 border-indigo-500 text-indigo-700 dark:text-indigo-300"
+                : "text-slate-500"
             } disabled:opacity-40`}
           >
             Carte
@@ -1133,39 +1235,58 @@ export default function App() {
           <button
             type="button"
             onClick={() => setGameTab("players")}
-            className={`flex-1 py-3 text-sm font-semibold ${
+            className={`flex-1 py-3 text-sm font-semibold transition-colors ${
               gameTab === "players"
-                ? "border-b-2 border-indigo-500 text-indigo-700 dark:text-white"
-                : "text-slate-500 dark:text-slate-500"
+                ? "border-b-2 border-indigo-500 text-indigo-700 dark:text-indigo-300"
+                : "text-slate-500"
             }`}
           >
             Joueurs
           </button>
         </div>
 
-        <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-950">
+        {/* Content */}
+        <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-900">
+          {/* Players tab */}
           {gameTab === "players" && (
             <div className="h-full overflow-auto p-4">
-              <h2 className="mb-3 text-sm font-semibold text-slate-400">
+              <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 Participants
               </h2>
               <ul className="space-y-3">
                 {rosterList.map((p) => (
                   <li
                     key={p.sessionId}
-                    className="rounded-xl bg-slate-900/90 p-3 ring-1 ring-slate-700"
+                    onClick={() => setSelectedPlayer({
+                      ...p,
+                      lastLocation: gameState.allies?.find(a => a.sessionId === p.sessionId) 
+                        || gameState.preyForCat?.find(pr => pr.sessionId === p.sessionId)
+                    })}
+                    className="cursor-pointer rounded-xl bg-white p-4 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 dark:bg-slate-800 dark:ring-slate-700 dark:hover:bg-slate-700"
                   >
                     <div className="flex justify-between gap-2">
-                      <span className="font-medium text-white">
+                      <span className="font-medium text-slate-900 dark:text-white">
                         {p.nickname}
-                        {p.sessionId === sessionId ? (
-                          <span className="ml-1 text-xs text-indigo-400">
+                        {p.sessionId === sessionId && (
+                          <span className="ml-1 text-xs text-indigo-600 dark:text-indigo-400">
                             (vous)
                           </span>
-                        ) : null}
+                        )}
+                        {p.disconnected && (
+                          <span className="ml-1 text-xs text-red-500">
+                            (deconnecte)
+                          </span>
+                        )}
                       </span>
+                      <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
-                    <p className="mt-1 text-sm text-slate-300">
+                    <p className={`mt-1 text-sm ${
+                      p.role === "cat" 
+                        ? "text-orange-600 dark:text-orange-400" 
+                        : "text-sky-600 dark:text-sky-400"
+                    }`}>
                       {roleBadgeText(p)}
                     </p>
                   </li>
@@ -1173,57 +1294,65 @@ export default function App() {
               </ul>
             </div>
           )}
+
+          {/* Cat locked map */}
           {gameTab === "map" && catLocked && isCat && (
             <CatMapLockOverlay
               mapUnlockAt={gameState.mapUnlockAt}
               socket={socket}
             />
           )}
+
+          {/* Map tab */}
           {gameTab === "map" && !(catLocked && isCat) && (
             <div className="relative h-full w-full">
-              <div className="pointer-events-none absolute left-2 top-2 z-[1000] flex max-w-[min(100%-1rem,280px)] flex-col gap-2">
-                <div className="pointer-events-auto flex max-h-32 flex-wrap gap-1 overflow-y-auto rounded-lg bg-slate-900/95 p-1.5 shadow-lg ring-1 ring-slate-600">
-                  {Object.entries(BASEMAPS).map(([id, b]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setMapBasemap(id)}
-                      className={`rounded-md px-2 py-1 text-[10px] font-semibold ${
-                        mapBasemap === id
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-800 text-slate-300"
-                      }`}
-                    >
-                      {b.name}
-                    </button>
-                  ))}
+              {/* Zone phase indicator */}
+              {gameState.settings?.shrinkZoneEnabled && (
+                <div className="pointer-events-none absolute left-3 top-3 z-[1000]">
+                  <ZonePhaseIndicator
+                    currentRadius={gameState.effectiveGlobalRadiusM}
+                    nextRadius={gameState.nextPhaseRadiusM}
+                    phaseEndsAt={gameState.phaseEndsAt}
+                    totalPhases={gameState.totalPhases || 5}
+                    currentPhase={gameState.currentPhase || 1}
+                  />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setRecenterTick((n) => n + 1)}
-                  className="pointer-events-auto rounded-lg bg-slate-900/95 px-3 py-2 text-xs font-bold text-white shadow-lg ring-1 ring-slate-600"
-                >
-                  Centrer sur moi
-                </button>
-              </div>
+              )}
+
+              {/* Map controls */}
+              <MapControls
+                basemapId={mapBasemap}
+                onBasemapChange={setMapBasemap}
+                onRecenter={() => setRecenterTick((n) => n + 1)}
+                onZoomIn={() => setZoomInTick((n) => n + 1)}
+                onZoomOut={() => setZoomOutTick((n) => n + 1)}
+              />
+
               <GameMap
                 gameState={gameState}
                 role={role}
                 mySessionId={sessionId}
                 basemapId={mapBasemap}
                 recenterTick={recenterTick}
+                zoomInTick={zoomInTick}
+                zoomOutTick={zoomOutTick}
+                mapRef={mapRef}
               />
             </div>
           )}
         </div>
 
-        <footer className="z-10 flex shrink-0 gap-2 border-t border-slate-800 bg-slate-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        {/* Footer */}
+        <footer className="z-10 flex shrink-0 gap-2 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           {isPrey && (
             <button
               type="button"
               onClick={() => setShowQr(true)}
-              className="flex-1 rounded-xl bg-slate-800 py-4 text-base font-semibold text-white active:bg-slate-700"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-200 py-4 text-base font-semibold text-slate-800 transition-colors hover:bg-slate-300 active:bg-slate-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
             >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
               Mon QR
             </button>
           )}
@@ -1234,13 +1363,18 @@ export default function App() {
                 setErrorBanner(null);
                 setShowScan(true);
               }}
-              className="flex-1 rounded-xl bg-orange-600 py-4 text-base font-semibold text-white active:bg-orange-700"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 py-4 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:bg-orange-800"
             >
-              J&apos;ai trouvé un joueur
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              J&apos;ai trouve un joueur
             </button>
           )}
         </footer>
 
+        {/* Modals */}
         {showQr && (
           <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />
         )}
@@ -1250,7 +1384,15 @@ export default function App() {
             onClose={() => setShowScan(false)}
           />
         )}
+        {selectedPlayer && (
+          <PlayerSheet
+            player={selectedPlayer}
+            roomCode={currentRoomCode}
+            onClose={() => setSelectedPlayer(null)}
+          />
+        )}
 
+        {/* Admin panel */}
         {adminOpen && (
           <div
             className="fixed inset-0 z-[1900] flex items-end justify-center bg-black/60 sm:items-center"
@@ -1258,42 +1400,42 @@ export default function App() {
             aria-modal="true"
             aria-label="Panneau admin"
           >
-            <div className="max-h-[85vh] w-full max-w-md overflow-auto rounded-t-2xl bg-slate-900 p-4 shadow-xl ring-1 ring-slate-700 sm:rounded-2xl">
+            <div className="max-h-[85vh] w-full max-w-md overflow-auto rounded-t-2xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:rounded-2xl">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white">Admin</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Admin</h2>
                 <button
                   type="button"
-                  className="text-slate-400"
+                  className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   onClick={() => setAdminOpen(false)}
                 >
                   Fermer
                 </button>
               </div>
               <p className="mb-3 text-xs text-slate-500">
-                Expulser ou changer le rôle (visible par tout le monde).
+                Expulser ou changer le role (visible par tout le monde).
               </p>
               <button
                 type="button"
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Terminer la partie pour tout le monde et afficher le récapitulatif ?"
+                      "Terminer la partie pour tout le monde et afficher le recapitulatif ?"
                     )
                   ) {
                     adminEndGame();
                   }
                 }}
-                className="mb-4 w-full rounded-xl border border-red-800 bg-red-950/80 py-3 text-sm font-semibold text-red-100"
+                className="mb-4 w-full rounded-xl border border-red-300 bg-red-50 py-3 text-sm font-semibold text-red-700 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
               >
-                Fermer la partie (récap pour tous)
+                Fermer la partie (recap pour tous)
               </button>
               <ul className="space-y-3">
                 {rosterList.map((p) => (
                   <li
                     key={p.sessionId}
-                    className="rounded-xl bg-slate-950 p-3 ring-1 ring-slate-800"
+                    className="rounded-xl bg-slate-100 p-3 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
                   >
-                    <div className="font-medium text-white">
+                    <div className="font-medium text-slate-900 dark:text-white">
                       {p.nickname}
                       {p.sessionId === sessionId ? " (vous)" : ""}
                     </div>
@@ -1304,21 +1446,21 @@ export default function App() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          className="rounded-lg bg-orange-900/60 px-2 py-1.5 text-xs text-orange-100"
+                          className="rounded-lg bg-orange-100 px-2 py-1.5 text-xs font-medium text-orange-700 dark:bg-orange-900/60 dark:text-orange-100"
                           onClick={() => adminSetRole(p.sessionId, "cat")}
                         >
                           Chat
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg bg-sky-900/60 px-2 py-1.5 text-xs text-sky-100"
+                          className="rounded-lg bg-sky-100 px-2 py-1.5 text-xs font-medium text-sky-700 dark:bg-sky-900/60 dark:text-sky-100"
                           onClick={() => adminSetRole(p.sessionId, "player")}
                         >
                           Joueur
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg bg-red-950 px-2 py-1.5 text-xs text-red-200"
+                          className="rounded-lg bg-red-100 px-2 py-1.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
                           onClick={() => adminKick(p.sessionId)}
                         >
                           Expulser
@@ -1336,8 +1478,8 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6 text-slate-400">
-      Chargement…
+    <div className="flex min-h-full items-center justify-center bg-slate-50 p-6 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
     </div>
   );
 }
