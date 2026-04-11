@@ -1,0 +1,31 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+.map-pin.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.self-player-ring {
+  animation: self-ring-spin 12s linear infinite;
+}
+
+@keyframes self-ring-spin {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
