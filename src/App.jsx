@@ -6,9 +6,7 @@ import GameMap from "./components/game/GameMap.jsx";
 import GameSummary from "./components/summary/GameSummary.jsx";
 import QRModal from "./components/game/QRModal.jsx";
 import ScannerModal from "./components/game/ScannerModal.jsx";
-import MapControls from "./components/game/MapControls.jsx";
-import PlayerBottomSheet from "./components/game/PlayerBottomSheet.jsx";
-import Toast, { useToasts } from "./components/ui/Toast.jsx";
+import { BASEMAPS } from "./lib/map/basemaps.js";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
@@ -49,25 +47,6 @@ function clearSession() {
     localStorage.removeItem(LS_NICKNAME_KEY);
   } catch (e) {
     console.warn("localStorage non disponible:", e);
-  }
-}
-
-function getUrlRoomCode() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("code") || "";
-  } catch {
-    return "";
-  }
-}
-
-function clearUrlCode() {
-  try {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("code");
-    window.history.replaceState({}, "", url.pathname);
-  } catch {
-    // Ignore
   }
 }
 
@@ -180,11 +159,7 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
-  const { toasts, addToast, removeToast } = useToasts();
-  const [entryMode, setEntryMode] = useState(() => {
-    // If URL has code, default to join mode
-    return getUrlRoomCode() ? "join" : "create";
-  });
+  const [entryMode, setEntryMode] = useState("create");
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [stage, setStage] = useState("entry");
@@ -192,8 +167,7 @@ export default function App() {
     const saved = loadSession();
     return saved?.nickname || "";
   });
-  const [roomCodeInput, setRoomCodeInput] = useState(() => getUrlRoomCode());
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [roomCodeInput, setRoomCodeInput] = useState("");
   const [sessionId, setSessionId] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [lobby, setLobby] = useState(null);
