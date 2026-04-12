@@ -1744,7 +1744,7 @@ export default function App() {
           )}
         </div>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-[800] flex gap-0.5 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+        <nav className="fixed bottom-[68px] left-0 right-0 z-[800] flex gap-0.5 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
           {tabBtn("map", "Carte", !showMapTab, "bottom")}
           {tabBtn("players", "Joueurs", false, "bottom")}
           {isHost && tabBtn("admin", "Admin", false, "bottom")}
