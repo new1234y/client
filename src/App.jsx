@@ -13,6 +13,8 @@ import SharePartyModal from "./components/game/SharePartyModal.jsx";
 import GameTimer from "./components/game/GameTimer.jsx";
 import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
+import ConfigHint from "./components/ui/ConfigHint.jsx";
+import PartyDiscussionChrome from "./components/game/PartyDiscussionChrome.jsx";
 import { BASEMAPS } from "./lib/map/basemaps.js";
 
 const SOCKET_URL =
@@ -118,7 +120,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError 
   );
 }
 
-function CatMapLockOverlay({ mapUnlockAt, socket, sessionId }) {
+function CatMapLockOverlay({ mapUnlockAt, socket }) {
   const [secLeft, setSecLeft] = useState(0);
   const didRefresh = useRef(false);
 
@@ -154,24 +156,45 @@ function CatMapLockOverlay({ mapUnlockAt, socket, sessionId }) {
           {mm}:{String(ss).padStart(2, "0")}
         </p>
         <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
-          La carte s’ouvre automatiquement à la fin du délai.
-        </p>
-        <div className="mt-6 flex justify-center">
-          <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-600">
-            {sessionId ? (
-              <QRCodeSVG value={sessionId} size={120} level="M" />
-            ) : (
-              <div className="flex h-[120px] w-[120px] items-center justify-center text-slate-400">
-                …
-              </div>
-            )}
-          </div>
-        </div>
-        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-          Gardez ce QR pour une capture rapide une fois la carte active.
+          La carte s’ouvre automatiquement à la fin du délai. Vous pouvez consulter
+          l’onglet Joueurs : le compte à rebours reste visible en haut de l’écran.
         </p>
       </div>
     </div>
+  );
+}
+
+/** Compte à rebours verrouillage carte chat — visible sur tous les onglets */
+function CatLockCountdownHeader({ mapUnlockAt, socket }) {
+  const [secLeft, setSecLeft] = useState(0);
+  const didRefresh = useRef(false);
+
+  useEffect(() => {
+    didRefresh.current = false;
+  }, [mapUnlockAt]);
+
+  useEffect(() => {
+    if (!mapUnlockAt) return;
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((mapUnlockAt - Date.now()) / 1000));
+      setSecLeft(s);
+      if (s <= 0 && !didRefresh.current) {
+        didRefresh.current = true;
+        socket?.emit("refresh_state");
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [mapUnlockAt, socket]);
+
+  const mm = Math.floor(secLeft / 60);
+  const ss = secLeft % 60;
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-1 text-xs font-bold tabular-nums text-orange-800 ring-1 ring-orange-200 dark:bg-orange-950/80 dark:text-orange-100 dark:ring-orange-800">
+      Carte · {mm}:{String(ss).padStart(2, "0")}
+    </span>
   );
 }
 
@@ -234,21 +257,46 @@ export default function App() {
   const [reconnectError, setReconnectError] = useState(null);
   const [midJoinWait, setMidJoinWait] = useState(null);
   const [joinRequestQueue, setJoinRequestQueue] = useState([]);
+  const [partyChatMessages, setPartyChatMessages] = useState([]);
+  const [discussionMobileOpen, setDiscussionMobileOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 768px)").matches
+      : false
+  );
   const [showShareParty, setShowShareParty] = useState(false);
   const [recapSlug, setRecapSlug] = useState(() => getRecapIdFromPath());
   const [recapData, setRecapData] = useState(null);
   const [recapErr, setRecapErr] = useState(false);
   const [recapLoading, setRecapLoading] = useState(() => Boolean(getRecapIdFromPath()));
   const lastNicknameRef = useRef("");
+  const sessionIdRef = useRef(null);
+  const isHostRef = useRef(false);
   const reconnectTimeoutRef = useRef(null);
   const lastPingRef = useRef(Date.now());
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
   stageRef.current = stage;
+  sessionIdRef.current = sessionId;
+  isHostRef.current = isHost;
 
   useEffect(() => {
     setShowShareParty(false);
+    setDiscussionMobileOpen(false);
   }, [stage]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const fn = () => setIsDesktop(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+
+  /** Carte tuiles : suit le thème clair / sombre pendant la partie */
+  useEffect(() => {
+    if (stage !== "game") return;
+    setMapBasemap(theme === "dark" ? "dark" : "light");
+  }, [theme, stage]);
 
   // Auto-switch to join mode if URL has code
   useEffect(() => {
@@ -288,6 +336,7 @@ export default function App() {
     setReconnectError(null);
     setMidJoinWait(null);
     setJoinRequestQueue([]);
+    setPartyChatMessages([]);
     setShowShareParty(false);
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -318,12 +367,15 @@ export default function App() {
         
         if (res.phase === "lobby" && res.lobby) {
           setLobby(res.lobby);
+          if (res.lobby.partyChat) setPartyChatMessages(res.lobby.partyChat);
           setStage("lobby");
         } else if (res.phase === "role_reveal" && res.rolesReveal) {
           setRolesReveal(res.rolesReveal);
+          if (res.rolesReveal.partyChat) setPartyChatMessages(res.rolesReveal.partyChat);
           setStage("role_reveal");
         } else if (res.phase === "playing" && res.gameState) {
           setGameState(res.gameState);
+          if (res.gameState.partyChat) setPartyChatMessages(res.gameState.partyChat);
           setRole(res.gameState.me?.role ?? null);
           setStage("game");
         } else if (res.phase === "finished") {
@@ -333,7 +385,12 @@ export default function App() {
       } else {
         setReconnectError(res?.error || "Echec de reconnexion");
         
-        if (res?.error?.includes("expiree") || res?.error?.includes("n'existe plus")) {
+        if (
+          res?.error?.includes("expir") ||
+          res?.error?.includes("n'existe plus") ||
+          res?.error?.includes("n'existe") ||
+          res?.error?.includes("termin")
+        ) {
           clearSession();
           setIsReconnecting(false);
           resetToEntry(false);
@@ -367,16 +424,17 @@ export default function App() {
       lastPingRef.current = Date.now();
       
       const saved = loadSession();
-      if (saved && stageRef.current === "entry") {
+      if (!saved || stageRef.current === "summary") return;
+      if (stageRef.current === "entry") {
         setIsReconnecting(true);
-        attemptReconnect(s);
       }
+      attemptReconnect(s);
     });
 
     s.on("disconnect", () => {
       setConnected(false);
       
-      if (stageRef.current !== "entry" && stageRef.current !== "summary") {
+      if (stageRef.current === "game") {
         setIsReconnecting(true);
       }
     });
@@ -389,12 +447,14 @@ export default function App() {
     s.on("lobby_update", (payload) => {
       setIsReconnecting(false);
       setLobby(payload);
+      if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "lobby") setStage("lobby");
     });
 
     s.on("roles_reveal", (payload) => {
       setIsReconnecting(false);
       setRolesReveal(payload);
+      if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       setStage("role_reveal");
     });
 
@@ -402,6 +462,7 @@ export default function App() {
       setIsReconnecting(false);
       setGameState(payload);
       setRole(payload.me?.role ?? null);
+      if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "playing") setStage("game");
     });
 
@@ -442,7 +503,30 @@ export default function App() {
       addNotification(`${data.nickname} s'est reconnecte`, "success");
     });
 
+    s.on("party_chat", (m) => {
+      setPartyChatMessages((prev) => {
+        if (prev.some((x) => x.id === m.id)) return prev;
+        return [...prev, m].slice(-120);
+      });
+      if (m.sessionId && m.sessionId !== sessionIdRef.current) {
+        const preview =
+          m.type === "image"
+            ? "a partagé une photo"
+            : m.type === "location"
+              ? "a partagé sa position"
+              : m.text
+                ? String(m.text).slice(0, 72) + (String(m.text).length > 72 ? "…" : "")
+                : "nouveau message";
+        addNotification(`Discussion · ${m.nickname} : ${preview}`, "info", 4500);
+      }
+    });
+
     s.on("join_request_pending", (data) => {
+      if (data?.hostSessionId) {
+        if (data.hostSessionId !== sessionIdRef.current) return;
+      } else if (!isHostRef.current) {
+        return;
+      }
       setJoinRequestQueue((q) => [
         ...q,
         {
@@ -471,6 +555,9 @@ export default function App() {
         setGameState(payload.gameState);
         setRole(payload.gameState.me?.role ?? null);
       }
+      if (payload.gameState?.partyChat) setPartyChatMessages(payload.gameState.partyChat);
+      else if (payload.rolesReveal?.partyChat) setPartyChatMessages(payload.rolesReveal.partyChat);
+      else if (payload.lobby?.partyChat) setPartyChatMessages(payload.lobby.partyChat);
       if (payload.phase === "role_reveal") {
         setStage("role_reveal");
       } else if (payload.phase === "playing") {
@@ -495,9 +582,6 @@ export default function App() {
       if (document.visibilityState === "visible") {
         if (!s.connected) {
           s.connect();
-        } else if (Date.now() - lastPingRef.current > 60000) {
-          s.disconnect();
-          s.connect();
         } else {
           s.emit("refresh_state");
         }
@@ -507,11 +591,10 @@ export default function App() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const heartbeatCheck = setInterval(() => {
-      if (s.connected && Date.now() - lastPingRef.current > 90000) {
-        s.disconnect();
-        s.connect();
+      if (s.connected && Date.now() - lastPingRef.current > 180000) {
+        s.emit("refresh_state");
       }
-    }, 30000);
+    }, 60000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -527,6 +610,10 @@ export default function App() {
   useEffect(() => {
     if (!isHost && gameTab === "admin") setGameTab("map");
   }, [isHost, gameTab]);
+
+  useEffect(() => {
+    if (gameTab === "party") setGameTab("map");
+  }, [gameTab]);
 
   useEffect(() => {
     if (!socket || !position) return;
@@ -551,6 +638,8 @@ export default function App() {
       cityDifficulty: "medium",
       timeLimitEnabled: false,
       timeLimitMinutes: 30,
+      catAssignmentMode: "random",
+      hostCatMapPreview: false,
     };
 
   const onCreate = useCallback(() => {
@@ -693,6 +782,16 @@ export default function App() {
     });
   }, [socket]);
 
+  const sendPartyChat = useCallback(
+    (msg) => {
+      if (!socket) return;
+      socket.emit("party_chat_send", msg, (res) => {
+        if (!res?.ok) setErrorBanner(res?.error || "Message refuse.");
+      });
+    },
+    [socket]
+  );
+
   const roleLabel = useMemo(() => {
     if (role === "cat") return "Chat";
     if (role === "player") return "Joueur";
@@ -713,6 +812,26 @@ export default function App() {
     }
     return [];
   }, [gameState?.roster, rolesReveal?.players]);
+
+  const geoChatImages = useMemo(
+    () =>
+      (partyChatMessages || [])
+        .filter(
+          (m) =>
+            m.type === "image" &&
+            m.image &&
+            m.lat != null &&
+            m.lng != null
+        )
+        .map((m) => ({
+          id: m.id,
+          lat: m.lat,
+          lng: m.lng,
+          image: m.image,
+          nickname: m.nickname,
+        })),
+    [partyChatMessages]
+  );
 
   useEffect(() => {
     if (!rolesReveal?.players || !sessionId) return;
@@ -932,11 +1051,12 @@ export default function App() {
   // Lobby screen
   if (stage === "lobby" && lobby) {
     return (
-      <div className="flex min-h-full flex-col bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="flex min-h-full flex-col bg-gradient-to-b from-slate-50 to-slate-100/90 text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-100">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
-        
-        <header className="mb-4 flex shrink-0 items-start justify-between gap-3">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:max-w-none">
+        <header className="flex shrink-0 items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Salle</p>
             <p className="font-mono text-3xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
@@ -1015,8 +1135,8 @@ export default function App() {
           </div>
         )}
 
-        <div className="mb-4 rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-900/80 dark:ring-slate-700">
-          <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <div className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-700">
+          <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
             Joueurs ({lobby.players?.length ?? 0})
           </h2>
           <ul className="space-y-2">
@@ -1025,7 +1145,14 @@ export default function App() {
                 key={p.sessionId}
                 className="flex items-center justify-between text-slate-800 dark:text-slate-200"
               >
-                <span>{p.nickname}</span>
+                <span>
+                  {p.nickname}
+                  {p.disconnected ? (
+                    <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                      (déconnecté)
+                    </span>
+                  ) : null}
+                </span>
                 {p.sessionId === sessionId && (
                   <span className="text-xs text-indigo-600 dark:text-indigo-400">vous</span>
                 )}
@@ -1035,11 +1162,15 @@ export default function App() {
         </div>
 
         {isHost && (
-          <div className="mb-4 space-y-4 rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-900/80 dark:ring-slate-700">
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Paramètres
-            </h2>
-
+          <div className="space-y-5 rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-700">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Configuration de la partie
+              </h2>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Règles visibles par tous une fois la chasse lancée. La discussion reste à droite (ordinateur) ou derrière le bouton bulle (téléphone).
+              </p>
+            </div>
             <CityZonePicker
               position={position}
               zoneMode={settings.zoneMode || "circle"}
@@ -1073,10 +1204,9 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  Brouillage, délai chat et limite de temps sont réglés par le
-                  niveau (pas de cercle global en mode ville).
-                </p>
+                <ConfigHint>
+                  Ajuste la règle de brouillage et le rythme du jeu en mode contours de ville (pas de grand cercle unique).
+                </ConfigHint>
               </div>
             )}
 
@@ -1097,6 +1227,9 @@ export default function App() {
                     }
                     className="mt-1 w-full accent-indigo-600"
                   />
+                  <ConfigHint>
+                    Taille du terrain autorisé autour du centre de partie. Hors de ce cercle, le jeu peut pénaliser ou masquer les positions.
+                  </ConfigHint>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-400">
@@ -1113,6 +1246,9 @@ export default function App() {
                     }
                     className="mt-1 w-full accent-indigo-600"
                   />
+                  <ConfigHint>
+                    Autour de chaque joueur, une zone où la position des autres est volontairement imprécise pour les chats.
+                  </ConfigHint>
                 </div>
                 <div>
                   <label className="text-xs text-slate-600 dark:text-slate-400">
@@ -1129,6 +1265,9 @@ export default function App() {
                     }
                     className="mt-1 w-full accent-indigo-600"
                   />
+                  <ConfigHint>
+                    Au début de la chasse, les chats ne voient pas tout de suite la carte complète : ce délai laisse aux joueurs le temps de s’éloigner.
+                  </ConfigHint>
                 </div>
               </>
             )}
@@ -1151,6 +1290,42 @@ export default function App() {
                 }
                 className="mt-1 w-full accent-indigo-600"
               />
+              <ConfigHint>
+                Combien de participants seront désignés comme chats (traqueurs) pour attraper les autres.
+              </ConfigHint>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-600 dark:bg-slate-800/80">
+              <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
+                Attribution des chats
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => pushSettings({ catAssignmentMode: "random" })}
+                  className={`rounded-xl py-2.5 text-xs font-bold ${
+                    (settings.catAssignmentMode || "random") === "random"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                  }`}
+                >
+                  Tirage aléatoire
+                </button>
+                <button
+                  type="button"
+                  onClick={() => pushSettings({ catAssignmentMode: "manual" })}
+                  className={`rounded-xl py-2.5 text-xs font-bold ${
+                    settings.catAssignmentMode === "manual"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                  }`}
+                >
+                  Choix par l&apos;hôte
+                </button>
+              </div>
+              <ConfigHint>
+                Aléatoire : le jeu tire les chats au hasard. Manuel : vous choisissez qui est chat ou joueur sur chaque ligne (sauf vous-même), puis vous lancez la chasse quand le nombre de chats correspond au curseur ci-dessus.
+              </ConfigHint>
             </div>
 
             {settings.zoneMode === "circle" && (
@@ -1171,6 +1346,9 @@ export default function App() {
                     className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
                   />
                 </label>
+                <ConfigHint>
+                  Le cercle autorisé se resserre par paliers jusqu’au rayon minimum, pour resserrer la partie sur la fin.
+                </ConfigHint>
                 {settings.shrinkZoneEnabled && (
                   <div className="mt-2 space-y-2 pl-1">
                     <label className="text-xs text-slate-600 dark:text-slate-400">
@@ -1236,6 +1414,9 @@ export default function App() {
                     className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
                   />
                 </label>
+                <ConfigHint>
+                  La partie s’arrête automatiquement quand le compte à rebours atteint zéro, avec récapitulatif pour tout le monde.
+                </ConfigHint>
                 {settings.timeLimitEnabled && (
                   <div className="mt-2 pl-1">
                     <label className="text-xs text-slate-600 dark:text-slate-400">
@@ -1281,6 +1462,19 @@ export default function App() {
             Au moins une position GPS est necessaire pour le centre de la zone.
           </p>
         )}
+          </main>
+          <PartyDiscussionChrome
+            desktop={isDesktop}
+            open={discussionMobileOpen}
+            onToggle={setDiscussionMobileOpen}
+            fabBottomClass="bottom-6"
+            messages={partyChatMessages}
+            sessionId={sessionId}
+            onSend={sendPartyChat}
+            position={position}
+            disabled={!socket}
+          />
+        </div>
       </div>
     );
   }
@@ -1288,7 +1482,7 @@ export default function App() {
   // Role reveal screen
   if (stage === "role_reveal" && rolesReveal) {
     return (
-      <div className="flex min-h-full flex-col bg-slate-50 p-4 dark:bg-slate-950">
+      <div className="flex min-h-full flex-col bg-gradient-to-b from-slate-50 to-slate-100/90 dark:from-slate-950 dark:to-slate-900">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
 
@@ -1300,22 +1494,26 @@ export default function App() {
           />
         )}
 
-        <header className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <header className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Avant la chasse</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Avant la chasse</p>
             <p className="font-mono text-2xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
               {rolesReveal.code}
             </p>
-            <h1 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">Rôles</h1>
-            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
-              Qui est chat, qui est joueur.
+            <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+              Attribution des rôles
+            </h1>
+            <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
+              Chaque participant voit son camp. En mode manuel, l&apos;hôte règle les autres joueurs uniquement — pas sa propre ligne.
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={() => setShowShareParty(true)}
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-md"
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
             >
               Partager
             </button>
@@ -1324,13 +1522,13 @@ export default function App() {
         </header>
 
         {errorBanner && (
-          <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
+          <div className="rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
             {errorBanner}
           </div>
         )}
 
         {isHost && joinRequestQueue.length > 0 && (
-          <div className="mb-3 space-y-2">
+          <div className="space-y-2">
             {joinRequestQueue.map((j) => (
               <div
                 key={j.requestId}
@@ -1360,56 +1558,81 @@ export default function App() {
           </div>
         )}
 
-        <ul className="mb-6 flex-1 space-y-3">
+        {(rolesReveal?.settings?.catAssignmentMode || "random") === "manual" && isHost && (
+          <div className="rounded-2xl border border-sky-200/80 bg-sky-50/90 p-4 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+            <p className="font-semibold">Mode manuel (hôte)</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              Pour chaque autre joueur, appuyez une fois sur <strong>Chat</strong> ou <strong>Joueur</strong> jusqu&apos;à obtenir exactement{" "}
+              {rolesReveal?.settings?.catCount ?? 1} chat(s), puis lancez la chasse.
+            </p>
+          </div>
+        )}
+
+        <ul className="space-y-3 pb-2">
           {rolesReveal.players?.map((p) => (
             <li
               key={p.sessionId}
-              className={`rounded-xl p-4 ring-1 ${
+              className={`rounded-2xl p-4 shadow-sm ring-1 ${
                 p.sessionId === sessionId
-                  ? "bg-indigo-50 ring-indigo-300 dark:bg-indigo-950/50 dark:ring-indigo-600"
-                  : "bg-white ring-slate-200 dark:bg-slate-900/80 dark:ring-slate-700"
+                  ? "bg-indigo-50/90 ring-indigo-200 dark:bg-indigo-950/40 dark:ring-indigo-800"
+                  : "bg-white/90 ring-slate-200/90 dark:bg-slate-900/80 dark:ring-slate-700"
               }`}
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium text-slate-900 dark:text-white">
                   {p.nickname}
                   {p.sessionId === sessionId ? (
-                    <span className="ml-2 text-xs text-indigo-600 dark:text-indigo-400">(vous)</span>
+                    <span className="ml-2 text-xs font-normal text-indigo-600 dark:text-indigo-400">vous</span>
                   ) : null}
                 </span>
                 <span
-                  className={
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${
                     p.role === "cat"
-                      ? "font-semibold text-orange-600 dark:text-orange-400"
-                      : "font-semibold text-sky-600 dark:text-sky-400"
-                  }
+                      ? "bg-orange-100 text-orange-800 dark:bg-orange-950/80 dark:text-orange-200"
+                      : "bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-200"
+                  }`}
                 >
                   {p.role === "cat" ? "Chat" : "Joueur"}
                 </span>
               </div>
+              {p.sessionId === sessionId && (
+                <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                  {p.role === "cat"
+                    ? "Vous traquez les joueurs sur la carte et validez les captures au scanner."
+                    : "Vous fuyez, partagez la discussion si besoin, et montrez votre QR à un chat pour être capturé."}
+                </p>
+              )}
               {isHost && p.sessionId !== sessionId && (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      className="rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 active:scale-[0.98] dark:bg-orange-600 dark:hover:bg-orange-500"
+                      onClick={() => adminSetRole(p.sessionId, "cat")}
+                    >
+                      Chat
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-xl bg-sky-500 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 active:scale-[0.98] dark:bg-sky-600 dark:hover:bg-sky-500"
+                      onClick={() => adminSetRole(p.sessionId, "player")}
+                    >
+                      Joueur
+                    </button>
+                  </div>
+                  <ConfigHint>
+                    Affecte ce participant comme traqueur (chat) ou comme proie (joueur). Votre propre carte n&apos;est pas modifiable ici.
+                  </ConfigHint>
                   <button
                     type="button"
-                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    onClick={() => adminSetRole(p.sessionId, "cat")}
-                  >
-                    Forcer chat
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    onClick={() => adminSetRole(p.sessionId, "player")}
-                  >
-                    Forcer joueur
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
+                    className="w-full rounded-xl border border-red-200 bg-red-50/90 py-2.5 text-xs font-semibold text-red-800 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
                     onClick={() => adminKick(p.sessionId)}
                   >
-                    Expulser
+                    Expulser de la salle
                   </button>
+                  <ConfigHint>
+                    Déconnecte immédiatement cette personne de la partie (utile en cas d&apos;abus ou de mauvais pseudo).
+                  </ConfigHint>
                 </div>
               )}
             </li>
@@ -1421,15 +1644,28 @@ export default function App() {
             type="button"
             onClick={onBeginHunt}
             disabled={(rolesReveal?.players?.length ?? 0) < 2}
-            className="w-full rounded-xl bg-orange-600 py-4 text-base font-semibold text-white disabled:opacity-40 hover:bg-orange-700 active:bg-orange-800"
+            className="w-full rounded-2xl bg-orange-600 py-4 text-base font-semibold text-white shadow-md transition hover:bg-orange-700 disabled:opacity-40"
           >
-            Demarrer la chasse
+            Démarrer la chasse
           </button>
         ) : (
-          <p className="text-center text-sm text-slate-500">
-            En attente du demarrage par l&apos;hote...
+          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+            En attente du démarrage par l&apos;hôte…
           </p>
         )}
+          </main>
+          <PartyDiscussionChrome
+            desktop={isDesktop}
+            open={discussionMobileOpen}
+            onToggle={setDiscussionMobileOpen}
+            fabBottomClass="bottom-6"
+            messages={partyChatMessages}
+            sessionId={sessionId}
+            onSend={sendPartyChat}
+            position={position}
+            disabled={!socket}
+          />
+        </div>
       </div>
     );
   }
@@ -1468,11 +1704,11 @@ export default function App() {
 
     const renderAdminPanel = () => (
       <div className="h-full overflow-auto p-4">
-        <h2 className="mb-2 text-lg font-bold text-slate-900 dark:text-white">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">
           Contrôle hôte
         </h2>
         <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-          Rôles et expulsions sont visibles par tous les joueurs.
+          Actions visibles par tous : expliquez-les si besoin pour éviter les surprises.
         </p>
         <button
           type="button"
@@ -1485,15 +1721,18 @@ export default function App() {
               adminEndGame();
             }
           }}
-          className="mb-6 w-full rounded-xl border border-red-300 bg-red-50 py-3 text-sm font-semibold text-red-700 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
+          className="mb-2 w-full rounded-xl border border-red-300 bg-red-50 py-3 text-sm font-semibold text-red-800 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
         >
           Fermer la partie (récap pour tous)
         </button>
-        <ul className="space-y-3">
+        <ConfigHint>
+          Arrête la chasse immédiatement et affiche le résumé pour chaque participant connecté.
+        </ConfigHint>
+        <ul className="mt-6 space-y-4">
           {rosterList.map((p) => (
             <li
               key={p.sessionId}
-              className="rounded-xl bg-slate-100 p-3 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
+              className="rounded-2xl bg-slate-100 p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
             >
               <div className="font-medium text-slate-900 dark:text-white">
                 {p.nickname}
@@ -1501,28 +1740,33 @@ export default function App() {
               </div>
               <p className="text-xs text-slate-500">{roleBadgeText(p)}</p>
               {p.sessionId !== sessionId && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-orange-100 px-2 py-1.5 text-xs font-medium text-orange-700 dark:bg-orange-900/60 dark:text-orange-100"
-                    onClick={() => adminSetRole(p.sessionId, "cat")}
-                  >
-                    Chat
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-sky-100 px-2 py-1.5 text-xs font-medium text-sky-700 dark:bg-sky-900/60 dark:text-sky-100"
-                    onClick={() => adminSetRole(p.sessionId, "player")}
-                  >
-                    Joueur
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg bg-red-100 px-2 py-1.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-200"
-                    onClick={() => adminKick(p.sessionId)}
-                  >
-                    Expulser
-                  </button>
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white dark:bg-orange-600"
+                      onClick={() => adminSetRole(p.sessionId, "cat")}
+                    >
+                      Chat
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white dark:bg-sky-600"
+                      onClick={() => adminSetRole(p.sessionId, "player")}
+                    >
+                      Joueur
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-red-100 px-3 py-2 text-xs font-semibold text-red-800 dark:bg-red-950 dark:text-red-200"
+                      onClick={() => adminKick(p.sessionId)}
+                    >
+                      Expulser
+                    </button>
+                  </div>
+                  <ConfigHint>
+                    Chat / Joueur : corrige le camp en cours de partie. Expulser : retire la personne sans attendre la fin.
+                  </ConfigHint>
                 </div>
               )}
             </li>
@@ -1562,6 +1806,12 @@ export default function App() {
         <header className="z-10 hidden shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:flex">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              {catLocked && isCat && gameState.mapUnlockAt && (
+                <CatLockCountdownHeader
+                  mapUnlockAt={gameState.mapUnlockAt}
+                  socket={socket}
+                />
+              )}
               {gameState.timeLimitEndsAt && (
                 <GameTimer endsAt={gameState.timeLimitEndsAt} />
               )}
@@ -1590,9 +1840,17 @@ export default function App() {
 
         <div className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
           <div className="min-w-0 flex-1">
-            {gameState.timeLimitEndsAt && (
-              <GameTimer endsAt={gameState.timeLimitEndsAt} />
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {catLocked && isCat && gameState.mapUnlockAt && (
+                <CatLockCountdownHeader
+                  mapUnlockAt={gameState.mapUnlockAt}
+                  socket={socket}
+                />
+              )}
+              {gameState.timeLimitEndsAt && (
+                <GameTimer endsAt={gameState.timeLimitEndsAt} />
+              )}
+            </div>
             <p className="mt-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">
               {role === "cat" ? "Chat" : role === "player" ? "Joueur" : ""}
               {me?.spectator ? " · Spectateur" : ""}
@@ -1645,13 +1903,15 @@ export default function App() {
           </div>
         )}
 
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="hidden shrink-0 border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90 md:flex">
           {tabBtn("map", "Carte", !showMapTab)}
           {tabBtn("players", "Joueurs")}
           {isHost && tabBtn("admin", "Admin")}
         </div>
 
-        <div className="relative min-h-0 flex-1 bg-slate-200 pb-16 dark:bg-slate-900 md:pb-0">
+        <div className="relative min-h-0 flex-1 bg-slate-200 pb-[5.5rem] dark:bg-slate-900 md:pb-0">
           {gameTab === "players" && (
             <div className="h-full overflow-auto p-4">
               <div className="mb-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
@@ -1705,7 +1965,6 @@ export default function App() {
             <CatMapLockOverlay
               mapUnlockAt={gameState.mapUnlockAt}
               socket={socket}
-              sessionId={sessionId}
             />
           )}
 
@@ -1739,6 +1998,7 @@ export default function App() {
                 recenterTick={recenterTick}
                 zoomInTick={zoomInTick}
                 zoomOutTick={zoomOutTick}
+                geoChatImages={geoChatImages}
               />
             </div>
           )}
@@ -1791,7 +2051,7 @@ export default function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              J&apos;ai trouvé un joueur
+              Scan capture
             </button>
           )}
         </footer>
@@ -1832,6 +2092,20 @@ export default function App() {
             </button>
           )}
         </footer>
+          </div>
+          <PartyDiscussionChrome
+            desktop={isDesktop}
+            open={discussionMobileOpen}
+            onToggle={setDiscussionMobileOpen}
+            fabBottomClass="bottom-[132px]"
+            fabAlignClass="left-4"
+            messages={partyChatMessages}
+            sessionId={sessionId}
+            onSend={sendPartyChat}
+            position={position}
+            disabled={!socket}
+          />
+        </div>
 
         {showQr && (
           <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />

@@ -3,6 +3,7 @@ import {
   nominatimSearchCitiesNear,
   nominatimSearchCityByName,
 } from "../../lib/nominatim.js";
+import ConfigHint from "../ui/ConfigHint.jsx";
 
 export default function CityZonePicker({
   position,
@@ -97,6 +98,10 @@ export default function CityZonePicker({
           Villes (contours)
         </button>
       </div>
+      <ConfigHint>
+        Cercle : une zone ronde centrée sur la partie. Villes : périmètres réels (OpenStreetMap) pour limiter le jeu
+        aux contours choisis.
+      </ConfigHint>
 
       {zoneMode === "city" && (
         <>

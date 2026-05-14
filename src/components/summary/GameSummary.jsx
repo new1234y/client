@@ -90,6 +90,14 @@ function timelineLabel(ev) {
       return `${ev.nickname} est devenu·e chat`;
     case "role_changed":
       return `${ev.nickname} : ${ev.from} → ${ev.to} (admin)`;
+    case "admin_role_pick": {
+      const r = ev.role === "cat" ? "chat" : "joueur";
+      return `${ev.nickname} désigné·e ${r} par l'hôte`;
+    }
+    case "player_disconnected":
+      return `${ev.nickname} s'est déconnecté·e`;
+    case "player_reconnected":
+      return `${ev.nickname} s'est reconnecté·e`;
     case "game_over":
       return ev.message || "Fin de partie";
     default:
@@ -555,6 +563,52 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             </li>
           ))}
         </ul>
+
+        {(summary?.partyChat || []).length > 0 && (
+          <>
+            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase text-slate-500">
+              Discussion de partie
+            </h2>
+            <ul className="max-w-3xl space-y-2">
+              {[...(summary.partyChat || [])]
+                .sort((a, b) => (a.t || 0) - (b.t || 0))
+                .map((m) => (
+                  <li
+                    key={m.id}
+                    className="rounded-lg border border-slate-200 bg-white/80 p-2 text-sm dark:border-slate-600 dark:bg-slate-800/80"
+                  >
+                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                      {formatClock(m.t)} · {m.nickname}
+                    </p>
+                    {m.type === "text" && (
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                        {m.text}
+                      </p>
+                    )}
+                    {m.type === "location" && m.lat != null && m.lng != null && (
+                      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                        📍 {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
+                      </p>
+                    )}
+                    {m.type === "image" && m.image && (
+                      <div className="mt-1">
+                        <img
+                          src={m.image}
+                          alt=""
+                          className="max-h-36 max-w-full rounded-md border border-slate-200 dark:border-slate-600"
+                        />
+                        {m.lat != null && m.lng != null && (
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            📍 {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
       </div>
 
       <div className="shrink-0 border-t border-slate-200 p-4 dark:border-slate-800">
