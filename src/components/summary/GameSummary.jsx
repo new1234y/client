@@ -107,15 +107,15 @@ function timelineLabel(ev) {
 
 function ToggleRow({ label, checked, onChange }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-600 dark:bg-slate-800/90">
-      <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-3 shadow-card">
+      <span className="text-sm font-medium text-[var(--color-text)]">
         {label}
       </span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-5 w-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 dark:border-slate-500 dark:bg-slate-900"
+        className="h-5 w-5 shrink-0 rounded border-[var(--color-border)] text-brand-blue focus:ring-2 focus:ring-brand-blue"
       />
     </label>
   );
@@ -314,15 +314,15 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   if (!summary) return null;
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="shrink-0 border-b border-slate-200 px-4 py-4 dark:border-slate-800">
+    <div className="flex min-h-full flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
+      <header className="shrink-0 border-b border-[var(--color-border)] px-4 py-4">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Récap</h1>
-            <p className="font-mono text-lg font-semibold text-indigo-600 dark:text-indigo-400">
+            <h1 className="text-xl font-bold tracking-tight">Recap</h1>
+            <p className="font-mono text-lg font-semibold text-brand-blue">
               {summary.code}
             </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
               {zoneMode === "city" ? "Zone : contours ville" : "Zone : cercle"}
             </p>
           </div>
@@ -331,44 +331,44 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               type="button"
               onClick={() => setShareOpen(true)}
               disabled={!publicRecapUrl && !shareBusy}
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-brand-blue px-4 py-2.5 text-sm font-bold text-white shadow-card disabled:opacity-50"
             >
-              {shareBusy ? "…" : "Partager"}
+              {shareBusy ? "..." : "Partager"}
             </button>
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium dark:border-slate-600 dark:bg-slate-800"
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2.5 text-sm font-medium text-[var(--color-text)]"
             >
               {theme === "dark" ? "Clair" : "Sombre"}
             </button>
           </div>
         </div>
 
-        <div className="mx-auto mt-4 max-w-3xl rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+        <div className="mx-auto mt-4 max-w-3xl rounded-xl bg-[var(--color-bg-raised)] p-4 shadow-card ring-1 ring-[var(--color-border)]">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setPlaying((p) => !p)}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white"
+              className="rounded-lg bg-brand-blue px-4 py-2 text-sm font-bold text-white"
             >
               {playing ? "Pause" : "Lecture"}
             </button>
             <button
               type="button"
               onClick={() => setOffsetMs(0)}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-semibold dark:bg-slate-800"
+              className="rounded-lg bg-[var(--color-bg-overlay)] px-3 py-2 text-sm font-semibold text-[var(--color-text)]"
             >
-              Début
+              Debut
             </button>
-            <span className="text-xs text-slate-500">Vitesse ×{speed}</span>
+            <span className="text-xs text-[var(--color-text-muted)]">Vitesse x{speed}</span>
             <input
               type="range"
               min={2}
               max={40}
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
-              className="h-2 w-24 accent-indigo-600"
+              className="h-2 w-24 accent-brand-blue"
             />
           </div>
           <input
@@ -378,9 +378,9 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             step={500}
             value={Math.min(duration, offsetMs)}
             onChange={(e) => setOffsetMs(Number(e.target.value))}
-            className="mt-3 w-full accent-indigo-600"
+            className="mt-3 w-full accent-brand-blue"
           />
-          <div className="mt-1 flex justify-between font-mono text-xs text-slate-500">
+          <div className="mt-1 flex justify-between font-mono text-xs text-[var(--color-text-muted)]">
             <span>{formatClock(absT)}</span>
             <span>
               {formatDur(offsetMs)} / {formatDur(duration)}
@@ -389,7 +389,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
       </header>
 
-      <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-800">
+      <div className="flex shrink-0 flex-wrap gap-2 border-b border-[var(--color-border)] px-4 py-2">
         {Object.entries(BASEMAPS).map(([id, b]) => (
           <button
             key={id}
@@ -397,8 +397,8 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             onClick={() => setBasemapId(id)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
               basemapId === id
-                ? "bg-indigo-600 text-white"
-                : "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                ? "bg-brand-blue text-white"
+                : "bg-[var(--color-bg-overlay)] text-[var(--color-text)] ring-1 ring-[var(--color-border)]"
             }`}
           >
             {b.name}
@@ -408,13 +408,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
 
       <div className="mx-auto grid w-full max-w-3xl shrink-0 grid-cols-1 gap-3 p-3 md:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase text-slate-500">
+          <p className="text-xs font-semibold uppercase text-[var(--color-text-faint)]">
             Joueurs
           </p>
           {players.map((p) => (
             <label
               key={p.sessionId}
-              className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm dark:border-slate-600 dark:bg-slate-800/90"
+              className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-3 shadow-card"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span
@@ -423,13 +423,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                     background: summary.colors?.[p.sessionId] || "#94a3b8",
                   }}
                 />
-                <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                <span className="truncate text-sm font-medium text-[var(--color-text)]">
                   {p.nickname}
                 </span>
               </span>
               <input
                 type="checkbox"
-                className="h-5 w-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 dark:border-slate-500 dark:bg-slate-900"
+                className="h-5 w-5 shrink-0 rounded border-[var(--color-border)] text-brand-blue focus:ring-2 focus:ring-brand-blue"
                 checked={!!visible[p.sessionId]}
                 onChange={() => togglePlayer(p.sessionId)}
               />
@@ -437,7 +437,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
           ))}
         </div>
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase text-slate-500">
+          <p className="text-xs font-semibold uppercase text-[var(--color-text-faint)]">
             Calques
           </p>
           <ToggleRow
@@ -459,7 +459,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
       </div>
 
-      <div className="h-[42vh] min-h-[220px] w-full shrink-0 border-b border-slate-200 dark:border-slate-800">
+      <div className="h-[42vh] min-h-[220px] w-full shrink-0 border-b border-[var(--color-border)]">
         <MapContainer
           center={center}
           zoom={15}
@@ -543,20 +543,20 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-        <h2 className="mb-2 text-xs font-semibold uppercase text-slate-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase text-[var(--color-text-faint)]">
           Chronologie
         </h2>
-        <ul className="max-w-3xl space-y-1 border-l-2 border-indigo-200 pl-4 dark:border-indigo-900">
+        <ul className="max-w-3xl space-y-1 border-l-2 border-brand-blue/30 pl-4">
           {timelineSorted.map((ev, i) => (
             <li
               key={i}
               className={`rounded-lg py-1.5 pl-2 ${
                 i === activeEventIndex
-                  ? "bg-indigo-50 dark:bg-indigo-950/60"
+                  ? "bg-brand-blue-light dark:bg-brand-blue/10"
                   : ""
               }`}
             >
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-[var(--color-text-muted)]">
                 {formatClock(ev.t)}
               </span>
               <p className="text-sm">{timelineLabel(ev)}</p>
@@ -566,7 +566,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
 
         {(summary?.partyChat || []).length > 0 && (
           <>
-            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase text-slate-500">
+            <h2 className="mb-2 mt-6 text-xs font-semibold uppercase text-[var(--color-text-faint)]">
               Discussion de partie
             </h2>
             <ul className="max-w-3xl space-y-2">
@@ -575,19 +575,19 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                 .map((m) => (
                   <li
                     key={m.id}
-                    className="rounded-lg border border-slate-200 bg-white/80 p-2 text-sm dark:border-slate-600 dark:bg-slate-800/80"
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-raised)] p-2 text-sm"
                   >
-                    <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    <p className="text-[10px] font-semibold text-[var(--color-text-muted)]">
                       {formatClock(m.t)} · {m.nickname}
                     </p>
                     {m.type === "text" && (
-                      <p className="mt-0.5 whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-[var(--color-text)]">
                         {m.text}
                       </p>
                     )}
                     {m.type === "location" && m.lat != null && m.lng != null && (
-                      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
-                        📍 {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        Position: {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
                       </p>
                     )}
                     {m.type === "image" && m.image && (
@@ -595,11 +595,11 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                         <img
                           src={m.image}
                           alt=""
-                          className="max-h-36 max-w-full rounded-md border border-slate-200 dark:border-slate-600"
+                          className="max-h-36 max-w-full rounded-lg border border-[var(--color-border)]"
                         />
                         {m.lat != null && m.lng != null && (
-                          <p className="mt-1 text-[10px] text-slate-500">
-                            📍 {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
+                          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+                            Position: {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)}
                           </p>
                         )}
                       </div>
@@ -611,11 +611,11 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-slate-200 p-4 dark:border-slate-800">
+      <div className="shrink-0 border-t border-[var(--color-border)] p-4">
         <button
           type="button"
           onClick={onLeave}
-          className="mx-auto block w-full max-w-md rounded-xl bg-indigo-600 py-3.5 text-base font-semibold text-white"
+          className="mx-auto block w-full max-w-md rounded-lg bg-brand-blue py-3.5 text-base font-bold text-white"
         >
           Retour
         </button>
@@ -627,42 +627,42 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Partager le récap
+          <div className="w-full max-w-md rounded-xl bg-[var(--color-bg)] p-6 shadow-card-lg ring-1 ring-[var(--color-border)]">
+            <h3 className="text-lg font-bold text-[var(--color-text)]">
+              Partager le recap
             </h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Lien public (lecture seule). Les données restent sur ce serveur
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+              Lien public (lecture seule). Les donnees restent sur ce serveur
               tant qu&apos;il tourne.
             </p>
             {publicRecapUrl ? (
               <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                <div className="rounded-xl bg-white p-2 ring-2 ring-indigo-100 dark:bg-slate-800 dark:ring-indigo-900">
+                <div className="rounded-lg bg-white p-2 ring-2 ring-brand-blue/20 dark:bg-navy-800 dark:ring-brand-blue/30">
                   <QRCodeSVG value={publicRecapUrl} size={160} level="M" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="break-all font-mono text-xs text-indigo-700 dark:text-indigo-300">
+                  <p className="break-all font-mono text-xs text-brand-blue">
                     {publicRecapUrl}
                   </p>
                   <button
                     type="button"
                     onClick={copyRecap}
-                    className="mt-3 w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white sm:w-auto sm:px-5"
+                    className="mt-3 w-full rounded-lg bg-brand-blue py-2.5 text-sm font-bold text-white sm:w-auto sm:px-5"
                   >
-                    {copied ? "Copié" : "Copier le lien"}
+                    {copied ? "Copie" : "Copier le lien"}
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
-                Lien indisponible (vérifiez que le serveur expose{" "}
+              <p className="mt-4 text-sm text-brand-yellow-dark dark:text-brand-yellow">
+                Lien indisponible (verifiez que le serveur expose{" "}
                 <span className="font-mono">/api/recap</span> et le proxy Vite).
               </p>
             )}
             <button
               type="button"
               onClick={() => setShareOpen(false)}
-              className="mt-6 w-full rounded-xl border border-slate-200 py-3 text-sm font-semibold dark:border-slate-600"
+              className="mt-6 w-full rounded-lg border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text)]"
             >
               Fermer
             </button>

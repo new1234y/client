@@ -73,8 +73,8 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
   if (!player) return null;
 
   const roleColor = player.role === "cat" 
-    ? "text-orange-500 dark:text-orange-400" 
-    : "text-sky-500 dark:text-sky-400";
+    ? "text-brand-red" 
+    : "text-brand-blue";
 
   const isDisconnected = player.disconnected;
   const lastLocation = player.lastLocation;
@@ -87,37 +87,37 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg animate-slide-up rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900"
+        className="w-full max-w-lg animate-slide-up rounded-t-2xl bg-[var(--color-bg)] pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-card-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle bar */}
         <div className="flex justify-center py-3">
-          <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-700" />
+          <div className="h-1 w-10 rounded-full bg-[var(--color-border)]" />
         </div>
 
         <div className="px-5 pb-4">
           {/* Player info */}
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-2xl dark:bg-slate-800">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[var(--color-bg-overlay)] text-2xl">
               {player.role === "cat" ? (
-                <svg className="h-7 w-7 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-7 w-7 text-brand-red" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                 </svg>
               ) : (
-                <svg className="h-7 w-7 text-sky-500" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-7 w-7 text-brand-blue" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
               )}
             </div>
             <div className="flex-1">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              <h2 className="text-xl font-bold text-[var(--color-text)]">
                 {player.nickname}
               </h2>
               <p className={`text-sm font-medium ${roleColor}`}>
                 {roleBadgeText(player)}
               </p>
               {isDisconnected && (
-                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                <p className="mt-1 text-xs text-brand-red">
                   Deconnecte
                 </p>
               )}
@@ -126,22 +126,22 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
 
           {/* Last location */}
           {lastLocation && (
-            <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
-              <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+            <div className="mt-4 rounded-lg bg-[var(--color-bg-overlay)] p-4">
+              <p className="text-xs font-medium uppercase text-[var(--color-text-faint)]">
                 Derniere position connue
               </p>
-              <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+              <p className="mt-1 text-sm text-[var(--color-text)]">
                 {lastLocation.lat?.toFixed(5)}, {lastLocation.lng?.toFixed(5)}
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                 {formatLastSeen(lastLocation.timestamp)}
               </p>
             </div>
           )}
 
           {/* Share section */}
-          <div className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-700">
-            <p className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <div className="mt-5 border-t border-[var(--color-border)] pt-5">
+            <p className="mb-3 text-sm font-medium text-[var(--color-text)]">
               Inviter des joueurs
             </p>
             
@@ -149,7 +149,7 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-bg-overlay)] px-4 py-3 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border)] active:bg-[var(--color-border)]"
               >
                 {copied ? (
                   <>
@@ -171,7 +171,7 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
               <button
                 type="button"
                 onClick={handleShare}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white active:bg-indigo-700"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-3 text-sm font-bold text-white active:opacity-90"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -183,7 +183,7 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
             <button
               type="button"
               onClick={() => setShowQR(!showQR)}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3 text-sm font-medium text-[var(--color-text)]"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
@@ -192,7 +192,7 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
             </button>
 
             {showQR && (
-              <div className="mt-4 flex justify-center rounded-xl bg-white p-6 shadow-inner">
+              <div className="mt-4 flex justify-center rounded-lg bg-white p-6 shadow-inner">
                 <QRCodeSVG 
                   value={shareUrl} 
                   size={180} 
@@ -203,8 +203,8 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
               </div>
             )}
 
-            <p className="mt-3 text-center text-xs text-slate-500">
-              Code de partie: <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{roomCode}</span>
+            <p className="mt-3 text-center text-xs text-[var(--color-text-muted)]">
+              Code de partie: <span className="font-mono font-bold text-brand-blue">{roomCode}</span>
             </p>
           </div>
         </div>
@@ -213,7 +213,7 @@ export default function PlayerSheet({ player, roomCode, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-xl bg-slate-100 py-3.5 text-base font-semibold text-slate-700 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+            className="w-full rounded-lg bg-[var(--color-bg-overlay)] py-3.5 text-base font-semibold text-[var(--color-text)] active:bg-[var(--color-border)]"
           >
             Fermer
           </button>
