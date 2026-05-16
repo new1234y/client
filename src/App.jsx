@@ -1005,23 +1005,13 @@ export default function App() {
           </>
         )}
 
-        {entryMode === "create" ? (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="w-full rounded-lg bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
-          >
-            Creer ma partie
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onJoin}
-            className="w-full rounded-lg bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
-          >
-            Rejoindre la partie
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onCreate}
+          className="w-full rounded-lg bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
+        >
+          Creer ma partie
+        </button>
 
         {/* Game history section */}
         {midJoinWait && (
@@ -1034,114 +1024,6 @@ export default function App() {
             </p>
             <p className="mt-2 text-center text-xs text-cozy-text-muted">
               L'hôte doit accepter votre demande.
-            </p>
-            <button
-              type="button"
-              onClick={() => setMidJoinWait(null)}
-              className="mt-4 w-full rounded-lg border border-cozy-border py-3 text-sm font-semibold text-cozy-text-secondary"
-            >
-              Annuler
-            </button>
-          </div>
-        )}
-      </div>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </header>
-
-        {errorBanner && (
-          <div className="mb-4 rounded-lg bg-cozy-red-muted p-3 text-sm text-cozy-red ring-1 ring-cozy-red/20">
-            {errorBanner}
-          </div>
-        )}
-
-        <div className="mb-4 flex rounded-lg bg-cozy-surface p-1 ring-1 ring-cozy-border">
-          <button
-            type="button"
-            onClick={() => {
-              setEntryMode("create");
-              setErrorBanner(null);
-            }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
-              entryMode === "create"
-                ? "bg-cozy-bg text-cozy-primary shadow-sm"
-                : "text-cozy-text-secondary"
-            }`}
-          >
-            Creer une partie
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEntryMode("join");
-              setErrorBanner(null);
-            }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
-              entryMode === "join"
-                ? "bg-cozy-bg text-cozy-primary shadow-sm"
-                : "text-cozy-text-secondary"
-            }`}
-          >
-            Rejoindre
-          </button>
-        </div>
-
-        <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
-          Pseudo
-        </label>
-        <input
-          className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
-          placeholder="Votre nom"
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          maxLength={24}
-          autoComplete="nickname"
-        />
-
-        {entryMode === "join" && (
-          <>
-            <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
-              Code de la salle
-            </label>
-            <input
-              className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base uppercase tracking-widest text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
-              placeholder="ex: AZERT"
-              value={roomCodeInput}
-              onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-              maxLength={8}
-              autoCapitalize="characters"
-            />
-          </>
-        )}
-
-        {entryMode === "create" ? (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="w-full rounded-xl bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
-          >
-            Creer ma partie
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onJoin}
-            className="w-full rounded-xl bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
-          >
-            Rejoindre la partie
-          </button>
-        )}
-
-        {/* Game history section */}
-        {midJoinWait && (
-          <div className="mt-6 rounded-2xl bg-cozy-bg p-5 shadow-md ring-1 ring-cozy-border">
-            <p className="text-center text-sm font-semibold text-cozy-text">
-              En attente · salle{" "}
-              <span className="font-mono text-cozy-primary">
-                {midJoinWait.code}
-              </span>
-            </p>
-            <p className="mt-2 text-center text-xs text-cozy-text-muted">
-              L’hôte doit accepter votre demande.
             </p>
             <button
               type="button"
