@@ -4,6 +4,78 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Cozy Pop Matte — Design Tokens ── */
+:root {
+  /* Primary — Matte Blue (trust / navigation) */
+  --color-primary: 59 130 246;        /* #3B82F6 */
+  --color-primary-hover: 37 99 235;   /* #2563EB */
+  --color-primary-muted: 219 234 254; /* #DBEAFE */
+
+  /* Accent Yellow — Matte (energy / reward) */
+  --color-yellow: 250 204 21;        /* #FACC15 */
+  --color-yellow-muted: 254 249 195; /* #FEF9C3 */
+
+  /* Accent Red — Matte (urgency / danger) */
+  --color-red: 239 68 68;            /* #EF4444 */
+  --color-red-muted: 254 226 226;    /* #FEE2E2 */
+
+  /* Neutrals */
+  --color-bg: 255 255 255;           /* #FFFFFF */
+  --color-surface: 248 250 252;      /* #F8FAFC */
+  --color-border: 226 232 240;       /* #E2E8F0 */
+  --color-text: 30 41 59;            /* #1E293B */
+  --color-text-secondary: 100 116 139; /* #64748B */
+  --color-text-muted: 148 163 184;   /* #94A3B8 */
+
+  /* Cat (orange matte) */
+  --color-cat: 251 146 60;           /* #FB923C */
+  --color-cat-muted: 255 237 213;    /* #FFEDD5 */
+
+  /* Player (sky matte) */
+  --color-player: 56 189 248;        /* #38BDF8 */
+  --color-player-muted: 224 242 254; /* #E0F2FE */
+
+  /* Success */
+  --color-success: 34 197 94;        /* #22C55E */
+  --color-success-muted: 220 252 231; /* #DCFCE7 */
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-full: 9999px;
+}
+
+.dark {
+  --color-primary: 96 165 250;        /* #60A5FA */
+  --color-primary-hover: 59 130 246;  /* #3B82F6 */
+  --color-primary-muted: 30 58 138;   /* #1E3A8A */
+
+  --color-yellow: 250 204 21;
+  --color-yellow-muted: 66 32 6;
+
+  --color-red: 248 113 113;
+  --color-red-muted: 69 10 10;
+
+  --color-bg: 15 23 42;              /* #0F172A */
+  --color-surface: 30 41 59;         /* #1E293B */
+  --color-border: 51 65 85;          /* #334155 */
+  --color-text: 241 245 249;         /* #F1F5F9 */
+  --color-text-secondary: 148 163 184;
+  --color-text-muted: 100 116 139;
+
+  --color-cat: 251 146 60;
+  --color-cat-muted: 67 20 7;
+
+  --color-player: 56 189 248;
+  --color-player-muted: 12 74 110;
+
+  --color-success: 74 222 128;
+  --color-success-muted: 5 46 22;
+}
+
 html,
 body,
 #root {
@@ -11,6 +83,11 @@ body,
   margin: 0;
 }
 
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* Leaflet global */
 .leaflet-container {
   font-family: inherit;
 }
@@ -28,4 +105,85 @@ body,
   to {
     stroke-dashoffset: -120;
   }
+}
+
+/* ── Confetti Particles ── */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-12px) rotate(0deg) scale(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) rotate(45deg) scale(1);
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(20px); }
+}
+
+/* Cozy soft slide-up for bottom sheets */
+@keyframes cozy-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: cozy-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Custom range slider — matte blue thumb */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgb(var(--color-border));
+  border-radius: 9999px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(var(--color-primary));
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+.dark input[type="range"]::-webkit-slider-thumb {
+  border-color: rgb(var(--color-surface));
+}
+input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(var(--color-primary));
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+
+/* Checkbox accent override */
+input[type="checkbox"] {
+  accent-color: rgb(var(--color-primary));
+}
+
+/* Smooth focus ring */
+*:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 2px;
 }

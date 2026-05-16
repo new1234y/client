@@ -458,14 +458,14 @@ export default function GameMap({
           <Popup className="chat-photo-popup" maxWidth={280}>
             <div className="min-w-0">
               {m.nickname ? (
-                <p className="mb-1 text-xs font-semibold text-slate-700">{m.nickname}</p>
+                <p className="mb-1 text-xs font-semibold text-cozy-text-secondary">{m.nickname}</p>
               ) : null}
               <img
                 src={m.image}
                 alt=""
                 className="max-h-64 w-full rounded-lg object-contain"
               />
-              <p className="mt-1 text-[10px] text-slate-500">Photo partagée dans la discussion</p>
+              <p className="mt-1 text-[10px] text-cozy-text-muted">Photo partagée dans la discussion</p>
             </div>
           </Popup>
         </Marker>

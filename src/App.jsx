@@ -89,29 +89,29 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError 
   if (!isReconnecting) return null;
   return (
     <div
-      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Reconnexion en cours"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-slate-900">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-        <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
+      <div className="w-full max-w-sm rounded-2xl bg-cozy-bg p-6 text-center shadow-xl ring-1 ring-cozy-border">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-cozy-primary/20 border-t-cozy-primary" />
+        <h2 className="mb-2 text-lg font-semibold text-cozy-text">
           Reconnexion en cours...
         </h2>
-        <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">
+        <p className="mb-1 text-sm text-cozy-text-secondary">
           Tentative {reconnectAttempt}
         </p>
         {lastError && (
-          <p className="mb-4 text-xs text-red-600 dark:text-red-400">{lastError}</p>
+          <p className="mb-4 text-xs text-cozy-red">{lastError}</p>
         )}
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-500">
+        <p className="mb-4 text-xs text-cozy-text-muted">
           La connexion a ete perdue. Nous essayons de vous reconnecter automatiquement.
         </p>
         <button
           type="button"
           onClick={onCancel}
-          className="w-full rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          className="w-full rounded-lg bg-cozy-surface py-3 text-sm font-semibold text-cozy-text ring-1 ring-cozy-border transition-colors hover:bg-cozy-border/50"
         >
           Annuler et quitter
         </button>
@@ -147,17 +147,17 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
   const ss = secLeft % 60;
 
   return (
-    <div className="flex h-full flex-col justify-center bg-slate-50 p-6 dark:bg-slate-950">
-      <div className="mx-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-        <p className="text-center text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+    <div className="flex h-full flex-col justify-center bg-cozy-bg p-6">
+      <div className="mx-auto w-full max-w-md rounded-2xl bg-cozy-bg p-6 shadow-lg ring-1 ring-cozy-border">
+        <p className="text-center text-xs font-semibold uppercase tracking-wider text-cozy-cat">
           Chat · carte verrouillée
         </p>
-        <p className="mt-3 text-center text-5xl font-black tabular-nums text-slate-900 dark:text-white">
+        <p className="mt-3 text-center text-5xl font-black tabular-nums text-cozy-text">
           {mm}:{String(ss).padStart(2, "0")}
         </p>
-        <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
-          La carte s’ouvre automatiquement à la fin du délai. Vous pouvez consulter
-          l’onglet Joueurs : le compte à rebours reste visible en haut de l’écran.
+        <p className="mt-3 text-center text-sm text-cozy-text-secondary">
+          La carte s'ouvre automatiquement à la fin du délai. Vous pouvez consulter
+          l'onglet Joueurs : le compte à rebours reste visible en haut de l'écran.
         </p>
       </div>
     </div>
@@ -192,7 +192,7 @@ function CatLockCountdownHeader({ mapUnlockAt, socket }) {
   const ss = secLeft % 60;
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-1 text-xs font-bold tabular-nums text-orange-800 ring-1 ring-orange-200 dark:bg-orange-950/80 dark:text-orange-100 dark:ring-orange-800">
+    <span className="inline-flex items-center gap-1 rounded-lg bg-cozy-cat-muted px-2 py-1 text-xs font-bold tabular-nums text-cozy-cat ring-1 ring-cozy-cat/20">
       Carte · {mm}:{String(ss).padStart(2, "0")}
     </span>
   );
@@ -208,7 +208,7 @@ function ThemeToggle({ theme, onToggle, size = "md" }) {
     <button
       type="button"
       onClick={onToggle}
-      className={`flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 ${sizeClasses}`}
+      className={`flex items-center justify-center gap-1.5 rounded-lg border border-cozy-border bg-cozy-bg font-semibold text-cozy-text-secondary transition-colors hover:bg-cozy-surface active:bg-cozy-border/50 ${sizeClasses}`}
       title={theme === "dark" ? "Mode clair" : "Mode sombre"}
     >
       {theme === "dark" ? (
@@ -874,17 +874,17 @@ export default function App() {
 
   if (recapSlug && recapLoading) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-slate-50 p-8 dark:bg-slate-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-        <p className="text-sm text-slate-600 dark:text-slate-400">Chargement du récap…</p>
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-cozy-bg p-8">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-cozy-primary/20 border-t-cozy-primary" />
+        <p className="text-sm text-cozy-text-secondary">Chargement du récap…</p>
       </div>
     );
   }
 
   if (recapSlug && recapErr) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-4 bg-slate-50 p-8 dark:bg-slate-950">
-        <p className="text-center text-slate-700 dark:text-slate-300">
+      <div className="flex min-h-full flex-col items-center justify-center gap-4 bg-cozy-bg p-8">
+        <p className="text-center text-cozy-text-secondary">
           Récap introuvable ou expiré.
         </p>
         <button
@@ -893,7 +893,7 @@ export default function App() {
             window.history.replaceState({}, "", "/");
             window.location.reload();
           }}
-          className="rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white"
+          className="rounded-xl bg-cozy-primary px-6 py-3 font-semibold text-white"
         >
           Accueil
         </button>
@@ -919,21 +919,21 @@ export default function App() {
   // Entry screen
   if (stage === "entry") {
     return (
-      <div className="flex min-h-full flex-col bg-slate-50 p-4 pb-8 dark:bg-slate-950">
+      <div className="flex min-h-full flex-col bg-cozy-bg p-4 pb-8">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
         
         <header className="mb-6 flex items-start justify-between gap-3 pt-2">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl font-extrabold tracking-tight text-cozy-text">
               Chase GPS
             </h1>
-            <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
-              Les <strong className="text-slate-800 dark:text-slate-200">chats</strong> traquent les{" "}
-              <strong className="text-slate-800 dark:text-slate-200">joueurs</strong> sur une carte.
+            <p className="mt-1 max-w-md text-sm text-cozy-text-secondary">
+              Les <strong className="text-cozy-text">chats</strong> traquent les{" "}
+              <strong className="text-cozy-text">joueurs</strong> sur une carte.
             </p>
-            <p className="mt-2 flex items-center gap-2 text-xs text-slate-500">
-              <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
+            <p className="mt-2 flex items-center gap-2 text-xs text-cozy-text-muted">
+              <span className={`h-2 w-2 rounded-full ${connected ? "bg-cozy-success" : "bg-cozy-yellow animate-pulse"}`} />
               {connected ? "Connecte" : "Connexion..."}
             </p>
           </div>
@@ -941,22 +941,22 @@ export default function App() {
         </header>
 
         {errorBanner && (
-          <div className="mb-4 rounded-xl bg-red-100 p-3 text-sm text-red-900 ring-1 ring-red-200 dark:bg-red-950/80 dark:text-red-100 dark:ring-red-900">
+          <div className="mb-4 rounded-lg bg-cozy-red-muted p-3 text-sm text-cozy-red ring-1 ring-cozy-red/20">
             {errorBanner}
           </div>
         )}
 
-        <div className="mb-4 flex rounded-xl bg-slate-200/80 p-1 dark:bg-slate-800/80">
+        <div className="mb-4 flex rounded-lg bg-cozy-surface p-1 ring-1 ring-cozy-border">
           <button
             type="button"
             onClick={() => {
               setEntryMode("create");
               setErrorBanner(null);
             }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+            className={`flex-1 rounded-md py-3 text-sm font-bold transition-colors ${
               entryMode === "create"
-                ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
-                : "text-slate-600 dark:text-slate-400"
+                ? "bg-cozy-bg text-cozy-primary shadow-sm"
+                : "text-cozy-text-muted"
             }`}
           >
             Creer une partie
@@ -967,21 +967,21 @@ export default function App() {
               setEntryMode("join");
               setErrorBanner(null);
             }}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+            className={`flex-1 rounded-md py-3 text-sm font-bold transition-colors ${
               entryMode === "join"
-                ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
-                : "text-slate-600 dark:text-slate-400"
+                ? "bg-cozy-bg text-cozy-primary shadow-sm"
+                : "text-cozy-text-muted"
             }`}
           >
             Rejoindre
           </button>
         </div>
 
-        <label className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
           Pseudo
         </label>
         <input
-          className="mb-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 outline-none ring-indigo-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
           placeholder="Votre nom"
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
@@ -991,11 +991,11 @@ export default function App() {
 
         {entryMode === "join" && (
           <>
-            <label className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
               Code de la salle
             </label>
             <input
-              className="mb-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base uppercase tracking-widest text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base uppercase tracking-widest text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
               placeholder="ex: AZERT"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
@@ -1009,7 +1009,7 @@ export default function App() {
           <button
             type="button"
             onClick={onCreate}
-            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+            className="w-full rounded-lg bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
           >
             Creer ma partie
           </button>
@@ -1017,7 +1017,7 @@ export default function App() {
           <button
             type="button"
             onClick={onJoin}
-            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+            className="w-full rounded-lg bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
           >
             Rejoindre la partie
           </button>
@@ -1025,20 +1025,128 @@ export default function App() {
 
         {/* Game history section */}
         {midJoinWait && (
-          <div className="mt-6 rounded-2xl bg-white p-5 shadow-md ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-            <p className="text-center text-sm font-semibold text-slate-900 dark:text-white">
+          <div className="mt-6 rounded-2xl bg-cozy-bg p-5 shadow-md ring-1 ring-cozy-border">
+            <p className="text-center text-sm font-semibold text-cozy-text">
               En attente · salle{" "}
-              <span className="font-mono text-indigo-600 dark:text-indigo-400">
+              <span className="font-mono text-cozy-primary">
                 {midJoinWait.code}
               </span>
             </p>
-            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-center text-xs text-cozy-text-muted">
+              L'hôte doit accepter votre demande.
+            </p>
+            <button
+              type="button"
+              onClick={() => setMidJoinWait(null)}
+              className="mt-4 w-full rounded-lg border border-cozy-border py-3 text-sm font-semibold text-cozy-text-secondary"
+            >
+              Annuler
+            </button>
+          </div>
+        )}
+      </div>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </header>
+
+        {errorBanner && (
+          <div className="mb-4 rounded-lg bg-cozy-red-muted p-3 text-sm text-cozy-red ring-1 ring-cozy-red/20">
+            {errorBanner}
+          </div>
+        )}
+
+        <div className="mb-4 flex rounded-lg bg-cozy-surface p-1 ring-1 ring-cozy-border">
+          <button
+            type="button"
+            onClick={() => {
+              setEntryMode("create");
+              setErrorBanner(null);
+            }}
+            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+              entryMode === "create"
+                ? "bg-cozy-bg text-cozy-primary shadow-sm"
+                : "text-cozy-text-secondary"
+            }`}
+          >
+            Creer une partie
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEntryMode("join");
+              setErrorBanner(null);
+            }}
+            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+              entryMode === "join"
+                ? "bg-cozy-bg text-cozy-primary shadow-sm"
+                : "text-cozy-text-secondary"
+            }`}
+          >
+            Rejoindre
+          </button>
+        </div>
+
+        <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
+          Pseudo
+        </label>
+        <input
+          className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
+          placeholder="Votre nom"
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value)}
+          maxLength={24}
+          autoComplete="nickname"
+        />
+
+        {entryMode === "join" && (
+          <>
+            <label className="mb-1 text-sm font-medium text-cozy-text-secondary">
+              Code de la salle
+            </label>
+            <input
+              className="mb-4 w-full rounded-lg border border-cozy-border bg-cozy-bg px-4 py-3.5 text-base uppercase tracking-widest text-cozy-text outline-none focus:ring-2 focus:ring-cozy-primary"
+              placeholder="ex: AZERT"
+              value={roomCodeInput}
+              onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+              maxLength={8}
+              autoCapitalize="characters"
+            />
+          </>
+        )}
+
+        {entryMode === "create" ? (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="w-full rounded-xl bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
+          >
+            Creer ma partie
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onJoin}
+            className="w-full rounded-xl bg-cozy-primary py-4 text-base font-semibold text-white transition-colors hover:bg-cozy-primary-hover active:brightness-90"
+          >
+            Rejoindre la partie
+          </button>
+        )}
+
+        {/* Game history section */}
+        {midJoinWait && (
+          <div className="mt-6 rounded-2xl bg-cozy-bg p-5 shadow-md ring-1 ring-cozy-border">
+            <p className="text-center text-sm font-semibold text-cozy-text">
+              En attente · salle{" "}
+              <span className="font-mono text-cozy-primary">
+                {midJoinWait.code}
+              </span>
+            </p>
+            <p className="mt-2 text-center text-xs text-cozy-text-muted">
               L’hôte doit accepter votre demande.
             </p>
             <button
               type="button"
               onClick={() => setMidJoinWait(null)}
-              className="mt-4 w-full rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
+              className="mt-4 w-full rounded-lg border border-cozy-border py-3 text-sm font-semibold text-cozy-text-secondary"
             >
               Annuler
             </button>
@@ -1051,18 +1159,21 @@ export default function App() {
   // Lobby screen
   if (stage === "lobby" && lobby) {
     return (
-      <div className="flex min-h-full flex-col bg-gradient-to-b from-slate-50 to-slate-100/90 text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-100">
+      <div className="flex min-h-full flex-col bg-cozy-bg text-cozy-text">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:max-w-none">
         <header className="flex shrink-0 items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Salle</p>
-            <p className="font-mono text-3xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
+            <p className="text-xs uppercase tracking-wide text-cozy-text-muted">Salle</p>
+            <p className="font-mono text-3xl font-bold tracking-widest text-cozy-primary">
               {lobby.code}
             </p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1 text-sm text-cozy-text-secondary">
+              {isHost ? "Vous êtes l'hôte" : "En attente de l'hôte"}
+            </p>
+            <p className="mt-1 text-sm text-cozy-text-secondary">
               {isHost ? "Vous êtes l’hôte" : "En attente de l’hôte"}
             </p>
           </div>
@@ -1070,7 +1181,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowShareParty(true)}
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-md"
+              className="rounded-xl bg-cozy-primary px-4 py-2.5 text-sm font-bold text-white shadow-md"
             >
               Partager
             </button>
@@ -1087,7 +1198,7 @@ export default function App() {
         )}
 
         {errorBanner && (
-          <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
+          <div className="mb-3 rounded-xl bg-red-100 p-3 text-sm text-cozy-red">
             {errorBanner}
           </div>
         )}
@@ -1097,22 +1208,22 @@ export default function App() {
             {joinRequestQueue.map((j) => (
               <div
                 key={j.requestId}
-                className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-xl border border-cozy-yellow/30 bg-cozy-yellow-muted p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                <p className="text-sm font-medium text-cozy-text">
                   <span className="font-bold">{j.nickname}</span> souhaite rejoindre
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                    className="flex-1 rounded-lg bg-cozy-success px-3 py-2 text-xs font-bold text-white"
                     onClick={() => respondJoinRequest(j.requestId, true)}
                   >
                     Accepter
                   </button>
                   <button
                     type="button"
-                    className="flex-1 rounded-lg bg-slate-200 px-3 py-2 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-slate-100"
+                    className="flex-1 rounded-lg bg-cozy-surface px-3 py-2 text-xs font-bold text-cozy-text ring-1 ring-cozy-border"
                     onClick={() => respondJoinRequest(j.requestId, false)}
                   >
                     Refuser
@@ -1124,37 +1235,37 @@ export default function App() {
         )}
 
         {geoError && (
-          <div className="mb-3 rounded-xl bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-950/80 dark:text-amber-100">
+          <div className="mb-3 rounded-lg bg-cozy-yellow-muted p-3 text-sm text-cozy-yellow">
             {geoError.message}
           </div>
         )}
 
         {!geoError && !position && (
-          <div className="mb-3 rounded-xl bg-slate-200 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          <div className="mb-3 rounded-lg bg-cozy-surface p-3 text-sm text-cozy-text-secondary ring-1 ring-cozy-border">
             Recherche du signal GPS... Autorisez la position.
           </div>
         )}
 
-        <div className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-700">
-          <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <div className="rounded-2xl bg-cozy-bg/95 p-4 shadow-sm ring-1 ring-cozy-border backdrop-blur">
+          <h2 className="mb-2 text-sm font-semibold text-cozy-text">
             Joueurs ({lobby.players?.length ?? 0})
           </h2>
           <ul className="space-y-2">
             {(lobby.players || []).map((p) => (
               <li
                 key={p.sessionId}
-                className="flex items-center justify-between text-slate-800 dark:text-slate-200"
+                className="flex items-center justify-between text-cozy-text"
               >
                 <span>
                   {p.nickname}
                   {p.disconnected ? (
-                    <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <span className="ml-2 text-xs font-medium text-cozy-yellow">
                       (déconnecté)
                     </span>
                   ) : null}
                 </span>
                 {p.sessionId === sessionId && (
-                  <span className="text-xs text-indigo-600 dark:text-indigo-400">vous</span>
+                  <span className="text-xs text-cozy-primary">vous</span>
                 )}
               </li>
             ))}
@@ -1162,12 +1273,12 @@ export default function App() {
         </div>
 
         {isHost && (
-          <div className="space-y-5 rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-700">
+          <div className="space-y-5 rounded-2xl bg-cozy-bg/95 p-4 shadow-sm ring-1 ring-cozy-border backdrop-blur">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <h2 className="text-sm font-semibold text-cozy-text">
                 Configuration de la partie
               </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-cozy-text-muted">
                 Règles visibles par tous une fois la chasse lancée. La discussion reste à droite (ordinateur) ou derrière le bouton bulle (téléphone).
               </p>
             </div>
@@ -1181,7 +1292,7 @@ export default function App() {
 
             {settings.zoneMode === "city" && (
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
+                <p className="mb-2 text-xs font-semibold uppercase text-cozy-text-muted">
                   Difficulté (zone ville)
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -1196,8 +1307,8 @@ export default function App() {
                       onClick={() => pushSettings({ cityDifficulty: id })}
                       className={`rounded-xl py-3 text-xs font-bold ${
                         (settings.cityDifficulty || "medium") === id
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600"
+                          ? "bg-cozy-primary text-white shadow-md"
+                          : "bg-cozy-surface text-cozy-text-secondary ring-1 ring-cozy-border"
                       }`}
                     >
                       {label}
@@ -1213,7 +1324,7 @@ export default function App() {
             {settings.zoneMode === "circle" && (
               <>
                 <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
+                  <label className="text-xs text-cozy-text-secondary">
                     Rayon zone (m) : {settings.globalRadiusM}
                   </label>
                   <input
@@ -1225,14 +1336,14 @@ export default function App() {
                     onChange={(e) =>
                       pushSettings({ globalRadiusM: Number(e.target.value) })
                     }
-                    className="mt-1 w-full accent-indigo-600"
+                    className="mt-1 w-full accent-cozy-primary"
                   />
                   <ConfigHint>
                     Taille du terrain autorisé autour du centre de partie. Hors de ce cercle, le jeu peut pénaliser ou masquer les positions.
                   </ConfigHint>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
+                  <label className="text-xs text-cozy-text-secondary">
                     Rayon brouillage (m) : {settings.jamRadiusM}
                   </label>
                   <input
@@ -1244,14 +1355,14 @@ export default function App() {
                     onChange={(e) =>
                       pushSettings({ jamRadiusM: Number(e.target.value) })
                     }
-                    className="mt-1 w-full accent-indigo-600"
+                    className="mt-1 w-full accent-cozy-primary"
                   />
                   <ConfigHint>
                     Autour de chaque joueur, une zone où la position des autres est volontairement imprécise pour les chats.
                   </ConfigHint>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
+                  <label className="text-xs text-cozy-text-secondary">
                     Délai carte chats (min) : {settings.catDelayMinutes ?? 5}
                   </label>
                   <input
@@ -1263,7 +1374,7 @@ export default function App() {
                     onChange={(e) =>
                       pushSettings({ catDelayMinutes: Number(e.target.value) })
                     }
-                    className="mt-1 w-full accent-indigo-600"
+                    className="mt-1 w-full accent-cozy-primary"
                   />
                   <ConfigHint>
                     Au début de la chasse, les chats ne voient pas tout de suite la carte complète : ce délai laisse aux joueurs le temps de s’éloigner.
@@ -1273,7 +1384,7 @@ export default function App() {
             )}
 
             <div>
-              <label className="text-xs text-slate-600 dark:text-slate-400">
+              <label className="text-xs text-cozy-text-secondary">
                 Nombre de chats : {settings.catCount}
               </label>
               <input
@@ -1288,15 +1399,15 @@ export default function App() {
                 onChange={(e) =>
                   pushSettings({ catCount: Number(e.target.value) })
                 }
-                className="mt-1 w-full accent-indigo-600"
+                className="mt-1 w-full accent-cozy-primary"
               />
               <ConfigHint>
                 Combien de participants seront désignés comme chats (traqueurs) pour attraper les autres.
               </ConfigHint>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-600 dark:bg-slate-800/80">
-              <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
+            <div className="rounded-lg border border-cozy-border bg-cozy-surface p-3">
+              <p className="mb-2 text-xs font-semibold uppercase text-cozy-text-muted">
                 Attribution des chats
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -1305,8 +1416,8 @@ export default function App() {
                   onClick={() => pushSettings({ catAssignmentMode: "random" })}
                   className={`rounded-xl py-2.5 text-xs font-bold ${
                     (settings.catAssignmentMode || "random") === "random"
-                      ? "bg-indigo-600 text-white shadow"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                      ? "bg-cozy-primary text-white shadow"
+                      : "bg-cozy-bg text-cozy-text-secondary ring-1 ring-cozy-border"
                   }`}
                 >
                   Tirage aléatoire
@@ -1316,8 +1427,8 @@ export default function App() {
                   onClick={() => pushSettings({ catAssignmentMode: "manual" })}
                   className={`rounded-xl py-2.5 text-xs font-bold ${
                     settings.catAssignmentMode === "manual"
-                      ? "bg-indigo-600 text-white shadow"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                      ? "bg-cozy-primary text-white shadow"
+                      : "bg-cozy-bg text-cozy-text-secondary ring-1 ring-cozy-border"
                   }`}
                 >
                   Choix par l&apos;hôte
@@ -1329,12 +1440,12 @@ export default function App() {
             </div>
 
             {settings.zoneMode === "circle" && (
-              <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
-                <p className="mb-2 text-xs font-bold uppercase text-slate-500">
+              <div className="border-t border-cozy-border pt-3">
+                <p className="mb-2 text-xs font-bold uppercase text-cozy-text-muted">
                   Options avancées
                 </p>
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/80">
-                  <span className="text-sm text-slate-800 dark:text-slate-100">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-cozy-border bg-cozy-surface px-3 py-2.5">
+                  <span className="text-sm text-cozy-text">
                     Zone globale qui rétrécit
                   </span>
                   <input
@@ -1343,7 +1454,7 @@ export default function App() {
                     onChange={(e) =>
                       pushSettings({ shrinkZoneEnabled: e.target.checked })
                     }
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
+                    className="h-5 w-5 rounded border-cozy-border text-cozy-primary"
                   />
                 </label>
                 <ConfigHint>
@@ -1351,7 +1462,7 @@ export default function App() {
                 </ConfigHint>
                 {settings.shrinkZoneEnabled && (
                   <div className="mt-2 space-y-2 pl-1">
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
+                    <label className="text-xs text-cozy-text-secondary">
                       Durée jusqu&apos;au rayon min (min) :{" "}
                       {settings.shrinkDurationMinutes ?? 15}
                     </label>
@@ -1366,9 +1477,9 @@ export default function App() {
                           shrinkDurationMinutes: Number(e.target.value),
                         })
                       }
-                      className="w-full accent-indigo-600"
+                      className="w-full accent-cozy-primary"
                     />
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
+                    <label className="text-xs text-cozy-text-secondary">
                       Rayon minimum (m) : {settings.shrinkMinRadiusM ?? 100}
                     </label>
                     <input
@@ -1382,9 +1493,9 @@ export default function App() {
                           shrinkMinRadiusM: Number(e.target.value),
                         })
                       }
-                      className="w-full accent-indigo-600"
+                      className="w-full accent-cozy-primary"
                     />
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
+                    <label className="text-xs text-cozy-text-secondary">
                       Paliers : {settings.shrinkPhases ?? 5}
                     </label>
                     <input
@@ -1396,13 +1507,13 @@ export default function App() {
                       onChange={(e) =>
                         pushSettings({ shrinkPhases: Number(e.target.value) })
                       }
-                      className="w-full accent-indigo-600"
+                      className="w-full accent-cozy-primary"
                     />
                   </div>
                 )}
 
-                <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/80">
-                  <span className="text-sm text-slate-800 dark:text-slate-100">
+                <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-cozy-border bg-cozy-surface px-3 py-2.5">
+                  <span className="text-sm text-cozy-text">
                     Limite de durée
                   </span>
                   <input
@@ -1411,7 +1522,7 @@ export default function App() {
                     onChange={(e) =>
                       pushSettings({ timeLimitEnabled: e.target.checked })
                     }
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
+                    className="h-5 w-5 rounded border-cozy-border text-cozy-primary"
                   />
                 </label>
                 <ConfigHint>
@@ -1419,7 +1530,7 @@ export default function App() {
                 </ConfigHint>
                 {settings.timeLimitEnabled && (
                   <div className="mt-2 pl-1">
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
+                    <label className="text-xs text-cozy-text-secondary">
                       Minutes max : {settings.timeLimitMinutes ?? 30}
                     </label>
                     <input
@@ -1433,7 +1544,7 @@ export default function App() {
                           timeLimitMinutes: Number(e.target.value),
                         })
                       }
-                      className="w-full accent-indigo-600"
+                      className="w-full accent-cozy-primary"
                     />
                   </div>
                 )}
@@ -1447,18 +1558,18 @@ export default function App() {
             type="button"
             onClick={onRevealRoles}
             disabled={!lobby.canStartGps || !lobby.canRevealRoles}
-            className="mt-auto w-full rounded-xl bg-emerald-600 py-4 text-base font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 hover:bg-emerald-700 active:bg-emerald-800"
+            className="mt-auto w-full rounded-xl bg-cozy-success py-4 text-base font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 hover:brightness-90 active:brightness-75"
           >
             Reveler les roles
           </button>
         )}
         {isHost && !lobby.canRevealRoles && (
-          <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+          <p className="mt-2 text-center text-xs text-cozy-yellow">
             Il faut au moins 2 joueurs dans la salle pour lancer la partie.
           </p>
         )}
         {isHost && lobby.canRevealRoles && !lobby.canStartGps && (
-          <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+          <p className="mt-2 text-center text-xs text-cozy-yellow">
             Au moins une position GPS est necessaire pour le centre de la zone.
           </p>
         )}
@@ -1482,7 +1593,7 @@ export default function App() {
   // Role reveal screen
   if (stage === "role_reveal" && rolesReveal) {
     return (
-      <div className="flex min-h-full flex-col bg-gradient-to-b from-slate-50 to-slate-100/90 dark:from-slate-950 dark:to-slate-900">
+      <div className="flex min-h-full flex-col bg-cozy-bg">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
 
@@ -1498,14 +1609,14 @@ export default function App() {
           <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <header className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Avant la chasse</p>
-            <p className="font-mono text-2xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
+            <p className="text-xs font-medium uppercase tracking-wide text-cozy-text-muted">Avant la chasse</p>
+            <p className="font-mono text-2xl font-bold tracking-widest text-cozy-primary">
               {rolesReveal.code}
             </p>
-            <h1 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            <h1 className="mt-1 text-lg font-semibold tracking-tight text-cozy-text">
               Attribution des rôles
             </h1>
-            <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1 max-w-md text-sm text-cozy-text-secondary">
               Chaque participant voit son camp. En mode manuel, l&apos;hôte règle les autres joueurs uniquement — pas sa propre ligne.
             </p>
           </div>
@@ -1513,7 +1624,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowShareParty(true)}
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+              className="rounded-xl bg-cozy-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-cozy-primary-hover"
             >
               Partager
             </button>
@@ -1522,7 +1633,7 @@ export default function App() {
         </header>
 
         {errorBanner && (
-          <div className="rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
+          <div className="rounded-xl bg-red-100 p-3 text-sm text-cozy-red">
             {errorBanner}
           </div>
         )}
@@ -1532,22 +1643,22 @@ export default function App() {
             {joinRequestQueue.map((j) => (
               <div
                 key={j.requestId}
-                className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 rounded-xl border border-cozy-yellow/30 bg-cozy-yellow-muted p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+                <p className="text-sm font-medium text-cozy-text">
                   <span className="font-bold">{j.nickname}</span> souhaite rejoindre
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+                    className="flex-1 rounded-lg bg-cozy-success px-3 py-2 text-xs font-bold text-white"
                     onClick={() => respondJoinRequest(j.requestId, true)}
                   >
                     Accepter
                   </button>
                   <button
                     type="button"
-                    className="flex-1 rounded-lg bg-slate-200 px-3 py-2 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-slate-100"
+                    className="flex-1 rounded-lg bg-cozy-surface px-3 py-2 text-xs font-bold text-cozy-text ring-1 ring-cozy-border"
                     onClick={() => respondJoinRequest(j.requestId, false)}
                   >
                     Refuser
@@ -1559,7 +1670,7 @@ export default function App() {
         )}
 
         {(rolesReveal?.settings?.catAssignmentMode || "random") === "manual" && isHost && (
-          <div className="rounded-2xl border border-sky-200/80 bg-sky-50/90 p-4 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
+          <div className="rounded-2xl border border-cozy-player/20 bg-cozy-player-muted p-4 text-sm text-cozy-text">
             <p className="font-semibold">Mode manuel (hôte)</p>
             <p className="mt-1 text-xs leading-relaxed">
               Pour chaque autre joueur, appuyez une fois sur <strong>Chat</strong> ou <strong>Joueur</strong> jusqu&apos;à obtenir exactement{" "}
@@ -1574,29 +1685,29 @@ export default function App() {
               key={p.sessionId}
               className={`rounded-2xl p-4 shadow-sm ring-1 ${
                 p.sessionId === sessionId
-                  ? "bg-indigo-50/90 ring-indigo-200 dark:bg-indigo-950/40 dark:ring-indigo-800"
-                  : "bg-white/90 ring-slate-200/90 dark:bg-slate-900/80 dark:ring-slate-700"
+                  ? "bg-cozy-primary-muted ring-cozy-primary/20"
+                  : "bg-cozy-bg ring-cozy-border"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium text-slate-900 dark:text-white">
+                <span className="font-medium text-cozy-text">
                   {p.nickname}
                   {p.sessionId === sessionId ? (
-                    <span className="ml-2 text-xs font-normal text-indigo-600 dark:text-indigo-400">vous</span>
+                    <span className="ml-2 text-xs font-normal text-cozy-primary">vous</span>
                   ) : null}
                 </span>
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-bold ${
                     p.role === "cat"
-                      ? "bg-orange-100 text-orange-800 dark:bg-orange-950/80 dark:text-orange-200"
-                      : "bg-sky-100 text-sky-800 dark:bg-sky-950/80 dark:text-sky-200"
+                      ? "bg-cozy-cat-muted text-cozy-cat"
+                      : "bg-cozy-player-muted text-cozy-player"
                   }`}
                 >
                   {p.role === "cat" ? "Chat" : "Joueur"}
                 </span>
               </div>
               {p.sessionId === sessionId && (
-                <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                <p className="mt-2 text-xs text-cozy-text-secondary">
                   {p.role === "cat"
                     ? "Vous traquez les joueurs sur la carte et validez les captures au scanner."
                     : "Vous fuyez, partagez la discussion si besoin, et montrez votre QR à un chat pour être capturé."}
@@ -1607,14 +1718,14 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      className="rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 active:scale-[0.98] dark:bg-orange-600 dark:hover:bg-orange-500"
+                      className="rounded-xl bg-cozy-cat py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cozy-cat active:scale-[0.98] "
                       onClick={() => adminSetRole(p.sessionId, "cat")}
                     >
                       Chat
                     </button>
                     <button
                       type="button"
-                      className="rounded-xl bg-sky-500 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 active:scale-[0.98] dark:bg-sky-600 dark:hover:bg-sky-500"
+                      className="rounded-xl bg-cozy-player py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 active:scale-[0.98] "
                       onClick={() => adminSetRole(p.sessionId, "player")}
                     >
                       Joueur
@@ -1625,7 +1736,7 @@ export default function App() {
                   </ConfigHint>
                   <button
                     type="button"
-                    className="w-full rounded-xl border border-red-200 bg-red-50/90 py-2.5 text-xs font-semibold text-red-800 transition hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+                    className="w-full rounded-xl border border-cozy-red/20 bg-cozy-red-muted py-2.5 text-xs font-semibold text-cozy-red transition hover:brightness-95"
                     onClick={() => adminKick(p.sessionId)}
                   >
                     Expulser de la salle
@@ -1644,12 +1755,12 @@ export default function App() {
             type="button"
             onClick={onBeginHunt}
             disabled={(rolesReveal?.players?.length ?? 0) < 2}
-            className="w-full rounded-2xl bg-orange-600 py-4 text-base font-semibold text-white shadow-md transition hover:bg-orange-700 disabled:opacity-40"
+            className="w-full rounded-2xl bg-cozy-cat py-4 text-base font-semibold text-white shadow-md transition hover:brightness-90 disabled:opacity-40"
           >
             Démarrer la chasse
           </button>
         ) : (
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-center text-sm text-cozy-text-muted">
             En attente du démarrage par l&apos;hôte…
           </p>
         )}
@@ -1672,12 +1783,12 @@ export default function App() {
 
   if (stage === "game" && !gameState) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-slate-50 p-6 dark:bg-slate-950">
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-cozy-bg p-6">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-        <p className="text-slate-600 dark:text-slate-400">Synchronisation...</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-cozy-primary/20 border-t-cozy-primary" />
+        <p className="text-cozy-text-secondary">Synchronisation...</p>
         {geoError && (
-          <p className="text-center text-sm text-amber-600 dark:text-amber-400">{geoError.message}</p>
+          <p className="text-center text-sm text-cozy-yellow">{geoError.message}</p>
         )}
       </div>
     );
@@ -1704,10 +1815,10 @@ export default function App() {
 
     const renderAdminPanel = () => (
       <div className="h-full overflow-auto p-4">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">
+        <h2 className="mb-1 text-lg font-semibold text-cozy-text">
           Contrôle hôte
         </h2>
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mb-4 text-xs text-cozy-text-muted">
           Actions visibles par tous : expliquez-les si besoin pour éviter les surprises.
         </p>
         <button
@@ -1721,7 +1832,7 @@ export default function App() {
               adminEndGame();
             }
           }}
-          className="mb-2 w-full rounded-xl border border-red-300 bg-red-50 py-3 text-sm font-semibold text-red-800 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
+          className="mb-2 w-full rounded-xl border border-cozy-red/20 bg-cozy-red-muted py-3 text-sm font-semibold text-cozy-red"
         >
           Fermer la partie (récap pour tous)
         </button>
@@ -1732,33 +1843,33 @@ export default function App() {
           {rosterList.map((p) => (
             <li
               key={p.sessionId}
-              className="rounded-2xl bg-slate-100 p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
+              className="rounded-2xl bg-cozy-surface p-4 ring-1 ring-cozy-border"
             >
-              <div className="font-medium text-slate-900 dark:text-white">
+              <div className="font-medium text-cozy-text">
                 {p.nickname}
                 {p.sessionId === sessionId ? " (vous)" : ""}
               </div>
-              <p className="text-xs text-slate-500">{roleBadgeText(p)}</p>
+              <p className="text-xs text-cozy-text-muted">{roleBadgeText(p)}</p>
               {p.sessionId !== sessionId && (
                 <div className="mt-3 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white dark:bg-orange-600"
+                      className="rounded-lg bg-cozy-cat px-3 py-2 text-xs font-semibold text-white"
                       onClick={() => adminSetRole(p.sessionId, "cat")}
                     >
                       Chat
                     </button>
                     <button
                       type="button"
-                      className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white dark:bg-sky-600"
+                      className="rounded-lg bg-cozy-player px-3 py-2 text-xs font-semibold text-white"
                       onClick={() => adminSetRole(p.sessionId, "player")}
                     >
                       Joueur
                     </button>
                     <button
                       type="button"
-                      className="rounded-lg bg-red-100 px-3 py-2 text-xs font-semibold text-red-800 dark:bg-red-950 dark:text-red-200"
+                      className="rounded-lg bg-cozy-red-muted px-3 py-2 text-xs font-semibold text-cozy-red"
                       onClick={() => adminKick(p.sessionId)}
                     >
                       Expulser
@@ -1780,11 +1891,11 @@ export default function App() {
       const base =
         "flex-1 py-3 text-sm font-semibold transition-colors md:py-2.5 disabled:opacity-40";
       const topCls = active
-        ? "border-b-2 border-indigo-500 text-indigo-700 dark:text-indigo-300"
-        : "border-b-2 border-transparent text-slate-500";
+        ? "border-b-2 border-cozy-primary text-cozy-primary"
+        : "border-b-2 border-transparent text-cozy-text-muted";
       const bottomCls = active
-        ? "text-indigo-700 dark:text-indigo-200"
-        : "text-slate-500";
+        ? "text-cozy-primary"
+        : "text-cozy-text-muted";
       return (
         <button
           key={id}
@@ -1799,11 +1910,11 @@ export default function App() {
     };
 
     return (
-      <div className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-950">
+      <div className="flex h-full min-h-0 flex-col bg-cozy-bg">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
 
-        <header className="z-10 hidden shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:flex">
+        <header className="z-10 hidden shrink-0 items-center justify-between gap-2 border-b border-cozy-border bg-cozy-bg/95 px-3 py-2 backdrop-blur md:flex">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {catLocked && isCat && gameState.mapUnlockAt && (
@@ -1816,29 +1927,29 @@ export default function App() {
                 <GameTimer endsAt={gameState.timeLimitEndsAt} />
               )}
             </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-600 dark:text-slate-400">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-cozy-text-secondary">
               <span
                 className={
                   role === "cat"
-                    ? "font-semibold text-orange-600 dark:text-orange-400"
-                    : "font-semibold text-sky-600 dark:text-sky-400"
+                    ? "font-semibold text-cozy-cat"
+                    : "font-semibold text-cozy-player"
                 }
               >
                 {role === "cat" ? "Vous êtes chat" : role === "player" ? "Vous êtes joueur" : ""}
               </span>
-              {me?.spectator && <span className="text-slate-500">· Spectateur</span>}
+              {me?.spectator && <span className="text-cozy-text-muted">· Spectateur</span>}
               {gameState.settings?.shrinkZoneEnabled && (
-                <span className="text-violet-600 dark:text-violet-400">· Zone rétrécit</span>
+                <span className="text-cozy-primary">· Zone rétrécit</span>
               )}
             </p>
           </div>
           <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
           {!connected && (
-            <span className="animate-pulse text-xs text-red-500">Déconnecté</span>
+            <span className="animate-pulse text-xs text-cozy-red">Déconnecté</span>
           )}
         </header>
 
-        <div className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+        <div className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-cozy-border bg-cozy-bg/95 px-3 py-2 backdrop-blur md:hidden">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {catLocked && isCat && gameState.mapUnlockAt && (
@@ -1851,7 +1962,7 @@ export default function App() {
                 <GameTimer endsAt={gameState.timeLimitEndsAt} />
               )}
             </div>
-            <p className="mt-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">
+            <p className="mt-0.5 text-xs font-medium text-cozy-text-secondary">
               {role === "cat" ? "Chat" : role === "player" ? "Joueur" : ""}
               {me?.spectator ? " · Spectateur" : ""}
             </p>
@@ -1860,26 +1971,26 @@ export default function App() {
         </div>
 
         {isHost && joinRequestQueue.length > 0 && (
-          <div className="z-[1200] shrink-0 space-y-2 border-b border-amber-200 bg-amber-50/95 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/80">
+          <div className="z-[1200] shrink-0 space-y-2 border-b border-cozy-yellow/30 bg-cozy-yellow-muted px-3 py-2">
             {joinRequestQueue.map((j) => (
               <div
                 key={j.requestId}
                 className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
               >
-                <p className="text-xs font-medium text-amber-950 dark:text-amber-100">
+                <p className="text-xs font-medium text-cozy-text">
                   <span className="font-bold">{j.nickname}</span> demande à rejoindre
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"
+                    className="rounded-lg bg-cozy-success px-3 py-1.5 text-xs font-bold text-white"
                     onClick={() => respondJoinRequest(j.requestId, true)}
                   >
                     Accepter
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-slate-100"
+                    className="rounded-lg bg-cozy-surface px-3 py-1.5 text-xs font-bold text-cozy-text ring-1 ring-cozy-border"
                     onClick={() => respondJoinRequest(j.requestId, false)}
                   >
                     Refuser
@@ -1891,7 +2002,7 @@ export default function App() {
         )}
 
         {errorBanner && (
-          <div className="z-10 shrink-0 bg-red-100 px-3 py-2 text-center text-sm text-red-900 dark:bg-red-950/95 dark:text-red-100">
+          <div className="z-10 shrink-0 bg-cozy-red-muted px-3 py-2 text-center text-sm text-cozy-red">
             {errorBanner}
             <button
               type="button"
@@ -1905,50 +2016,50 @@ export default function App() {
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="hidden shrink-0 border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90 md:flex">
+        <div className="hidden shrink-0 border-b border-cozy-border bg-cozy-surface md:flex">
           {tabBtn("map", "Carte", !showMapTab)}
           {tabBtn("players", "Joueurs")}
           {isHost && tabBtn("admin", "Admin")}
         </div>
 
-        <div className="relative min-h-0 flex-1 bg-slate-200 pb-[5.5rem] dark:bg-slate-900 md:pb-0">
+        <div className="relative min-h-0 flex-1 bg-cozy-surface pb-[5.5rem] md:pb-0">
           {gameTab === "players" && (
             <div className="h-full overflow-auto p-4">
-              <div className="mb-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <div className="mb-4 rounded-2xl bg-cozy-bg p-4 ring-1 ring-cozy-border">
+                <p className="text-xs font-medium uppercase tracking-wide text-cozy-text-muted">
                   Code de la partie
                 </p>
-                <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
+                <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-cozy-primary">
                   {currentRoomCode}
                 </p>
               </div>
-              <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <h2 className="mb-3 text-sm font-semibold text-cozy-text-muted">
                 Participants
               </h2>
               <ul className="space-y-3">
                 {rosterList.map((p) => (
                   <li
                     key={p.sessionId}
-                    className="rounded-xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
+                    className="rounded-xl bg-cozy-bg p-4 ring-1 ring-cozy-border"
                   >
-                    <span className="font-medium text-slate-900 dark:text-white">
+                    <span className="font-medium text-cozy-text">
                       {p.nickname}
                       {p.sessionId === sessionId && (
-                        <span className="ml-1 text-xs text-indigo-600 dark:text-indigo-400">
+                        <span className="ml-1 text-xs text-cozy-primary">
                           (vous)
                         </span>
                       )}
                     </span>
                     {p.disconnected && (
-                      <span className="ml-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      <span className="ml-2 text-xs font-medium text-cozy-yellow">
                         Déconnecté
                       </span>
                     )}
                     <p
                       className={`mt-1 text-sm ${
                         p.role === "cat"
-                          ? "text-orange-600 dark:text-orange-400"
-                          : "text-sky-600 dark:text-sky-400"
+                          ? "text-cozy-cat"
+                          : "text-cozy-player"
                       }`}
                     >
                       {roleBadgeText(p)}
@@ -2004,23 +2115,23 @@ export default function App() {
           )}
         </div>
 
-        <nav className="fixed bottom-[68px] left-0 right-0 z-[800] flex gap-0.5 border-t border-slate-200 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+        <nav className="fixed bottom-[68px] left-0 right-0 z-[800] flex gap-0.5 border-t border-cozy-border bg-cozy-bg/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
           {tabBtn("map", "Carte", !showMapTab, "bottom")}
           {tabBtn("players", "Joueurs", false, "bottom")}
           {isHost && tabBtn("admin", "Admin", false, "bottom")}
         </nav>
 
-        <footer className="z-10 hidden shrink-0 gap-2 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:flex">
+        <footer className="z-10 hidden shrink-0 gap-2 border-t border-cozy-border bg-cozy-bg/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:flex">
           {capturedPrey && sessionId && (
-            <div className="flex flex-1 items-center gap-4 rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800">
-              <div className="shrink-0 rounded-lg bg-white p-2 dark:bg-slate-900">
+            <div className="flex flex-1 items-center gap-4 rounded-xl bg-cozy-surface px-4 py-3">
+              <div className="shrink-0 rounded-lg bg-cozy-bg p-2">
                 <QRCodeSVG value={sessionId} size={88} level="M" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                <p className="text-sm font-bold text-cozy-text">
                   Je me suis fait attraper
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-cozy-text-muted">
                   Spectateur · montrez encore ce QR au besoin
                 </p>
               </div>
@@ -2030,7 +2141,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowQr(true)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-200 py-4 text-base font-semibold text-slate-800 transition-colors hover:bg-slate-300 active:bg-slate-400 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-cozy-surface py-4 text-base font-semibold text-cozy-text transition-colors hover:bg-cozy-border/50 ring-1 ring-cozy-border"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
@@ -2045,7 +2156,7 @@ export default function App() {
                 setErrorBanner(null);
                 setShowScan(true);
               }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 py-4 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:bg-orange-800"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-cozy-cat py-4 text-base font-semibold text-white transition-colors hover:brightness-90 active:brightness-75"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -2056,17 +2167,17 @@ export default function App() {
           )}
         </footer>
 
-        <footer className="z-10 flex shrink-0 gap-2 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+        <footer className="z-10 flex shrink-0 gap-2 border-t border-cozy-border bg-cozy-bg/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
           {capturedPrey && sessionId && (
-            <div className="flex w-full items-center gap-3 rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-              <div className="shrink-0 rounded-lg bg-white p-1.5 dark:bg-slate-900">
+            <div className="flex w-full items-center gap-3 rounded-xl bg-cozy-surface px-3 py-2">
+              <div className="shrink-0 rounded-lg bg-cozy-bg p-1.5">
                 <QRCodeSVG value={sessionId} size={72} level="M" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                <p className="text-sm font-bold text-cozy-text">
                   Je me suis fait attraper
                 </p>
-                <p className="text-xs text-slate-500">Spectateur</p>
+                <p className="text-xs text-cozy-text-muted">Spectateur</p>
               </div>
             </div>
           )}
@@ -2074,7 +2185,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowQr(true)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-white"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-cozy-surface py-3 text-sm font-semibold text-cozy-text ring-1 ring-cozy-border"
             >
               Mon QR
             </button>
@@ -2086,7 +2197,7 @@ export default function App() {
                 setErrorBanner(null);
                 setShowScan(true);
               }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 text-sm font-semibold text-white"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-cozy-cat py-3 text-sm font-semibold text-white"
             >
               Scanner capture
             </button>
@@ -2121,8 +2232,8 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-slate-50 p-6 text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+    <div className="flex min-h-full items-center justify-center bg-cozy-bg p-6 text-cozy-text-muted">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-cozy-primary/20 border-t-cozy-primary" />
     </div>
   );
 }
