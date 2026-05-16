@@ -74,9 +74,9 @@ export default function MapControls({
     <div className="pointer-events-none absolute bottom-24 right-3 z-[1000] flex flex-col items-end gap-2">
       {/* Layer selector popup */}
       {showLayers && (
-        <div className="pointer-events-auto mb-2 w-40 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-          <div className="border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-            <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+        <div className="pointer-events-auto mb-2 w-40 overflow-hidden rounded-lg bg-[var(--color-bg)] shadow-card-lg ring-1 ring-[var(--color-border)]">
+          <div className="border-b border-[var(--color-border)] px-3 py-2">
+            <p className="text-xs font-semibold uppercase text-[var(--color-text-faint)]">
               Style de carte
             </p>
           </div>
@@ -91,16 +91,16 @@ export default function MapControls({
                 }}
                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                   basemapId === id
-                    ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                    : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                    ? "bg-brand-blue/10 text-brand-blue ring-1 ring-brand-blue/20 dark:bg-brand-blue/15 dark:text-brand-blue"
+                    : "text-[var(--color-text)] hover:bg-[var(--color-bg-overlay)]"
                 }`}
               >
-                <span className={basemapId === id ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500"}>
+                <span className={basemapId === id ? "text-brand-blue" : "text-[var(--color-text-faint)]"}>
                   {mapIcons[id] || mapIcons.osm}
                 </span>
                 <span className="flex-1 font-medium">{b.name}</span>
                 {basemapId === id && (
-                  <span className="text-indigo-600 dark:text-indigo-400">
+                  <span className="text-brand-blue">
                     {icons.check}
                   </span>
                 )}
@@ -116,7 +116,7 @@ export default function MapControls({
         <button
           type="button"
           onClick={onRecenter}
-          className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-slate-700 shadow-lg ring-1 ring-slate-200 transition-colors active:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700 dark:active:bg-slate-800"
+          className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--color-bg)] text-[var(--color-text-muted)] shadow-card-lg ring-1 ring-[var(--color-border)] transition-all active:bg-[var(--color-bg-overlay)]"
           title="Centrer sur moi"
         >
           {icons.location}
@@ -126,10 +126,10 @@ export default function MapControls({
         <button
           type="button"
           onClick={() => setShowLayers(!showLayers)}
-          className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-lg ring-1 transition-colors ${
+          className={`flex h-11 w-11 items-center justify-center rounded-lg shadow-card-lg ring-1 transition-all ${
             showLayers
-              ? "bg-indigo-600 text-white ring-indigo-600"
-              : "bg-white text-slate-700 ring-slate-200 active:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700 dark:active:bg-slate-800"
+              ? "bg-brand-blue text-white ring-brand-blue"
+              : "bg-[var(--color-bg)] text-[var(--color-text-muted)] ring-[var(--color-border)] active:bg-[var(--color-bg-overlay)]"
           }`}
           title="Changer le style de carte"
         >
@@ -137,11 +137,11 @@ export default function MapControls({
         </button>
 
         {/* Zoom controls */}
-        <div className="flex flex-col overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+        <div className="flex flex-col overflow-hidden rounded-lg bg-[var(--color-bg)] shadow-card-lg ring-1 ring-[var(--color-border)]">
           <button
             type="button"
             onClick={onZoomIn}
-            className="flex h-10 w-11 items-center justify-center border-b border-slate-200 text-slate-700 transition-colors active:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:active:bg-slate-800"
+            className="flex h-10 w-11 items-center justify-center border-b border-[var(--color-border)] text-[var(--color-text-muted)] transition-all active:bg-[var(--color-bg-overlay)]"
             title="Zoom +"
           >
             {icons.zoomIn}
@@ -149,7 +149,7 @@ export default function MapControls({
           <button
             type="button"
             onClick={onZoomOut}
-            className="flex h-10 w-11 items-center justify-center text-slate-700 transition-colors active:bg-slate-100 dark:text-slate-200 dark:active:bg-slate-800"
+            className="flex h-10 w-11 items-center justify-center text-[var(--color-text-muted)] transition-all active:bg-[var(--color-bg-overlay)]"
             title="Zoom -"
           >
             {icons.zoomOut}

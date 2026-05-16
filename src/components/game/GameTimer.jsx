@@ -39,10 +39,10 @@ export default function GameTimer({ endsAt, className = "" }) {
     <div
       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-bold tabular-nums ${
         isUrgent
-          ? "animate-pulse bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+          ? "animate-pulse bg-brand-red-light text-brand-red ring-1 ring-brand-red/20 dark:bg-brand-red/15 dark:text-brand-red dark:ring-brand-red/30"
           : isWarning
-            ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-            : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            ? "bg-brand-yellow-light text-brand-yellow-dark ring-1 ring-brand-yellow/20 dark:bg-brand-yellow/15 dark:text-brand-yellow dark:ring-brand-yellow/30"
+            : "bg-[var(--color-bg-overlay)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border)]"
       } ${className}`}
     >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

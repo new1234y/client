@@ -20,12 +20,12 @@ export default function PartyDiscussionChrome({
 }) {
   if (desktop) {
     return (
-      <aside className="flex h-full min-h-0 w-full max-w-[400px] shrink-0 flex-col border-l border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="shrink-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <h2 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
+      <aside className="flex h-full min-h-0 w-full max-w-[400px] shrink-0 flex-col border-l border-[var(--color-border)] bg-[var(--color-bg)]">
+        <div className="shrink-0 border-b border-[var(--color-border)] px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight text-[var(--color-text)]">
             Discussion
           </h2>
-          <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 text-[11px] leading-snug text-[var(--color-text-muted)]">
             Messages, photos géolocalisées et points GPS partagés avec la partie.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function PartyDiscussionChrome({
       <button
         type="button"
         onClick={() => onToggle(!open)}
-        className={`fixed z-[880] flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-900/25 ring-2 ring-white/20 transition active:scale-95 dark:bg-indigo-500 dark:ring-slate-900/50 ${fabAlignClass} ${fabBottomClass}`}
+        className={`fixed z-[880] flex h-14 w-14 items-center justify-center rounded-lg bg-brand-blue text-white shadow-card-lg ring-2 ring-white/20 transition active:scale-95 dark:bg-brand-blue dark:ring-navy-800/50 ${fabAlignClass} ${fabBottomClass}`}
         aria-expanded={open}
         aria-label={open ? "Fermer la discussion" : "Ouvrir la discussion"}
       >
@@ -70,23 +70,23 @@ export default function PartyDiscussionChrome({
           onClick={() => onToggle(false)}
         >
           <div
-            className="flex max-h-[min(78dvh,560px)] min-h-[45dvh] flex-col rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900"
+            className="flex max-h-[min(78dvh,560px)] min-h-[45dvh] flex-col rounded-t-2xl bg-[var(--color-bg)] shadow-card-lg"
             role="dialog"
             aria-modal="true"
             aria-label="Discussion de partie"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Discussion</h2>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <h2 className="text-sm font-semibold text-[var(--color-text)]">Discussion</h2>
+                <p className="text-[11px] text-[var(--color-text-muted)]">
                   Fermez pour revenir à la carte sans quitter la partie.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => onToggle(false)}
-                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="rounded-lg bg-[var(--color-bg-overlay)] px-3 py-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-border)]"
               >
                 Fermer
               </button>

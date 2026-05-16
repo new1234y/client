@@ -27,12 +27,12 @@ export function useNotifications() {
 }
 
 const typeStyles = {
-  info: "bg-indigo-600 text-white",
+  info: "bg-brand-blue text-white",
   success: "bg-emerald-600 text-white",
-  warning: "bg-amber-500 text-slate-900",
-  error: "bg-red-600 text-white",
-  player_left: "bg-slate-700 text-white",
-  player_joined: "bg-sky-600 text-white",
+  warning: "bg-brand-yellow text-white",
+  error: "bg-brand-red text-white",
+  player_left: "bg-navy-700 text-white dark:bg-navy-600",
+  player_joined: "bg-brand-blue text-white",
 };
 
 const typeIcons = {
@@ -76,15 +76,15 @@ export function NotificationContainer({ notifications, onRemove }) {
       {notifications.map((notif) => (
         <div
           key={notif.id}
-          className={`pointer-events-auto flex w-[min(100%,24rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-2xl border-2 border-white/25 px-4 py-3.5 text-left shadow-2xl ring-2 ring-black/10 backdrop-blur-md transition-all duration-300 dark:border-white/10 dark:ring-white/5 ${typeStyles[notif.type] || typeStyles.info}`}
+          className={`pointer-events-auto flex w-[min(100%,24rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-lg border-2 border-white/25 px-4 py-3.5 text-left shadow-card-lg ring-2 ring-black/10 backdrop-blur-md transition-all duration-300 dark:border-white/10 dark:ring-white/5 ${typeStyles[notif.type] || typeStyles.info}`}
           role="alert"
         >
           {typeIcons[notif.type] || typeIcons.info}
-          <span className="text-sm font-medium">{notif.message}</span>
+          <span className="text-sm font-semibold">{notif.message}</span>
           <button
             type="button"
             onClick={() => onRemove(notif.id)}
-            className="ml-2 rounded-full p-1 opacity-70 hover:opacity-100"
+            className="ml-auto rounded-full p-1 opacity-80 hover:opacity-100"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

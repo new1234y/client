@@ -1,16 +1,69 @@
 @import "leaflet/dist/leaflet.css";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────────── */
+:root {
+  --color-primary:       #3b82f6;
+  --color-primary-dk:    #2563eb;
+  --color-accent:        #f59e0b;
+  --color-accent-dk:     #d97706;
+  --color-danger:        #ef4444;
+  --color-danger-dk:     #dc2626;
+
+  --color-bg:            #ffffff;
+  --color-bg-raised:     #f8fafc;
+  --color-bg-overlay:    #f1f5f9;
+  --color-border:        #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-text:          #0f172a;
+  --color-text-muted:    #64748b;
+  --color-text-faint:    #94a3b8;
+
+  --color-cat:           #ef4444;
+  --color-cat-bg:        #fef2f2;
+  --color-cat-ring:      #fecaca;
+  --color-player:        #3b82f6;
+  --color-player-bg:     #eff6ff;
+  --color-player-ring:   #bfdbfe;
+
+  --radius: 8px;
+}
+
+.dark {
+  --color-bg:            #0f172a;
+  --color-bg-raised:     #1e293b;
+  --color-bg-overlay:    #1e293b;
+  --color-border:        #334155;
+  --color-border-strong: #475569;
+
+  --color-text:          #f1f5f9;
+  --color-text-muted:    #94a3b8;
+  --color-text-faint:    #334155;
+
+  --color-cat-bg:        rgba(239,68,68,0.12);
+  --color-cat-ring:      rgba(239,68,68,0.30);
+  --color-player-bg:     rgba(59,130,246,0.12);
+  --color-player-ring:   rgba(59,130,246,0.30);
+}
+
+/* ── Base ───────────────────────────────────────────────── */
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ── Leaflet overrides ─────────────────────────────────── */
 .leaflet-container {
   font-family: inherit;
 }
@@ -20,12 +73,40 @@ body,
   border: none !important;
 }
 
+/* ── Shared component classes ───────────────────────────── */
+.card {
+  background: var(--color-bg-raised);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06);
+}
+
+.badge-cat {
+  background: var(--color-cat-bg);
+  color: var(--color-cat);
+  border: 1px solid var(--color-cat-ring);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badge-player {
+  background: var(--color-player-bg);
+  color: var(--color-player);
+  border: 1px solid var(--color-player-ring);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .self-player-ring {
   animation: self-ring-spin 12s linear infinite;
 }
 
 @keyframes self-ring-spin {
-  to {
-    stroke-dashoffset: -120;
-  }
+  to { stroke-dashoffset: -120; }
 }
+
+input[type="range"] { accent-color: var(--color-primary); }
