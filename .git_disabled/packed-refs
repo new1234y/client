@@ -1,0 +1,6 @@
+# pack-refs with: peeled fully-peeled sorted 
+b8daa706caacd0c20b7c6f468e12bb2b315cddd1 refs/remotes/origin/game-ui-redesign
+856d622ab5bc6024808bc8115c2c76b5bd1bdc05 refs/remotes/origin/geolocated-cat-game
+921d65d5642147cf79f13beca0520fd9698d398e refs/remotes/origin/improve-websocket-reconnection
+4cd0d43e549d8107b8d98e03bed556866d6d71b2 refs/remotes/origin/main
+019e39692a6d717aeb4c5cad8ce5dd7d5738ed4c refs/remotes/origin/ui-ux-improvements
