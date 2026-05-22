@@ -1,9 +1,9 @@
-/** Rayon global à l’instant t (même logique paliers que le serveur). */
+/** Rayon global à l'instant t (même logique paliers que le serveur). */
 export function effectiveGlobalRadiusAtTime(summary, absT) {
   const R0 = Number(summary?.globalRadiusM) || 500;
   const s = summary?.settingsSnapshot || {};
   const hunt = summary?.huntStartedAt;
-  if (s.zoneMode === "city" || !s.shrinkZoneEnabled || !hunt) return R0;
+  if (!s.shrinkZoneEnabled || !hunt) return R0;
   const durMs = Math.max(
     60000,
     (Number(s.shrinkDurationMinutes) || 15) * 60 * 1000
@@ -25,12 +25,4 @@ export function effectiveGlobalRadiusAtTime(summary, absT) {
   const segMs = durMs / phases;
   const idx = Math.min(phases - 1, Math.floor(elapsed / segMs));
   return radii[idx];
-}
-
-export function zoneModeFromSummary(summary) {
-  return summary?.settingsSnapshot?.zoneMode === "city" ? "city" : "circle";
-}
-
-export function cityPolygonsFromSummary(summary) {
-  return summary?.settingsSnapshot?.cityPolygons || [];
 }

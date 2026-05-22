@@ -100,15 +100,15 @@ export default function SliderWithParticles(props) {
     const percent = (value - min) / (max - min);
     const track = input.offsetWidth;
     const x = percent * track + 14; // +14 for thumb radius
-    
+
     // Get absolute position on page
     const rect = input.getBoundingClientRect();
     const absoluteX = rect.left + x;
-    const absoluteY = rect.top + -195; // Adjusted to be at slider level
-    
-    return { 
-      x: absoluteX, 
-      y: absoluteY 
+    const absoluteY = rect.top + rect.height / 2; // Center of the slider
+
+    return {
+      x: absoluteX,
+      y: absoluteY
     };
   }, []);
 
@@ -152,9 +152,9 @@ export default function SliderWithParticles(props) {
           const track = input.offsetWidth;
           const xPos = percent * track + 14;
           const rect = input.getBoundingClientRect();
-          return { 
-            x: rect.left + xPos, 
-            y: rect.top + 20 
+          return {
+            x: rect.left + xPos,
+            y: rect.top + rect.height / 2
           };
         })();
         

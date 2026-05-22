@@ -6,6 +6,7 @@ export default function AnimatedCircle({
   radius,
   pathOptions,
   children,
+  eventHandlers,
 }) {
   const [display, setDisplay] = useState(() =>
     center ? [center.lat, center.lng] : [0, 0]
@@ -54,7 +55,7 @@ export default function AnimatedCircle({
   if (!center || radius == null) return null;
 
   return (
-    <Circle center={display} radius={radius} pathOptions={pathOptions}>
+    <Circle center={display} radius={radius} pathOptions={pathOptions} eventHandlers={eventHandlers}>
       {children}
     </Circle>
   );

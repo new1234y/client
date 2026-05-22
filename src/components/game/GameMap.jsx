@@ -82,7 +82,20 @@ function CollapseClustersOnMapClick({ onClear }) {
   return null;
 }
 
-function renderPreyDiscs(zoneMode, list, keyPrefix) {
+function PreventMapClickBounce() {
+  useMapEvents({
+    click: (e) => {
+      // Prevent map from panning when clicking on markers
+      if (e.originalEvent?.target?.closest('.leaflet-marker-icon, .leaflet-interactive')) {
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
+      }
+    },
+  });
+  return null;
+}
+
+function renderPreyDiscs(list, keyPrefix, onPlayerClick = null) {
   return (list || []).map((p) => {
     if (p.kind === "exact" && p.lat != null && p.lng != null) {
       const ic = p.disconnected ? iconDisconnected : iconPreyExact;
@@ -91,25 +104,18 @@ function renderPreyDiscs(zoneMode, list, keyPrefix) {
           key={`${keyPrefix}-${p.sessionId}`}
           position={[p.lat, p.lng]}
           icon={ic}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+              if (onPlayerClick) {
+                onPlayerClick({ ...p, role: "player" });
+              }
+            },
+          }}
         />
       );
     }
     if (p.kind === "circle" && p.center && p.radiusM != null) {
-      if (zoneMode === "city") {
-        return (
-          <CircleMarker
-            key={`${keyPrefix}-${p.sessionId}`}
-            center={[p.center.lat, p.center.lng]}
-            radius={7}
-            pathOptions={{
-              color: p.disconnected ? "#94a3b8" : "#ea580c",
-              fillColor: p.disconnected ? "#cbd5e1" : "#fb923c",
-              fillOpacity: 0.92,
-              weight: 2,
-            }}
-          />
-        );
-      }
       const isAdmin = keyPrefix === "admin";
       return (
         <AnimatedCircle
@@ -130,6 +136,14 @@ function renderPreyDiscs(zoneMode, list, keyPrefix) {
             fillOpacity: p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26,
             weight: 2,
             dashArray: isAdmin ? "10 8" : p.disconnected ? "4 6" : undefined,
+          }}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+              if (onPlayerClick) {
+                onPlayerClick({ ...p, role: "player" });
+              }
+            },
           }}
         />
       );
@@ -156,6 +170,7 @@ function ClusteredMarkers({
   items,
   expandKey,
   setExpandKey,
+  onPlayerClick = null,
 }) {
   // Render each item as an individual marker (no clustering)
   return (
@@ -168,6 +183,9 @@ function ClusteredMarkers({
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
+              if (onPlayerClick && it.playerData) {
+                onPlayerClick(it.playerData);
+              }
             },
           }}
         />
@@ -188,6 +206,7 @@ export default function GameMap({
   focusCenter = null,
   focusTick = 0,
   focusZoom = 18,
+  onPlayerClick = null,
 }) {
   const [expandKey, setExpandKey] = useState(null);
   const defaultCenter = [46.8, 2.5];
@@ -206,8 +225,6 @@ export default function GameMap({
     gameState?.effectiveGlobalRadiusM ??
     gameState?.settings?.globalRadiusM;
   const bm = BASEMAPS[basemapId] || BASEMAPS.osm;
-  const zoneMode = gameState?.settings?.zoneMode || "circle";
-  const cityPolygons = gameState?.settings?.cityPolygons || [];
 
   const centerTarget =
     me?.lat != null && me?.lng != null ? [me.lat, me.lng] : initialCenter;
@@ -255,6 +272,7 @@ export default function GameMap({
         lat: me.lat,
         lng: me.lng,
         icon: iconSelf,
+        playerData: { ...me, sessionId: mySessionId },
       });
     }
     for (const a of gameState?.allies || []) {
@@ -274,6 +292,7 @@ export default function GameMap({
         lat: a.lat,
         lng: a.lng,
         icon: ic,
+        playerData: { ...a },
       });
     }
     for (const c of gameState?.catsExact || []) {
@@ -289,6 +308,7 @@ export default function GameMap({
         lat: c.lat,
         lng: c.lng,
         icon: ic,
+        playerData: { ...c },
       });
     }
     if (role === "cat") {
@@ -300,6 +320,7 @@ export default function GameMap({
           lat: p.lat,
           lng: p.lng,
           icon: ic,
+          playerData: { ...p, role: "player" },
         });
       }
     }
@@ -311,6 +332,7 @@ export default function GameMap({
         lat: p.lat,
         lng: p.lng,
         icon: ic,
+        playerData: { ...p, role: "player" },
       });
     }
     return items;
@@ -337,6 +359,7 @@ export default function GameMap({
       attributionControl
     >
       <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
+      <PreventMapClickBounce />
       <RecenterOnDemand
         center={centerTarget}
         zoom={zoomGo}
@@ -345,25 +368,7 @@ export default function GameMap({
       <FlyToFocus center={focusCenter} zoom={focusZoom} tick={focusTick} />
       <ZoomOnTicks zoomInTick={zoomInTick} zoomOutTick={zoomOutTick} />
 
-      {zoneMode === "city" &&
-        cityPolygons.map((ring, idx) => {
-          if (!ring?.length) return null;
-          const positions = ring.map(([lat, lng]) => [lat, lng]);
-          return (
-            <Polygon
-              key={`city-${idx}`}
-              positions={positions}
-              pathOptions={{
-                color: "#6366f1",
-                weight: 2,
-                fillColor: "#818cf8",
-                fillOpacity: 0.08,
-              }}
-            />
-          );
-        })}
-
-      {zoneMode === "circle" && gc && gr != null && (
+      {gc && gr != null && (
         <AnimatedCircle
           center={{ lat: gc.lat, lng: gc.lng }}
           radius={gr}
@@ -377,47 +382,39 @@ export default function GameMap({
       )}
 
       {myJam?.center && myJam?.radiusM != null && (
-        <>
-          {zoneMode === "city" ? (
-            <CircleMarker
-              key="my-jam"
-              center={[myJam.center.lat, myJam.center.lng]}
-              radius={8}
-              pathOptions={{
-                color: "#0284c7",
-                fillColor: "#38bdf8",
-                fillOpacity: 0.35,
-                weight: 2,
-                dashArray: "6 4",
-              }}
-            />
-          ) : (
-            <AnimatedCircle
-              key="my-jam"
-              center={myJam.center}
-              radius={myJam.radiusM}
-              pathOptions={{
-                color: "#0284c7",
-                fillColor: "#0ea5e9",
-                fillOpacity: 0.16,
-                weight: 2,
-                dashArray: "10 6",
-              }}
-            />
-          )}
-        </>
+        <AnimatedCircle
+          key="my-jam"
+          center={myJam.center}
+          radius={myJam.radiusM}
+          pathOptions={{
+            color: "#0284c7",
+            fillColor: "#0ea5e9",
+            fillOpacity: 0.16,
+            weight: 2,
+            dashArray: "10 6",
+          }}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+              if (onPlayerClick && me) {
+                onPlayerClick({ ...me, sessionId: mySessionId });
+              }
+            },
+          }}
+        />
       )}
 
       <ClusteredMarkers
         items={clusterItems}
         expandKey={expandKey}
         setExpandKey={setExpandKey}
+        onPlayerClick={onPlayerClick}
       />
 
       {role === "cat" &&
-        renderPreyDiscs(zoneMode, gameState.preyForCat || [], "cat")}
+        renderPreyDiscs(gameState.preyForCat || [], "cat", onPlayerClick)}
 
-      {renderPreyDiscs(zoneMode, gameState.adminPreyPreview || [], "admin")}
+      {renderPreyDiscs(gameState.adminPreyPreview || [], "admin", onPlayerClick)}
 
       {chatGeoMarkers.locations.map((m) => (
         <Marker

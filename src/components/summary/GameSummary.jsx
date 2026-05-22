@@ -26,8 +26,6 @@ import {
 } from "../../lib/map/icons.js";
 import {
   effectiveGlobalRadiusAtTime,
-  zoneModeFromSummary,
-  cityPolygonsFromSummary,
 } from "../../lib/recapZone.js";
 
 function formatClock(t) {
@@ -192,8 +190,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   const t1 = summary?.endedAt ?? t0;
   const duration = Math.max(1, t1 - t0);
   const absT = t0 + offsetMs;
-  const zoneMode = zoneModeFromSummary(summary);
-  const cityPolys = cityPolygonsFromSummary(summary);
 
   const center = useMemo(() => {
     const gc = summary?.gameCenter;
@@ -204,10 +200,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   }, [summary]);
 
   const zoneR = useMemo(() => {
-    if (!summary || zoneMode !== "circle") return 0;
+    if (!summary) return 0;
     const r = effectiveGlobalRadiusAtTime(summary, absT);
     return r > 0 ? r : 0;
-  }, [summary, absT, zoneMode]);
+  }, [summary, absT]);
 
   const timelineSorted = useMemo(
     () => [...(summary?.timeline || [])].sort((a, b) => a.t - b.t),
@@ -292,7 +288,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   }, [summary, players, visible, absT]);
 
   const jamCircles = useMemo(() => {
-    if (!summary || !showJam || zoneMode === "city") return [];
+    if (!summary || !showJam) return [];
     const jam = summary.jamHistory || [];
     const colors = summary.colors || {};
     const out = [];
@@ -310,7 +306,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       });
     }
     return out;
-  }, [summary, players, visible, absT, showJam, zoneMode]);
+  }, [summary, players, visible, absT, showJam]);
 
   const [copied, setCopied] = useState(false);
   const copyRecap = useCallback(async () => {
@@ -340,7 +336,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         >
           <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
           {showZone &&
-            zoneMode === "circle" &&
             summary.gameCenter &&
             zoneR > 0 && (
               <Circle
@@ -354,23 +349,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                 }}
               />
             )}
-          {showZone &&
-            zoneMode === "city" &&
-            cityPolys.map((ring, idx) => {
-              if (!ring?.length) return null;
-              return (
-                <Polygon
-                  key={`z-${idx}`}
-                  positions={ring.map(([lat, lng]) => [lat, lng])}
-                  pathOptions={{
-                    color: "#5B7FA5",
-                    weight: 2,
-                    fillColor: "#818cf8",
-                    fillOpacity: 0.07,
-                  }}
-                />
-              );
-            })}
           {jamCircles.map((c) => (
             <Circle
               key={c.key}
@@ -509,17 +487,15 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Calques</p>
             <div className="mb-3 space-y-1.5">
               <ToggleRow
-                label={zoneMode === "city" ? "Contours de zone" : "Zone (cercle + paliers)"}
+                label="Zone (cercle + paliers)"
                 checked={showZone}
                 onChange={setShowZone}
               />
-              {zoneMode === "circle" && (
-                <ToggleRow
-                  label="Brouillage (cercle par proie)"
-                  checked={showJam}
-                  onChange={setShowJam}
-                />
-              )}
+              <ToggleRow
+                label="Brouillage (cercle par proie)"
+                checked={showJam}
+                onChange={setShowJam}
+              />
             </div>
 
             {/* Timeline */}

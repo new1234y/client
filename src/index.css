@@ -120,10 +120,6 @@ button, [role="button"] {
   transition: transform 0.12s ease-in-out, box-shadow 0.12s ease;
 }
 
-button:active, [role="button"]:active {
-  transform: scale(0.96) !important;
-}
-
 /* ═══════════════ CUSTOM SLIDER (MATTE DESIGN) ═══════════════ */
 input[type="range"] {
   -webkit-appearance: none;
@@ -316,12 +312,12 @@ input[type="range"]::-moz-range-thumb:active {
 
 /* ═══════════════ BOTTOM SHEET ANIMATION ═══════════════ */
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes slide-up {
-  0% { transform: translateY(100%); }
-  100% { transform: translateY(0); }
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
 /* ═══════════════ DARK MODE OVERRIDES ═══════════════ */

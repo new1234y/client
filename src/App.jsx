@@ -248,6 +248,7 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [nicknameError, setNicknameError] = useState(null);
   const [showQr, setShowQr] = useState(false);
   const [showScan, setShowScan] = useState(false);
   const [gameTab, setGameTab] = useState("map");
@@ -364,6 +365,8 @@ export default function App() {
     setEntryBusyKind(null);
     setFocusCenter(null);
     setFocusTick(0);
+    setErrorBanner(null);
+    setNicknameError(null);
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -666,9 +669,6 @@ export default function App() {
       shrinkDurationMinutes: 15,
       shrinkMinRadiusM: 100,
       shrinkPhases: 5,
-      zoneMode: "circle",
-      cityPolygons: [],
-      cityDifficulty: "medium",
       timeLimitEnabled: false,
       timeLimitMinutes: 30,
       catAssignmentMode: "random",
@@ -715,6 +715,7 @@ export default function App() {
       return;
     }
     setErrorBanner(null);
+    setNicknameError(null);
     lastNicknameRef.current = nickname.trim();
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("join");
@@ -753,7 +754,12 @@ export default function App() {
           );
           return;
         }
-        setErrorBanner(res?.error || "Impossible de rejoindre.");
+        // Check if error is about duplicate nickname
+        if (res?.error?.toLowerCase().includes("pseudo") || res?.error?.toLowerCase().includes("déjà") || res?.error?.toLowerCase().includes("nom")) {
+          setNicknameError(res?.error || "Ce pseudo est déjà utilisé.");
+        } else {
+          setErrorBanner(res?.error || "Impossible de rejoindre.");
+        }
       }
     );
   }, [socket, nickname, roomCodeInput, addNotification]);
@@ -1041,6 +1047,7 @@ export default function App() {
             onClick={() => {
               setEntryMode("create");
               setErrorBanner(null);
+              setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
             className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
@@ -1056,6 +1063,7 @@ export default function App() {
             onClick={() => {
               setEntryMode("join");
               setErrorBanner(null);
+              setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
             className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
@@ -1072,14 +1080,22 @@ export default function App() {
           Pseudo
         </label>
         <input
-          className="mb-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 outline-none ring-indigo-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className="mb-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 outline-none ring-indigo-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           placeholder="Votre nom"
           value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
+          onChange={(e) => {
+            setNickname(e.target.value);
+            setNicknameError(null);
+          }}
           maxLength={24}
           autoComplete="nickname"
           disabled={Boolean(entryBusyKind)}
         />
+        {nicknameError && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+            {nicknameError}
+          </p>
+        )}
 
         {entryMode === "join" && (
           <>
@@ -1279,106 +1295,66 @@ export default function App() {
                 Règles visibles par tous une fois la chasse lancée. La discussion reste à droite (ordinateur) ou derrière le bouton bulle (téléphone).
               </p>
             </div>
-            <CityZonePicker
-              position={position}
-              zoneMode={settings.zoneMode || "circle"}
-              onZoneModeChange={(m) => pushSettings({ zoneMode: m })}
-              selectedRings={settings.cityPolygons || []}
-              onChangeRings={(rings) => pushSettings({ cityPolygons: rings })}
-            />
 
-            {settings.zoneMode === "city" && (
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
-                  Difficulté (zone ville)
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "easy", label: "Simple" },
-                    { id: "medium", label: "Moyen" },
-                    { id: "hard", label: "Hard" },
-                  ].map(({ id, label }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => pushSettings({ cityDifficulty: id })}
-                      className={`rounded-xl py-3 text-xs font-bold ${
-                        (settings.cityDifficulty || "medium") === id
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <ConfigHint>
-                  Ajuste la règle de brouillage et le rythme du jeu en mode contours de ville (pas de grand cercle unique).
-                </ConfigHint>
-              </div>
-            )}
+            <div>
+              <label className="text-xs text-slate-600 dark:text-slate-400">
+                Rayon zone (m) : {settings.globalRadiusM}
+              </label>
+              <SliderWithParticles
+                type="range"
+                min={100}
+                max={2000}
+                step={50}
+                value={settings.globalRadiusM}
+                onChange={(e) =>
+                  pushSettings({ globalRadiusM: Number(e.target.value) })
+                }
+                className="mt-1 w-full accent-matte-blue"
+              />
+              <ConfigHint>
+                Taille du terrain autorisé autour du centre de partie. Hors de ce cercle, le jeu peut pénaliser ou masquer les positions.
+              </ConfigHint>
+            </div>
 
-            {settings.zoneMode === "circle" && (
-              <>
-                <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
-                    Rayon zone (m) : {settings.globalRadiusM}
-                  </label>
-                  <SliderWithParticles
-                    type="range"
-                    min={100}
-                    max={2000}
-                    step={50}
-                    value={settings.globalRadiusM}
-                    onChange={(e) =>
-                      pushSettings({ globalRadiusM: Number(e.target.value) })
-                    }
-                    className="mt-1 w-full accent-matte-blue"
-                  />
-                  <ConfigHint>
-                    Taille du terrain autorisé autour du centre de partie. Hors de ce cercle, le jeu peut pénaliser ou masquer les positions.
-                  </ConfigHint>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
-                    Rayon brouillage (m) : {settings.jamRadiusM}
-                  </label>
-                  <SliderWithParticles
-                    type="range"
-                    min={20}
-                    max={200}
-                    step={5}
-                    value={settings.jamRadiusM}
-                    onChange={(e) =>
-                      pushSettings({ jamRadiusM: Number(e.target.value) })
-                    }
-                    className="mt-1 w-full accent-matte-blue"
-                  />
-                  <ConfigHint>
-                    Autour de chaque joueur, une zone où la position des autres est volontairement imprécise pour les chats.
-                  </ConfigHint>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-600 dark:text-slate-400">
-                    Délai carte chats (min) : {settings.catDelayMinutes ?? 5}
-                  </label>
-                  <SliderWithParticles
-                    type="range"
-                    min={0}
-                    max={30}
-                    step={1}
-                    value={settings.catDelayMinutes ?? 5}
-                    onChange={(e) =>
-                      pushSettings({ catDelayMinutes: Number(e.target.value) })
-                    }
-                    className="mt-1 w-full accent-primary-blue"
-                  />
-                  <ConfigHint>
-                    Au début de la chasse, les chats ne voient pas tout de suite la carte complète : ce délai laisse aux joueurs le temps de s’éloigner.
-                  </ConfigHint>
-                </div>
-              </>
-            )}
+            <div>
+              <label className="text-xs text-slate-600 dark:text-slate-400">
+                Rayon brouillage (m) : {settings.jamRadiusM}
+              </label>
+              <SliderWithParticles
+                type="range"
+                min={20}
+                max={200}
+                step={5}
+                value={settings.jamRadiusM}
+                onChange={(e) =>
+                  pushSettings({ jamRadiusM: Number(e.target.value) })
+                }
+                className="mt-1 w-full accent-matte-blue"
+              />
+              <ConfigHint>
+                Autour de chaque joueur, une zone où la position des autres est volontairement imprécise pour les chats.
+              </ConfigHint>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-600 dark:text-slate-400">
+                Délai carte chats (min) : {settings.catDelayMinutes ?? 5}
+              </label>
+              <SliderWithParticles
+                type="range"
+                min={0}
+                max={30}
+                step={1}
+                value={settings.catDelayMinutes ?? 5}
+                onChange={(e) =>
+                  pushSettings({ catDelayMinutes: Number(e.target.value) })
+                }
+                className="mt-1 w-full accent-primary-blue"
+              />
+              <ConfigHint>
+                Au début de la chasse, les chats ne voient pas tout de suite la carte complète : ce délai laisse aux joueurs le temps de s'éloigner.
+              </ConfigHint>
+            </div>
 
             <div>
               <label className="text-xs text-slate-600 dark:text-slate-400">
@@ -1436,11 +1412,10 @@ export default function App() {
               </ConfigHint>
             </div>
 
-            {settings.zoneMode === "circle" && (
-              <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
-                <p className="mb-2 text-xs font-bold uppercase text-slate-500">
-                  Options avancées
-                </p>
+            <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+              <p className="mb-2 text-xs font-bold uppercase text-slate-500">
+                Options avancées
+              </p>
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/80">
                   <span className="text-sm text-slate-800 dark:text-slate-100">
                     Zone globale qui rétrécit
@@ -1546,7 +1521,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-            )}
           </div>
         )}
 
@@ -2062,6 +2036,7 @@ export default function App() {
                     geoChatItems={geoChatItems}
                     focusCenter={focusCenter}
                     focusTick={focusTick}
+                    onPlayerClick={setSelectedPlayer}
                   />
                 </div>
               )}
@@ -2185,6 +2160,10 @@ export default function App() {
             player={selectedPlayer}
             roomCode={currentRoomCode}
             onClose={() => setSelectedPlayer(null)}
+            onShowLocation={(lat, lng) => {
+              setFocusCenter([lat, lng]);
+              setFocusTick((n) => n + 1);
+            }}
           />
         )}
       </div>
