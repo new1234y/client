@@ -1,26 +1,24 @@
 import { QRCodeSVG } from "qrcode.react";
-import { useState } from "react";
+import { useCallback } from "react";
 
 export default function QRModal({ sessionId, onClose }) {
   if (!sessionId) return null;
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Rejoindre ma session",
-          text: `Rejoins ma session avec le code: ${sessionId}`,
-          url: window.location.href
-        });
-      } catch (err) {
-        console.error("Erreur lors du partage:", err);
-      }
-    } else {
-      // Fallback: copy to clipboard if share API not available
-      navigator.clipboard.writeText(sessionId);
-      alert("Code copié dans le presse-papier");
+  const handleShare = useCallback(async () => {
+    if (!navigator.share) return;
+    try {
+      await navigator.share({
+        title: "Code de partie",
+        text: `Rejoins la partie avec le code : ${sessionId}`,
+        url:
+          typeof window !== "undefined"
+            ? `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(sessionId)}`
+            : "",
+      });
+    } catch {
+      /* user cancelled */
     }
-  };
+  }, [sessionId]);
 
   return (
     <div
@@ -29,35 +27,70 @@ export default function QRModal({ sessionId, onClose }) {
       aria-modal="true"
       aria-label="Mon QR code"
     >
-      <div className="w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Scan QR code</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-          Scannez ce QR code pour rejoindre la session ou utilisez le code ci-dessous.
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        {/* Title */}
+        <h2 className="text-center text-xl font-bold text-slate-900 dark:text-white">
+          Scan QR code
+        </h2>
+
+        {/* Subtitle */}
+        <p className="mx-auto mt-2 max-w-[260px] text-center text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          Montrez ce code au joueur chat pour qu&apos;il puisse scanner votre QR de capture.
         </p>
+
+        {/* QR Code */}
         <div className="mt-5 flex justify-center">
-          <div className="rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-600">
-            <QRCodeSVG value={sessionId} size={168} level="M" />
+          <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-600 dark:bg-slate-800">
+            <QRCodeSVG value={sessionId} size={180} level="M" />
           </div>
         </div>
-        <div className="mt-5 flex gap-2">
-          <input
-            type="text"
-            value={sessionId}
-            readOnly
-            className="flex-1 rounded-[8px] border border-slate-300 bg-slate-50 px-4 py-3 text-center text-lg font-semibold text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-          />
-          <button
-            type="button"
-            onClick={handleShare}
-            className="rounded-[8px] bg-[#5B7FA5] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#4A6A8A]"
-          >
-            Partager
-          </button>
+
+        {/* Divider */}
+        <div className="mt-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+          <span className="whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
+            ou entrez le code manuellement
+          </span>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
         </div>
+
+        {/* Code field + share button */}
+        <div className="mt-4 flex items-stretch gap-2">
+          <div className="flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+            <span className="select-all font-mono text-base font-bold tracking-widest text-slate-900 dark:text-white">
+              {sessionId}
+            </span>
+          </div>
+          {typeof navigator !== "undefined" && navigator.share && (
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label="Partager"
+              className="flex items-center justify-center rounded-full bg-[#5B7FA5] px-4 text-white transition-colors hover:bg-[#4A6A8A]"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Close button */}
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 w-full rounded-[8px] bg-slate-200 py-3.5 text-base font-semibold text-slate-900 transition hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+          className="mt-5 w-full rounded-full bg-[#C45454] py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#B04A4A]"
         >
           Fermer
         </button>
