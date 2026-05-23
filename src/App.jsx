@@ -15,9 +15,11 @@ import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
-import PartyDiscussionChrome from "./components/game/PartyDiscussionChrome.jsx";
+import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
+import ZoneShrinkAnimation from "./components/game/ZoneShrinkAnimation.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
+import CircularLobby from "./components/CircularLobby.jsx";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
@@ -26,6 +28,7 @@ const SOCKET_URL =
 const LS_SESSION_KEY = "chase_gps_session";
 const LS_ROOM_KEY = "chase_gps_room";
 const LS_NICKNAME_KEY = "chase_gps_nickname";
+const LS_LAST_NICKNAME_KEY = "chase_gps_last_nickname";
 function saveSession(sessionId, roomCode, nickname) {
   try {
     localStorage.setItem(LS_SESSION_KEY, sessionId);
@@ -57,6 +60,23 @@ function clearSession() {
     localStorage.removeItem(LS_NICKNAME_KEY);
   } catch (e) {
     console.warn("localStorage non disponible:", e);
+  }
+}
+
+function saveLastNickname(nickname) {
+  try {
+    localStorage.setItem(LS_LAST_NICKNAME_KEY, nickname);
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+}
+
+function loadLastNickname() {
+  try {
+    return localStorage.getItem(LS_LAST_NICKNAME_KEY) || "";
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+    return "";
   }
 }
 
@@ -238,7 +258,7 @@ export default function App() {
   const [resumeCandidate, setResumeCandidate] = useState(null);
   const [nickname, setNickname] = useState(() => {
     const saved = loadSession();
-    return saved?.nickname || "";
+    return saved?.nickname || loadLastNickname();
   });
   const [roomCodeInput, setRoomCodeInput] = useState(() => getCodeFromUrl());
   const [sessionId, setSessionId] = useState(null);
@@ -263,7 +283,6 @@ export default function App() {
   const [midJoinWait, setMidJoinWait] = useState(null);
   const [joinRequestQueue, setJoinRequestQueue] = useState([]);
   const [partyChatMessages, setPartyChatMessages] = useState([]);
-  const [discussionMobileOpen, setDiscussionMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined"
       ? window.matchMedia("(min-width: 768px)").matches
@@ -275,11 +294,13 @@ export default function App() {
   const [recapData, setRecapData] = useState(null);
   const [recapErr, setRecapErr] = useState(false);
   const [recapLoading, setRecapLoading] = useState(() => Boolean(getRecapIdFromPath()));
+  const [showZoneShrinkAnimation, setShowZoneShrinkAnimation] = useState(false);
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
   const reconnectTimeoutRef = useRef(null);
   const entryReqRef = useRef(0);
+  const onJoinRef = useRef(null);
   const [reconnectBlockAt, setReconnectBlockAt] = useState(0);
   const [reconnectUiNow, setReconnectUiNow] = useState(() => Date.now());
   const [focusCenter, setFocusCenter] = useState(null);
@@ -293,7 +314,6 @@ export default function App() {
 
   useEffect(() => {
     setShowShareParty(false);
-    setDiscussionMobileOpen(false);
     setEntryBusyKind(null);
   }, [stage]);
 
@@ -327,8 +347,20 @@ export default function App() {
     if (urlCode) {
       setEntryMode("join");
       setRoomCodeInput(urlCode);
+      // Auto-join if nickname exists
+      const lastNick = loadLastNickname();
+      if (lastNick.trim()) {
+        setNickname(lastNick);
+        // Auto-join after a short delay to ensure socket is connected
+        const timer = setTimeout(() => {
+          if (socket && connected) {
+            onJoinRef.current?.();
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, []);
+  }, [socket, connected]);
 
   const geoEnabled =
     stage === "lobby" || stage === "role_reveal" || stage === "game";
@@ -500,6 +532,12 @@ export default function App() {
       setRole(payload.me?.role ?? null);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "playing") setStage("game");
+      
+      // Trigger zone shrink animation when radius changes
+      if (payload.settings?.shrinkZoneEnabled && payload.effectiveGlobalRadiusM) {
+        setShowZoneShrinkAnimation(true);
+        setTimeout(() => setShowZoneShrinkAnimation(false), 2000);
+      }
     });
 
     s.on("game_finished", (data) => {
@@ -683,14 +721,16 @@ export default function App() {
     setErrorBanner(null);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("create");
-    socket.emit("create_room", { nickname: nickname.trim() }, (res) => {
+    const trimmedNickname = nickname.trim();
+    saveLastNickname(trimmedNickname);
+    socket.emit("create_room", { nickname: trimmedNickname }, (res) => {
       if (reqId !== entryReqRef.current) return;
       setEntryBusyKind(null);
       if (!res?.ok) {
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
-      saveSession(res.sessionId, res.code, nickname.trim());
+      saveSession(res.sessionId, res.code, trimmedNickname);
       setSessionId(res.sessionId);
       setIsHost(true);
       setLobby(res.lobby);
@@ -716,17 +756,19 @@ export default function App() {
     }
     setErrorBanner(null);
     setNicknameError(null);
-    lastNicknameRef.current = nickname.trim();
+    const trimmedNickname = nickname.trim();
+    lastNicknameRef.current = trimmedNickname;
+    saveLastNickname(trimmedNickname);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("join");
     socket.emit(
       "join_room",
-      { code: roomCodeInput.trim(), nickname: nickname.trim() },
+      { code: roomCodeInput.trim(), nickname: trimmedNickname },
       (res) => {
         if (reqId !== entryReqRef.current) return;
         setEntryBusyKind(null);
         if (res?.ok) {
-          saveSession(res.sessionId, res.code, nickname.trim());
+          saveSession(res.sessionId, res.code, trimmedNickname);
           setSessionId(res.sessionId);
           setIsHost(res.isHost);
           setLobby(res.lobby);
@@ -738,7 +780,7 @@ export default function App() {
             "request_join_midgame",
             {
               code: roomCodeInput.trim(),
-              nickname: nickname.trim(),
+              nickname: trimmedNickname,
             },
             (r2) => {
               if (r2?.ok) {
@@ -763,6 +805,11 @@ export default function App() {
       }
     );
   }, [socket, nickname, roomCodeInput, addNotification]);
+
+  // Keep onJoinRef in sync with onJoin
+  useEffect(() => {
+    onJoinRef.current = onJoin;
+  }, [onJoin]);
 
   const pushSettings = useCallback(
     (partial) => {
@@ -829,6 +876,16 @@ export default function App() {
     });
   }, [socket]);
 
+  const leaveGame = useCallback(() => {
+    if (!socket) {
+      resetToEntry();
+      return;
+    }
+    socket.emit("leave_room", {}, (res) => {
+      resetToEntry();
+    });
+  }, [socket, resetToEntry]);
+
   const sendPartyChat = useCallback(
     (msg) => {
       if (!socket) return;
@@ -846,9 +903,11 @@ export default function App() {
   }, [role]);
 
   const rosterList = useMemo(() => {
-    if (gameState?.roster?.length) return gameState.roster;
-    if (rolesReveal?.players?.length) {
-      return rolesReveal.players.map((p) => ({
+    let baseRoster = [];
+    if (gameState?.roster?.length) {
+      baseRoster = gameState.roster;
+    } else if (rolesReveal?.players?.length) {
+      baseRoster = rolesReveal.players.map((p) => ({
         sessionId: p.sessionId,
         nickname: p.nickname,
         role: p.role,
@@ -857,8 +916,52 @@ export default function App() {
         spectator: false,
       }));
     }
-    return [];
-  }, [gameState?.roster, rolesReveal?.players]);
+
+    // Merge with location data from gameState
+    const locationMap = new Map();
+    
+    // Add allies location data
+    for (const a of gameState?.allies || []) {
+      if (a.sessionId && a.lat != null && a.lng != null) {
+        locationMap.set(a.sessionId, { lat: a.lat, lng: a.lng });
+      }
+    }
+    
+    // Add cats exact location data
+    for (const c of gameState?.catsExact || []) {
+      if (c.sessionId && c.lat != null && c.lng != null) {
+        locationMap.set(c.sessionId, { lat: c.lat, lng: c.lng });
+      }
+    }
+    
+    // Add prey for cat location data (if viewing as cat)
+    if (role === "cat") {
+      for (const p of gameState?.preyForCat || []) {
+        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
+          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        }
+      }
+    }
+    
+    // Add admin prey preview location data (if host with preview enabled)
+    if (isHost) {
+      for (const p of gameState?.adminPreyPreview || []) {
+        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
+          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        }
+      }
+    }
+
+    // Merge location data into roster
+    return baseRoster.map((player) => {
+      const loc = locationMap.get(player.sessionId);
+      return {
+        ...player,
+        lat: loc?.lat ?? null,
+        lng: loc?.lng ?? null,
+      };
+    });
+  }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, rolesReveal?.players, role, isHost]);
 
   const geoChatItems = useMemo(() => {
     return (partyChatMessages || [])
@@ -884,7 +987,6 @@ export default function App() {
     const lo = Number(lng);
     if (!Number.isFinite(la) || !Number.isFinite(lo)) return;
     setGameTab("map");
-    setDiscussionMobileOpen(false);
     setFocusCenter([la, lo]);
     setFocusTick((n) => n + 1);
   }, []);
@@ -927,7 +1029,7 @@ export default function App() {
       isReconnecting={showReconnectModal}
       reconnectAttempt={reconnectAttempt}
       lastError={reconnectError}
-      onCancel={() => resetToEntry()}
+      onCancel={leaveGame}
     />
   );
 
@@ -1080,7 +1182,11 @@ export default function App() {
           Pseudo
         </label>
         <input
-          className="mb-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 outline-none ring-indigo-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className={`mb-2 w-full rounded-xl border bg-white px-4 py-3.5 text-base text-slate-900 outline-none focus:ring-2 dark:bg-slate-900 dark:text-white ${
+            nicknameError
+              ? "border-orange-300 ring-orange-500 dark:border-orange-700 dark:ring-orange-400"
+              : "border-slate-300 ring-indigo-500 dark:border-slate-700"
+          }`}
           placeholder="Votre nom"
           value={nickname}
           onChange={(e) => {
@@ -1092,7 +1198,7 @@ export default function App() {
           disabled={Boolean(entryBusyKind)}
         />
         {nicknameError && (
-          <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+          <p className="mb-4 text-sm text-orange-600 dark:text-orange-400">
             {nicknameError}
           </p>
         )}
@@ -1260,29 +1366,14 @@ export default function App() {
         )}
 
         <div className="rounded-2xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-900/80 dark:ring-slate-700">
-          <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+          <h2 className="mb-4 text-sm font-semibold text-slate-800 dark:text-slate-200 text-center">
             Joueurs ({lobby.players?.length ?? 0})
           </h2>
-          <ul className="space-y-2">
-            {(lobby.players || []).map((p, idx) => (
-              <li
-                key={p.sessionId}
-                className={`flex items-center justify-between rounded-[8px] border-2 bg-white p-3 text-slate-800 shadow-sm dark:bg-slate-800 dark:text-slate-200 ${['border-[#C45454]','border-[#E2C96D]','border-[#5B7FA5]'][idx % 3]}`}
-              >
-                <span>
-                  {p.nickname}
-                  {p.disconnected ? (
-                    <span className="ml-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                      (déconnecté)
-                    </span>
-                  ) : null}
-                </span>
-                {p.sessionId === sessionId && (
-                  <span className="text-xs text-indigo-600 dark:text-indigo-400">vous</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <CircularLobby 
+            players={lobby.players || []} 
+            hostSessionId={lobby.hostSessionId || sessionId}
+            currentSessionId={sessionId}
+          />
         </div>
 
         {isHost && (
@@ -1546,23 +1637,12 @@ export default function App() {
         )}
         <button
           type="button"
-          onClick={() => resetToEntry()}
+          onClick={leaveGame}
           className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
         >
           Quitter la partie
         </button>
           </main>
-          <PartyDiscussionChrome
-            desktop={isDesktop}
-            open={discussionMobileOpen}
-            onToggle={setDiscussionMobileOpen}
-            fabBottomClass="bottom-6"
-            messages={partyChatMessages}
-            sessionId={sessionId}
-            onSend={sendPartyChat}
-            position={position}
-            disabled={!socket}
-          />
         </div>
       </div>
     );
@@ -1757,23 +1837,12 @@ export default function App() {
         )}
         <button
           type="button"
-          onClick={() => resetToEntry()}
+          onClick={leaveGame}
           className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
         >
           Quitter la partie
         </button>
           </main>
-          <PartyDiscussionChrome
-            desktop={isDesktop}
-            open={discussionMobileOpen}
-            onToggle={setDiscussionMobileOpen}
-            fabBottomClass="bottom-6"
-            messages={partyChatMessages}
-            sessionId={sessionId}
-            onSend={sendPartyChat}
-            position={position}
-            disabled={!socket}
-          />
         </div>
       </div>
     );
@@ -1796,7 +1865,7 @@ export default function App() {
     return (
       <>
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
-        <GameSummary summary={summary} onLeave={resetToEntry} />
+        <GameSummary summary={summary} onLeave={leaveGame} />
       </>
     );
   }
@@ -1918,7 +1987,7 @@ export default function App() {
               <span className="font-semibold">Reconnexion…</span>
               <button
                 type="button"
-                onClick={() => resetToEntry()}
+                onClick={leaveGame}
                 className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
               >
                 Quitter
@@ -1978,10 +2047,26 @@ export default function App() {
             {/* Main content area */}
             <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-900">
               {gameTab === "players" && (
-                <div className="h-full overflow-auto p-4">
+                <div className="h-full overflow-auto p-4 pb-24">
                   <div className="mb-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
                     <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-[#5B7FA5]">{currentRoomCode}</p>
+                  </div>
+                  <div className="mb-4 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowShareParty(true)}
+                      className="flex-1 rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4A6A8A]"
+                    >
+                      Partager
+                    </button>
+                    <button
+                      type="button"
+                      onClick={leaveGame}
+                      className="flex-1 rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Quitter la partie
+                    </button>
                   </div>
                   <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Participants</h2>
                   <ul className="space-y-3">
@@ -1996,6 +2081,21 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {gameTab === "chat" && (
+                <div className="h-full p-4 pb-24">
+                  <PartyChatPanel
+                    fillHeight
+                    variant="discussion"
+                    messages={partyChatMessages}
+                    sessionId={sessionId}
+                    onSend={sendPartyChat}
+                    position={position}
+                    disabled={!socket}
+                    onFocusLocation={onFocusChatLocation}
+                  />
                 </div>
               )}
 
@@ -2079,8 +2179,14 @@ export default function App() {
             <BottomNav
               activeTab={gameTab}
               onTabChange={setGameTab}
-              chatOpen={discussionMobileOpen}
-              onChatToggle={setDiscussionMobileOpen}
+              chatOpen={gameTab === "chat"}
+              onChatToggle={(open) => {
+                if (open) {
+                  setGameTab("chat");
+                } else {
+                  setGameTab("map");
+                }
+              }}
               canShowMap={showMapTab}
               showAdmin={isHost}
               centerAction={isCat && !catLocked ? "scan" : isPrey || capturedPrey ? "qr" : null}
@@ -2092,7 +2198,6 @@ export default function App() {
               onMore={() => {
                 if (isHost) {
                   setGameTab("admin");
-                  setDiscussionMobileOpen(false);
                 } else {
                   setShowShareParty(true);
                 }
@@ -2102,6 +2207,7 @@ export default function App() {
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
             <div className="hidden shrink-0 border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90 md:flex">
               {tabBtn("map", "Carte", !showMapTab)}
+              {tabBtn("chat", "Chat")}
               {tabBtn("players", "Joueurs")}
               {isHost && tabBtn("admin", "Admin")}
             </div>
@@ -2138,19 +2244,6 @@ export default function App() {
               )}
             </footer>
           </div>
-
-          <PartyDiscussionChrome
-            desktop={isDesktop}
-            open={discussionMobileOpen}
-            onToggle={setDiscussionMobileOpen}
-            hideFab
-            messages={partyChatMessages}
-            sessionId={sessionId}
-            onSend={sendPartyChat}
-            position={position}
-            disabled={!socket}
-            onFocusLocation={onFocusChatLocation}
-          />
         </div>
 
         {showQr && <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />}
@@ -2161,11 +2254,13 @@ export default function App() {
             roomCode={currentRoomCode}
             onClose={() => setSelectedPlayer(null)}
             onShowLocation={(lat, lng) => {
+              setGameTab("map");
               setFocusCenter([lat, lng]);
               setFocusTick((n) => n + 1);
             }}
           />
         )}
+        <ZoneShrinkAnimation isActive={showZoneShrinkAnimation} />
       </div>
     );
   }

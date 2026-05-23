@@ -324,3 +324,30 @@ input[type="range"]::-moz-range-thumb:active {
 .dark body, .dark #root {
   background-color: #0f172a !important;
 }
+
+/* ═══════════════ CIRCULAR LOBBY ANIMATIONS ═══════════════ */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}

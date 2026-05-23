@@ -2,32 +2,24 @@ import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useState } from "react";
 
 export default function SharePartyModal({ code, title, onClose }) {
-  const [copied, setCopied] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
   const joinUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${window.location.pathname}?code=${encodeURIComponent(code || "")}`
       : "";
 
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(joinUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
+  const handleShare = useCallback(async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title || "Rejoindre ma partie",
+          text: `Rejoins ma partie avec le code : ${code}`,
+          url: joinUrl,
+        });
+      } catch (err) {
+        console.log("Share cancelled or failed:", err);
+      }
     }
-  }, [joinUrl]);
-
-  const copyCodeOnly = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code || "");
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
-    } catch {
-      setCopiedCode(false);
-    }
-  }, [code]);
+  }, [joinUrl, code, title]);
 
   if (!code) return null;
 
@@ -39,43 +31,54 @@ export default function SharePartyModal({ code, title, onClose }) {
       aria-label="Partager la partie"
     >
       <div className="w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-          {title || "Inviter des joueurs"}
+        <h2 className="text-center text-lg font-bold text-slate-900 dark:text-white">
+          Scanner le QR code
         </h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Copier le lien ou le code ne vous déconnecte pas : vous restez dans la salle.
+        <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
+          Montrez ce code pour inviter des joueurs à rejoindre votre partie.
         </p>
 
-        <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          <div className="rounded-[8px] bg-white p-3 ring-2 ring-[#5B7FA5]/20 dark:bg-slate-800 dark:ring-[#5B7FA5]/30">
-            <QRCodeSVG value={joinUrl} size={168} level="M" />
+        <div className="mt-6 flex justify-center">
+          <div className="rounded-[8px] bg-white p-4 ring-2 ring-[#5B7FA5]/20 dark:bg-slate-800 dark:ring-[#5B7FA5]/30">
+            <QRCodeSVG value={joinUrl} size={180} level="M" />
           </div>
-          <div className="w-full min-w-0 flex-1 text-center sm:text-left">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Code salle</p>
-            <p className="mt-1 break-all font-mono text-3xl font-black tracking-[0.2em] text-[#5B7FA5]">
+        </div>
+
+        <div className="mt-6 flex items-center gap-4">
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            ou entrez le code manuellement
+          </span>
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex-1 rounded-[8px] border-2 border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800">
+            <p className="font-mono text-2xl font-bold tracking-[0.2em] text-[#5B7FA5]">
               {code}
             </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <button
-                type="button"
-                onClick={copy}
-                className="w-full rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white sm:w-auto sm:px-6"
-              >
-                {copied ? "Lien copié" : "Copier le lien d'invitation"}
-              </button>
-              <button
-                type="button"
-                onClick={copyCodeOnly}
-                className="w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:text-slate-200 sm:w-auto sm:px-5"
-              >
-                {copiedCode ? "Code copié" : "Copier le code seul"}
-              </button>
-            </div>
-            <p className="mt-3 text-left text-[11px] leading-snug text-slate-400 dark:text-slate-500">
-              Partagez par message ou autre appli : aucune action ici ne ferme votre session sur cet appareil.
-            </p>
-            <p className="mt-1 break-all text-left text-xs text-slate-400">{joinUrl}</p>
           </div>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[#5B7FA5] text-white shadow-lg transition-transform active:scale-95"
+            aria-label="Partager"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="h-6 w-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"
+              />
+            </svg>
+          </button>
         </div>
 
         <button

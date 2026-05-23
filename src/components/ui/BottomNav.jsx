@@ -114,7 +114,7 @@ export default function BottomNav({
             onClick={() => {
               if (chatOpen) onChatToggle(false);
               else {
-                onTabChange("map");
+                onTabChange("players");
                 onChatToggle(true);
               }
             }}
@@ -131,12 +131,12 @@ export default function BottomNav({
             Chat
           </button>
 
-          <button
-            type="button"
-            onClick={onMore}
-            className={tabCls(activeTab === "admin" && !chatOpen, false)}
-          >
-            {showAdmin ? (
+          {showAdmin && (
+            <button
+              type="button"
+              onClick={onMore}
+              className={tabCls(activeTab === "admin" && !chatOpen, false)}
+            >
               <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -145,17 +145,9 @@ export default function BottomNav({
                 />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-            ) : (
-              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M11.25 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m-1.5 3h1.5M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z"
-                />
-              </svg>
-            )}
-            {showAdmin ? "Admin" : "Infos"}
-          </button>
+              Admin
+            </button>
+          )}
         </div>
       </nav>
     </div>
