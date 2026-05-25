@@ -13,9 +13,13 @@ import L from "leaflet";
 import "../../lib/map/leafletFix.js";
 import {
   iconSelf,
+  iconSelfOutOfBounds,
   iconAlly,
+  iconAllyOutOfBounds,
   iconCat,
+  iconCatOutOfBounds,
   iconPreyExact,
+  iconPreyOutOfBounds,
   iconDisconnected,
   iconChatLocation,
 } from "../../lib/map/icons.js";
@@ -101,7 +105,9 @@ function PreventMapClickBounce() {
 function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
   return (list || []).map((p) => {
     if (p.kind === "exact" && p.lat != null && p.lng != null) {
-      const ic = p.disconnected ? iconDisconnected : iconPreyExact;
+      const ic = p.disconnected 
+        ? iconDisconnected 
+        : p.outOfBounds ? iconPreyOutOfBounds : iconPreyExact;
       return (
         <Marker
           key={`${keyPrefix}-${p.sessionId}`}
@@ -212,6 +218,7 @@ export default function GameMap({
   onPlayerClick = null,
 }) {
   const [expandKey, setExpandKey] = useState(null);
+  const [mapError, setMapError] = useState(null);
   const defaultCenter = [46.8, 2.5];
   const me = gameState?.me;
   const initialCenter = useMemo(() => {
@@ -233,8 +240,9 @@ export default function GameMap({
     me?.lat != null && me?.lng != null ? [me.lat, me.lng] : initialCenter;
   const zoomGo = me?.lat != null ? 17 : 14;
 
-  const pickMarkerIcon = useCallback((baseIcon, disconnected) => {
-    return disconnected ? iconDisconnected : baseIcon;
+  const pickMarkerIcon = useCallback((baseIcon, outOfBoundsIcon, disconnected, outOfBounds) => {
+    if (disconnected) return iconDisconnected;
+    return outOfBounds ? outOfBoundsIcon : baseIcon;
   }, []);
 
   const myJam = gameState?.myJamCircle;
@@ -275,7 +283,7 @@ export default function GameMap({
         key: `me-${mySessionId}`,
         lat: me.lat,
         lng: me.lng,
-        icon: iconSelf,
+        icon: pickMarkerIcon(iconSelf, iconSelfOutOfBounds, false, me.outOfBounds),
         playerData: { ...me, sessionId: mySessionId },
       });
     }
@@ -283,13 +291,12 @@ export default function GameMap({
       if (a.sessionId === mySessionId) continue;
       if (a.lat == null || a.lng == null) continue;
       const disc = Boolean(a.disconnected);
+      const isAllyMe = a.sessionId === mySessionId;
       const ic = pickMarkerIcon(
-        a.role === "cat"
-          ? iconCat
-          : a.sessionId === mySessionId
-            ? iconSelf
-            : iconAlly,
-        disc
+        isAllyMe ? iconSelf : iconAlly,
+        isAllyMe ? iconSelfOutOfBounds : iconAllyOutOfBounds,
+        disc,
+        Boolean(a.outOfBounds)
       );
       items.push({
         key: `ally-${a.sessionId}`,
@@ -303,9 +310,12 @@ export default function GameMap({
       if (c.sessionId === mySessionId) continue;
       if (c.lat == null || c.lng == null) continue;
       const disc = Boolean(c.disconnected);
+      const isCatMe = c.sessionId === mySessionId;
       const ic = pickMarkerIcon(
-        c.sessionId === mySessionId ? iconSelf : iconCat,
-        disc
+        isCatMe ? iconSelf : iconCat,
+        isCatMe ? iconSelfOutOfBounds : iconCatOutOfBounds,
+        disc,
+        Boolean(c.outOfBounds)
       );
       items.push({
         key: `cat-${c.sessionId}`,
@@ -318,7 +328,7 @@ export default function GameMap({
     if (role === "cat") {
       for (const p of gameState?.preyForCat || []) {
         if (p.kind !== "exact" || p.lat == null || p.lng == null) continue;
-        const ic = pickMarkerIcon(iconPreyExact, Boolean(p.disconnected));
+        const ic = pickMarkerIcon(iconPreyExact, iconPreyOutOfBounds, Boolean(p.disconnected), Boolean(p.outOfBounds));
         items.push({
           key: `prey-${p.sessionId}`,
           lat: p.lat,
@@ -330,7 +340,7 @@ export default function GameMap({
     }
     for (const p of gameState?.adminPreyPreview || []) {
       if (p.kind !== "exact" || p.lat == null || p.lng == null) continue;
-      const ic = pickMarkerIcon(iconPreyExact, Boolean(p.disconnected));
+      const ic = pickMarkerIcon(iconPreyExact, iconPreyOutOfBounds, Boolean(p.disconnected), Boolean(p.outOfBounds));
       items.push({
         key: `adm-${p.sessionId}`,
         lat: p.lat,
@@ -353,16 +363,41 @@ export default function GameMap({
 
   if (!gameState) return null;
 
+  const handleTileError = () => {
+    setMapError("Impossible de charger la carte. Vérifiez votre connexion internet.");
+  };
+
   return (
-    <MapContainer
-      center={initialCenter}
-      zoom={initialZoom}
-      className="h-full w-full"
-      zoomControl={false}
-      scrollWheelZoom
-      attributionControl
-    >
-      <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
+    <>
+      {mapError && (
+        <div className="absolute left-0 right-0 top-3 z-[2000] mx-auto max-w-md rounded-xl bg-red-100 px-4 py-3 text-center text-sm text-red-900 shadow-lg dark:bg-red-950/90 dark:text-red-100">
+          {mapError}
+          <button 
+            type="button"
+            onClick={() => setMapError(null)}
+            className="ml-2 font-semibold underline"
+          >
+            Fermer
+          </button>
+        </div>
+      )}
+      <MapContainer
+        center={initialCenter}
+        zoom={initialZoom}
+        className="h-full w-full"
+        zoomControl={false}
+        scrollWheelZoom
+        attributionControl
+      >
+        <TileLayer 
+          key={basemapId} 
+          attribution={bm.attribution} 
+          url={bm.url}
+          eventHandlers={{
+            tileerror: handleTileError,
+            loaderror: handleTileError,
+          }}
+        />
       <PreventMapClickBounce />
       <RecenterOnDemand
         center={centerTarget}
@@ -407,6 +442,7 @@ export default function GameMap({
             key={balise.id}
             center={{ lat: balise.lat, lng: balise.lng }}
             radius={balise.radiusM}
+            visualScale={balise.visualScale}
             beingCapturedBy={balise.beingCapturedBy}
             isMyCapture={isMyCapture}
             captureProgress={balise.captureProgress || 0}
@@ -478,5 +514,6 @@ export default function GameMap({
         </Marker>
       ))}
     </MapContainer>
+    </>
   );
 }

@@ -15,9 +15,21 @@ export const iconSelf = div(
   40
 );
 
+export const iconSelfOutOfBounds = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ef4444;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:14px;font-weight:800;color:#fff">⚠️</span>`,
+  "pin-self-oob",
+  40
+);
+
 export const iconAlly = div(
   `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#d97706;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:18px">🐭</span>`,
   "pin-ally",
+  38
+);
+
+export const iconAllyOutOfBounds = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ef4444;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:18px">🐭⚠️</span>`,
+  "pin-ally-oob",
   38
 );
 
@@ -27,9 +39,21 @@ export const iconCat = div(
   40
 );
 
+export const iconCatOutOfBounds = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ef4444;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:20px;line-height:1">🐱⚠️</span>`,
+  "pin-cat-oob",
+  40
+);
+
 export const iconPreyExact = div(
   `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ea580c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:16px">🎯</span>`,
   "pin-prey",
+  36
+);
+
+export const iconPreyOutOfBounds = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ef4444;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:16px">🎯⚠️</span>`,
+  "pin-prey-oob",
   36
 );
 

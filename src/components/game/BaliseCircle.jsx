@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Circle, CircleMarker } from "react-leaflet";
+import { Circle, CircleMarker, Marker, Popup } from "react-leaflet";
+import L from "leaflet";
 
-export default function BaliseCircle({ center, radius, beingCapturedBy, isMyCapture, captureProgress }) {
+function baliseIcon(sizePx, color) {
+  return L.divIcon({
+    className: "balise-marker-icon",
+    html: `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:14px;background:linear-gradient(145deg,${color},#4c1d95);border:3px solid white;box-shadow:0 0 0 4px rgba(168,85,247,.25),0 8px 24px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:white;font:900 ${Math.max(14, sizePx * 0.42)}px/1 system-ui">⌖</div>`,
+    iconSize: [sizePx, sizePx],
+    iconAnchor: [sizePx / 2, sizePx / 2],
+  });
+}
+
+export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, isMyCapture, captureProgress }) {
   const [rotation, setRotation] = useState(0);
   const [pulse, setPulse] = useState(0);
   const animationRef = useRef(null);
@@ -25,6 +35,7 @@ export default function BaliseCircle({ center, radius, beingCapturedBy, isMyCapt
 
   const captureRatio = captureProgress / 30000; // 30 seconds
   const isBeingCaptured = beingCapturedBy !== null;
+  const markerSize = Math.round(26 * Math.max(0.75, Math.min(1.9, Number(visualScale) || radius / 30)));
   
   // Color based on capture state
   const color = isBeingCaptured 
@@ -89,20 +100,15 @@ export default function BaliseCircle({ center, radius, beingCapturedBy, isMyCapt
       />
 
       {/* Center blinking dot */}
-      <CircleMarker
-        center={center}
-        radius={6}
-        pathOptions={{
-          color: color,
-          fillColor: fillColor,
-          fillOpacity: 0.9,
-          weight: 2,
-          className: "balise-center-dot",
-        }}
-        style={{
-          filter: `drop-shadow(0 0 ${8 + Math.sin(pulse * 2) * 4}px ${color})`,
-        }}
-      />
+      <Marker center={center} position={center} icon={baliseIcon(markerSize, color)}>
+        <Popup>
+          <div className="text-xs">
+            <strong>Balise</strong>
+            <br />
+            Rayon : {Math.round(radius)} m
+          </div>
+        </Popup>
+      </Marker>
 
       {/* Capture progress indicator */}
       {isBeingCaptured && (

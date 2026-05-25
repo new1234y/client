@@ -8,6 +8,7 @@ export default function BottomNav({
   canShowMap = true,
   showAdmin = false,
   onMore,
+  onQuit,
 }) {
   const tabCls = (active, disabled) =>
     `flex flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition ${
@@ -146,6 +147,23 @@ export default function BottomNav({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               Admin
+            </button>
+          )}
+
+          {onQuit && (
+            <button
+              type="button"
+              onClick={onQuit}
+              className={tabCls(false, false)}
+            >
+              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                />
+              </svg>
+              Quitter
             </button>
           )}
         </div>

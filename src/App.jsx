@@ -30,6 +30,7 @@ const LS_SESSION_KEY = "chase_gps_session";
 const LS_ROOM_KEY = "chase_gps_room";
 const LS_NICKNAME_KEY = "chase_gps_nickname";
 const LS_LAST_NICKNAME_KEY = "chase_gps_last_nickname";
+const LS_LAST_ROOM_KEY = "chase_gps_last_room";
 function saveSession(sessionId, roomCode, nickname) {
   try {
     localStorage.setItem(LS_SESSION_KEY, sessionId);
@@ -75,6 +76,15 @@ function saveLastNickname(nickname) {
 function loadLastNickname() {
   try {
     return localStorage.getItem(LS_LAST_NICKNAME_KEY) || "";
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+    return "";
+  }
+}
+
+function loadLastRoom() {
+  try {
+    return localStorage.getItem(LS_LAST_ROOM_KEY) || "";
   } catch (e) {
     console.warn("localStorage non disponible:", e);
     return "";
@@ -131,13 +141,15 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError 
         <p className="mb-4 text-xs text-slate-500 dark:text-slate-500">
           La connexion a ete perdue. Nous essayons de vous reconnecter automatiquement.
         </p>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="w-full rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-        >
-          Annuler et quitter
-        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+          >
+            Annuler et quitter
+          </button>
+        )}
       </div>
     </div>
   );
@@ -227,10 +239,15 @@ function ThemeToggle({ theme, onToggle, size = "md" }) {
     ? "h-9 w-9 text-sm" 
     : "px-3 py-2 text-xs";
   
+  const handleClick = (e) => {
+    e.stopPropagation();
+    onToggle();
+  };
+  
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={handleClick}
       className={`flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-700 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 ${sizeClasses}`}
       title={theme === "dark" ? "Mode clair" : "Mode sombre"}
     >
@@ -262,6 +279,7 @@ export default function App() {
     return saved?.nickname || loadLastNickname();
   });
   const [roomCodeInput, setRoomCodeInput] = useState(() => getCodeFromUrl());
+  const [rejoinCandidate, setRejoinCandidate] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [isHost, setIsHost] = useState(false);
   const [lobby, setLobby] = useState(null);
@@ -296,6 +314,8 @@ export default function App() {
   const [recapErr, setRecapErr] = useState(false);
   const [recapLoading, setRecapLoading] = useState(() => Boolean(getRecapIdFromPath()));
   const [showZoneShrinkAnimation, setShowZoneShrinkAnimation] = useState(false);
+  const [isOutOfBounds, setIsOutOfBounds] = useState(false);
+  const outOfBoundsAudioRef = useRef(null);
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
@@ -316,7 +336,17 @@ export default function App() {
   useEffect(() => {
     setShowShareParty(false);
     setEntryBusyKind(null);
-  }, [stage]);
+    // Check for rejoin candidate when entering entry screen
+    if (stage === "entry") {
+      const lastRoom = loadLastRoom();
+      const lastNick = loadLastNickname();
+      if (lastRoom && lastNick && !resumeCandidate) {
+        setRejoinCandidate({ roomCode: lastRoom, nickname: lastNick });
+      }
+    } else {
+      setRejoinCandidate(null);
+    }
+  }, [stage, resumeCandidate]);
 
   useEffect(() => {
     if (!isReconnecting) {
@@ -341,27 +371,6 @@ export default function App() {
     if (stage !== "game") return;
     setMapBasemap(theme === "dark" ? "dark" : "light");
   }, [theme, stage]);
-
-  // Auto-switch to join mode if URL has code
-  useEffect(() => {
-    const urlCode = getCodeFromUrl();
-    if (urlCode) {
-      setEntryMode("join");
-      setRoomCodeInput(urlCode);
-      // Auto-join if nickname exists
-      const lastNick = loadLastNickname();
-      if (lastNick.trim()) {
-        setNickname(lastNick);
-        // Auto-join after a short delay to ensure socket is connected
-        const timer = setTimeout(() => {
-          if (socket && connected) {
-            onJoinRef.current?.();
-          }
-        }, 500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [socket, connected]);
 
   const geoEnabled =
     stage === "lobby" || stage === "role_reveal" || stage === "game";
@@ -470,6 +479,27 @@ export default function App() {
     });
   }, [resetToEntry]);
 
+  // Auto-switch to join mode if URL has code
+  useEffect(() => {
+    const urlCode = getCodeFromUrl();
+    if (urlCode) {
+      setEntryMode("join");
+      setRoomCodeInput(urlCode);
+      const saved = loadSession();
+      if (saved?.roomCode?.toUpperCase() === urlCode.toUpperCase()) {
+        // If we have an active session for this room, show the resume choice
+        // DO NOT auto-reconnect here, let the connect handler or user handle it
+        setResumeCandidate(saved);
+        return;
+      }
+      const lastNick = loadLastNickname();
+      if (lastNick.trim()) {
+        setNickname(lastNick);
+        // Do not auto-join anymore, wait for user to click
+      }
+    }
+  }, [socket, connected]);
+
   useEffect(() => {
     const s = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
@@ -549,7 +579,52 @@ export default function App() {
     });
 
     s.on("capture_ok", (data) => {
-      addNotification(`${data.preyNickname} a ete capture!`, "success");
+      addNotification(`${data.preyNickname} a été attrapé !`, "success");
+    });
+
+    s.on("player_out_of_bounds", (data) => {
+      if (data.sessionId === sessionIdRef.current) {
+        setIsOutOfBounds(true);
+        addNotification(`Vous êtes sorti de la zone de jeu!`, "error", 5000);
+        if (navigator.vibrate) {
+          navigator.vibrate([300, 150, 300]);
+        }
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.type = "square";
+          osc.frequency.value = 300;
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          osc.start();
+          outOfBoundsAudioRef.current = { audioCtx, osc, gain };
+        } catch (e) {
+          console.warn("AudioContext non disponible ou bloque", e);
+        }
+      } else {
+        addNotification(`${data.nickname} est sorti de la zone!`, "warning", 4000);
+      }
+    });
+
+    s.on("player_reentered_zone", (data) => {
+      if (data.sessionId === sessionIdRef.current) {
+        setIsOutOfBounds(false);
+        if (outOfBoundsAudioRef.current) {
+          try {
+            const { audioCtx, osc, gain } = outOfBoundsAudioRef.current;
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            osc.stop(audioCtx.currentTime + 0.3);
+          } catch (e) {
+            console.warn("Error stopping audio", e);
+          }
+          outOfBoundsAudioRef.current = null;
+        }
+        addNotification(`Vous êtes revenu dans la zone de jeu!`, "success", 3000);
+      } else {
+        addNotification(`${data.nickname} est revenu dans la zone!`, "info", 3000);
+      }
     });
 
     s.on("kicked", () => {
@@ -597,11 +672,6 @@ export default function App() {
     });
 
     s.on("join_request_pending", (data) => {
-      if (data?.hostSessionId) {
-        if (data.hostSessionId !== sessionIdRef.current) return;
-      } else if (!isHostRef.current) {
-        return;
-      }
       setJoinRequestQueue((q) => [
         ...q,
         {
@@ -690,6 +760,14 @@ export default function App() {
     if (gameTab === "party") setGameTab("map");
   }, [gameTab]);
 
+  // Close all modals when switching tabs on mobile to prevent overlapping
+  useEffect(() => {
+    setShowQr(false);
+    setShowScan(false);
+    setShowShareParty(false);
+    setSelectedPlayer(null);
+  }, [gameTab]);
+
   useEffect(() => {
     if (!socket || !position) return;
     const now = Date.now();
@@ -711,14 +789,32 @@ export default function App() {
       timeLimitEnabled: false,
       timeLimitMinutes: 30,
       catAssignmentMode: "random",
+      gameMode: "tag_swap",
       hostCatMapPreview: false,
     };
+
+  const unlockAudioAndVibration = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.value = 0; // silent
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } catch(e) {}
+    if (navigator.vibrate) {
+      try { navigator.vibrate(1); } catch(e) {}
+    }
+  }, []);
 
   const onCreate = useCallback(() => {
     if (!socket || !nickname.trim()) {
       setErrorBanner("Choisissez un pseudo.");
       return;
     }
+    unlockAudioAndVibration();
     setErrorBanner(null);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("create");
@@ -730,6 +826,10 @@ export default function App() {
       if (!res?.ok) {
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
+      }
+      // Clear code from URL on successful create
+      if (window.history.replaceState) {
+        window.history.replaceState({}, "", window.location.pathname);
       }
       saveSession(res.sessionId, res.code, trimmedNickname);
       setSessionId(res.sessionId);
@@ -755,6 +855,7 @@ export default function App() {
       setErrorBanner("Pseudo et code requis.");
       return;
     }
+    unlockAudioAndVibration();
     setErrorBanner(null);
     setNicknameError(null);
     const trimmedNickname = nickname.trim();
@@ -769,6 +870,10 @@ export default function App() {
         if (reqId !== entryReqRef.current) return;
         setEntryBusyKind(null);
         if (res?.ok) {
+          // Clear code from URL on successful join
+          if (window.history.replaceState) {
+            window.history.replaceState({}, "", window.location.pathname);
+          }
           saveSession(res.sessionId, res.code, trimmedNickname);
           setSessionId(res.sessionId);
           setIsHost(res.isHost);
@@ -878,14 +983,27 @@ export default function App() {
   }, [socket]);
 
   const leaveGame = useCallback(() => {
-    if (!socket) {
-      resetToEntry();
-      return;
+    // Save session info for potential rejoin choice later
+    const saved = loadSession();
+    if (saved) {
+      try {
+        localStorage.setItem(LS_LAST_NICKNAME_KEY, saved.nickname);
+        localStorage.setItem(LS_LAST_ROOM_KEY, saved.roomCode);
+      } catch (e) {
+        console.warn("localStorage non disponible:", e);
+      }
     }
-    socket.emit("leave_room", {}, (res) => {
-      resetToEntry();
-    });
-  }, [socket, resetToEntry]);
+
+    // Clear session and reset UI immediately to prevent any auto-reconnect logic
+    clearSession();
+    resetToEntry(false);
+
+    if (socket && connected) {
+      socket.emit("leave_room", {}, (res) => {
+        // Already reset UI, just a confirmation
+      });
+    }
+  }, [socket, connected, resetToEntry]);
 
   const sendPartyChat = useCallback(
     (msg) => {
@@ -1036,7 +1154,7 @@ export default function App() {
       isReconnecting={showReconnectModal}
       reconnectAttempt={reconnectAttempt}
       lastError={reconnectError}
-      onCancel={leaveGame}
+      onCancel={isHost ? null : leaveGame}
     />
   );
 
@@ -1146,6 +1264,54 @@ export default function App() {
               >
                 Oublier
               </button>
+            </div>
+          </div>
+        )}
+
+        {rejoinCandidate && connected && !resumeCandidate && (
+          <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30">
+                <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">
+                Partie précédente
+              </h3>
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                Voulez-vous rejoindre la salle <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{rejoinCandidate.roomCode}</span> avec le pseudo <span className="font-semibold text-slate-900 dark:text-white">{rejoinCandidate.nickname}</span> ?
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNickname(rejoinCandidate.nickname);
+                    setRoomCodeInput(rejoinCandidate.roomCode);
+                    setEntryMode("join");
+                    setRejoinCandidate(null);
+                    // Short delay to ensure state updates before joining
+                    setTimeout(() => onJoin(), 100);
+                  }}
+                  className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none"
+                >
+                  Rejoindre maintenant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem(LS_LAST_ROOM_KEY);
+                    } catch (e) {
+                      console.warn("localStorage non disponible:", e);
+                    }
+                    setRejoinCandidate(null);
+                  }}
+                  className="w-full rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Ignorer
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1329,7 +1495,7 @@ export default function App() {
           </div>
         )}
 
-        {isHost && joinRequestQueue.length > 0 && (
+        {joinRequestQueue.length > 0 && (
           <div className="mb-3 space-y-2">
             {joinRequestQueue.map((j) => (
               <div
@@ -1510,6 +1676,42 @@ export default function App() {
               </ConfigHint>
             </div>
 
+            <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 dark:border-slate-600 dark:bg-slate-800/80">
+              <p className="mb-2 text-xs font-semibold uppercase text-slate-500">
+                Mode de partie
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={(lobby.players?.length || 0) <= 2}
+                  onClick={() => pushSettings({ gameMode: "infection" })}
+                  className={`rounded-xl py-2.5 text-xs font-bold ${
+                    (lobby.players?.length || 0) <= 2
+                      ? "cursor-not-allowed bg-slate-200 text-slate-400 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:ring-slate-700"
+                      : (settings.gameMode || "tag_swap") === "infection"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                  }`}
+                >
+                  Chats cumulés
+                </button>
+                <button
+                  type="button"
+                  onClick={() => pushSettings({ gameMode: "tag_swap" })}
+                  className={`rounded-xl py-2.5 text-xs font-bold ${
+                    settings.gameMode === "tag_swap"
+                      ? "bg-indigo-600 text-white shadow"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600"
+                  }`}
+                >
+                  Chat tournant
+                </button>
+              </div>
+              <ConfigHint>
+                Chats cumulés : disponible à partir de 3 joueurs, les joueurs attrapés rejoignent les chats et le dernier joueur gagne. Chat tournant : le chat échange son rôle avec le joueur attrapé, et le gagnant est celui qui passe le moins de temps chat.
+              </ConfigHint>
+            </div>
+
             <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
               <p className="mb-2 text-xs font-bold uppercase text-slate-500">
                 Options avancées
@@ -1642,13 +1844,15 @@ export default function App() {
             Au moins une position GPS est necessaire pour le centre de la zone.
           </p>
         )}
-        <button
-          type="button"
-          onClick={leaveGame}
-          className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
-        >
-          Quitter la partie
-        </button>
+        {!isHost && (
+          <button
+            type="button"
+            onClick={leaveGame}
+            className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
+          >
+            Quitter la partie
+          </button>
+        )}
           </main>
         </div>
       </div>
@@ -1703,7 +1907,7 @@ export default function App() {
           </div>
         )}
 
-        {isHost && joinRequestQueue.length > 0 && (
+        {joinRequestQueue.length > 0 && (
           <div className="space-y-2">
             {joinRequestQueue.map((j) => (
               <div
@@ -1797,7 +2001,7 @@ export default function App() {
                     </button>
                   </div>
                   <ConfigHint>
-                    Affecte ce participant comme traqueur (chat) ou comme proie (joueur).
+                    Affecte ce participant comme chat ou comme joueur.
                   </ConfigHint>
                   <button
                     type="button"
@@ -1842,13 +2046,15 @@ export default function App() {
             En attente du démarrage par l&apos;hôte…
           </p>
         )}
-        <button
-          type="button"
-          onClick={leaveGame}
-          className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
-        >
-          Quitter la partie
-        </button>
+        {!isHost && (
+          <button
+            type="button"
+            onClick={leaveGame}
+            className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
+          >
+            Quitter la partie
+          </button>
+        )}
           </main>
         </div>
       </div>
@@ -1889,6 +2095,10 @@ export default function App() {
 
     const renderAdminPanel = () => (
       <div className="h-full overflow-auto p-4">
+        <div className="mb-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
+          <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-[#5B7FA5]">{currentRoomCode}</p>
+        </div>
         <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">
           Contrôle hôte
         </h2>
@@ -1957,6 +2167,15 @@ export default function App() {
             </li>
           ))}
         </ul>
+        {!isHost && (
+          <button
+            type="button"
+            onClick={leaveGame}
+            className="mt-6 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            Quitter la partie
+          </button>
+        )}
       </div>
     );
 
@@ -1992,13 +2211,15 @@ export default function App() {
           <div className="z-[1200] shrink-0 border-b border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 dark:text-slate-200">
             <div className="flex items-center justify-between gap-3">
               <span className="font-semibold">Reconnexion…</span>
-              <button
-                type="button"
-                onClick={leaveGame}
-                className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-              >
-                Quitter
-              </button>
+              {!isHost && (
+                <button
+                  type="button"
+                  onClick={leaveGame}
+                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  Quitter
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -2059,20 +2280,13 @@ export default function App() {
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
                     <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-[#5B7FA5]">{currentRoomCode}</p>
                   </div>
-                  <div className="mb-4 flex gap-3">
+                  <div className="mb-4">
                     <button
                       type="button"
                       onClick={() => setShowShareParty(true)}
-                      className="flex-1 rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4A6A8A]"
+                      className="w-full rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4A6A8A]"
                     >
                       Partager
-                    </button>
-                    <button
-                      type="button"
-                      onClick={leaveGame}
-                      className="flex-1 rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                      Quitter la partie
                     </button>
                   </div>
                   <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Participants</h2>
@@ -2235,6 +2449,7 @@ export default function App() {
                   setShowShareParty(true);
                 }
               }}
+              onQuit={isHost ? null : leaveGame}
             />
 
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
