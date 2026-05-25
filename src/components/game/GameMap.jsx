@@ -22,6 +22,9 @@ import {
 import { BASEMAPS } from "../../lib/map/basemaps.js";
 import { offsetMeters } from "../../lib/map/geoOffset.js";
 import AnimatedCircle from "./AnimatedCircle.jsx";
+import GlobalCircle from "./GlobalCircle.jsx";
+import PlayerCircle from "./PlayerCircle.jsx";
+import BaliseCircle from "./BaliseCircle.jsx";
 
 function RecenterOnDemand({ center, zoom, tick }) {
   const map = useMap();
@@ -95,7 +98,7 @@ function PreventMapClickBounce() {
   return null;
 }
 
-function renderPreyDiscs(list, keyPrefix, onPlayerClick = null) {
+function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
   return (list || []).map((p) => {
     if (p.kind === "exact" && p.lat != null && p.lng != null) {
       const ic = p.disconnected ? iconDisconnected : iconPreyExact;
@@ -117,26 +120,26 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null) {
     }
     if (p.kind === "circle" && p.center && p.radiusM != null) {
       const isAdmin = keyPrefix === "admin";
+      const color = p.disconnected
+        ? "#94a3b8"
+        : isAdmin
+          ? "#7c3aed"
+          : "#fb923c";
+      const fillColor = p.disconnected
+        ? "#cbd5e1"
+        : isAdmin
+          ? "#a78bfa"
+          : "#f97316";
+      const fillOpacity = p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26;
+
       return (
-        <AnimatedCircle
+        <PlayerCircle
           key={`${keyPrefix}-${p.sessionId}`}
           center={p.center}
           radius={p.radiusM}
-          pathOptions={{
-            color: p.disconnected
-              ? "#94a3b8"
-              : isAdmin
-                ? "#7c3aed"
-                : "#fb923c",
-            fillColor: p.disconnected
-              ? "#cbd5e1"
-              : isAdmin
-                ? "#a78bfa"
-                : "#f97316",
-            fillOpacity: p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26,
-            weight: 2,
-            dashArray: isAdmin ? "10 8" : p.disconnected ? "4 6" : undefined,
-          }}
+          color={color}
+          fillColor={fillColor}
+          fillOpacity={fillOpacity}
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
@@ -235,6 +238,7 @@ export default function GameMap({
   }, []);
 
   const myJam = gameState?.myJamCircle;
+  const balises = gameState?.balises || [];
 
   const chatGeoMarkers = useMemo(() => {
     const photos = [];
@@ -369,30 +373,20 @@ export default function GameMap({
       <ZoomOnTicks zoomInTick={zoomInTick} zoomOutTick={zoomOutTick} />
 
       {gc && gr != null && (
-        <AnimatedCircle
+        <GlobalCircle
           center={{ lat: gc.lat, lng: gc.lng }}
           radius={gr}
-          pathOptions={{
-            color: "#818cf8",
-            fillColor: "#6366f1",
-            fillOpacity: 0.1,
-            weight: 3,
-          }}
         />
       )}
 
       {myJam?.center && myJam?.radiusM != null && (
-        <AnimatedCircle
+        <PlayerCircle
           key="my-jam"
           center={myJam.center}
           radius={myJam.radiusM}
-          pathOptions={{
-            color: "#0284c7",
-            fillColor: "#0ea5e9",
-            fillOpacity: 0.16,
-            weight: 2,
-            dashArray: "10 6",
-          }}
+          color="#0284c7"
+          fillColor="#0ea5e9"
+          fillOpacity={0.16}
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
@@ -404,6 +398,22 @@ export default function GameMap({
         />
       )}
 
+      {balises.map((balise) => {
+        const isBeingCaptured = balise.beingCapturedBy !== null;
+        const isMyCapture = balise.beingCapturedBy === mySessionId;
+        
+        return (
+          <BaliseCircle
+            key={balise.id}
+            center={{ lat: balise.lat, lng: balise.lng }}
+            radius={balise.radiusM}
+            beingCapturedBy={balise.beingCapturedBy}
+            isMyCapture={isMyCapture}
+            captureProgress={balise.captureProgress || 0}
+          />
+        );
+      })}
+
       <ClusteredMarkers
         items={clusterItems}
         expandKey={expandKey}
@@ -412,9 +422,9 @@ export default function GameMap({
       />
 
       {role === "cat" &&
-        renderPreyDiscs(gameState.preyForCat || [], "cat", onPlayerClick)}
+        renderPreyDiscs(gameState.preyForCat || [], "cat", onPlayerClick, mySessionId)}
 
-      {renderPreyDiscs(gameState.adminPreyPreview || [], "admin", onPlayerClick)}
+      {renderPreyDiscs(gameState.adminPreyPreview || [], "admin", onPlayerClick, mySessionId)}
 
       {chatGeoMarkers.locations.map((m) => (
         <Marker

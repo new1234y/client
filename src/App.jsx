@@ -12,6 +12,7 @@ import CityZonePicker from "./components/game/CityZonePicker.jsx";
 import SharePartyModal from "./components/game/SharePartyModal.jsx";
 import GameTimer from "./components/game/GameTimer.jsx";
 import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
+import GameInfoPanel from "./components/game/GameInfoPanel.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
@@ -955,10 +956,16 @@ export default function App() {
     // Merge location data into roster
     return baseRoster.map((player) => {
       const loc = locationMap.get(player.sessionId);
+      // Get coins from gameState.me if it's the current player, otherwise try to get from allies/cats
+      let coins = player.coins;
+      if (player.sessionId === sessionId && gameState?.me?.coins !== undefined) {
+        coins = gameState.me.coins;
+      }
       return {
         ...player,
         lat: loc?.lat ?? null,
         lng: loc?.lng ?? null,
+        coins,
       };
     });
   }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, rolesReveal?.players, role, isHost]);
@@ -1451,7 +1458,7 @@ export default function App() {
               <label className="text-xs text-slate-600 dark:text-slate-400">
                 Nombre de chats : {settings.catCount}
               </label>
-              <SliderWithParticles
+              <input
                 type="range"
                 min={1}
                 max={Math.max(1, (lobby.players?.length || 2) - 1)}
@@ -1771,7 +1778,7 @@ export default function App() {
                     : "Vous fuyez, partagez la discussion si besoin, et montrez votre QR à un chat pour être capturé."}
                 </p>
               )}
-              {isHost && p.sessionId !== sessionId && (
+              {isHost && (
                 <div className="mt-3 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -1790,7 +1797,7 @@ export default function App() {
                     </button>
                   </div>
                   <ConfigHint>
-                    Affecte ce participant comme traqueur (chat) ou comme proie (joueur). Votre propre carte n&apos;est pas modifiable ici.
+                    Affecte ce participant comme traqueur (chat) ou comme proie (joueur).
                   </ConfigHint>
                   <button
                     type="button"
@@ -2072,11 +2079,21 @@ export default function App() {
                   <ul className="space-y-3">
                     {rosterList.map((p) => (
                       <li key={p.sessionId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer rounded-[8px] bg-white p-4 ring-1 ring-slate-200 active:scale-[0.98] dark:bg-slate-800 dark:ring-slate-700">
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {p.nickname}
-                          {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
-                        </span>
-                        {p.disconnected && <span className="ml-2 text-xs font-medium text-amber-700 dark:text-amber-300">Déconnecté</span>}
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-900 dark:text-white">
+                            {p.nickname}
+                            {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
+                          </span>
+                          {p.coins !== undefined && p.coins > 0 && (
+                            <div className="flex items-center gap-1">
+                              <svg className="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
+                              </svg>
+                              <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{p.coins}</span>
+                            </div>
+                          )}
+                        </div>
+                        {p.disconnected && <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Déconnecté</span>}
                         <p className={`mt-1 text-sm ${p.role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>{roleBadgeText(p)}</p>
                       </li>
                     ))}
@@ -2142,12 +2159,19 @@ export default function App() {
               )}
 
               {/* Floating info bar above dock */}
-              <div className="pointer-events-none absolute bottom-20 left-0 right-0 z-[800] flex justify-center px-4 md:hidden">
-                <div className="pointer-events-auto flex items-center gap-3 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
-                  <span className={`text-xs font-semibold ${role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>
-                    {role === "cat" ? "Chat" : role === "player" ? "Joueur" : ""}
-                    {me?.spectator ? " · Spectateur" : ""}
-                  </span>
+              <div className="pointer-events-none absolute bottom-20 left-0 right-0 z-[800] flex flex-col items-center gap-2 px-4 md:hidden">
+                <GameInfoPanel
+                  role={role}
+                  isSpectator={me?.spectator}
+                  phaseEndsAt={gameState.phaseEndsAt}
+                  nextBaliseAt={gameState.nextBaliseAt}
+                  currentRadius={gameState.effectiveGlobalRadiusM}
+                  nextRadius={gameState.nextPhaseRadiusM}
+                  totalPhases={gameState.totalPhases}
+                  currentPhase={gameState.currentPhase}
+                  shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                />
+                <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
                   {catLocked && isCat && gameState.mapUnlockAt && (
                     <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
                   )}
@@ -2158,21 +2182,28 @@ export default function App() {
 
               {/* Desktop info bar (top) */}
               <div className="pointer-events-none absolute left-3 top-3 z-[800] hidden md:block">
-                <div className="pointer-events-auto flex items-center gap-3 rounded-[8px] bg-white/90 px-3 py-2 shadow backdrop-blur dark:bg-slate-900/90">
-                  <span className={`text-xs font-semibold ${role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>
-                    {role === "cat" ? "Vous êtes chat" : role === "player" ? "Vous êtes joueur" : ""}
-                    {me?.spectator ? " · Spectateur" : ""}
-                  </span>
-                  {catLocked && isCat && gameState.mapUnlockAt && (
-                    <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
-                  )}
-                  {gameState.timeLimitEndsAt && <GameTimer endsAt={gameState.timeLimitEndsAt} />}
-                  {gameState.settings?.shrinkZoneEnabled && (
-                    <span className="text-xs text-violet-600 dark:text-violet-400">Zone rétrécit</span>
-                  )}
-                  <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
-                  {!connected && <span className="animate-pulse text-xs text-[#C45454]">Déconnecté</span>}
-                </div>
+                <GameInfoPanel
+                  role={role}
+                  isSpectator={me?.spectator}
+                  phaseEndsAt={gameState.phaseEndsAt}
+                  nextBaliseAt={gameState.nextBaliseAt}
+                  currentRadius={gameState.effectiveGlobalRadiusM}
+                  nextRadius={gameState.nextPhaseRadiusM}
+                  totalPhases={gameState.totalPhases}
+                  currentPhase={gameState.currentPhase}
+                  shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                />
+              </div>
+              <div className="pointer-events-none absolute right-3 top-3 z-[800] hidden md:flex items-center gap-2">
+                {catLocked && isCat && gameState.mapUnlockAt && (
+                  <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
+                )}
+                {gameState.timeLimitEndsAt && <GameTimer endsAt={gameState.timeLimitEndsAt} />}
+                {gameState.settings?.shrinkZoneEnabled && (
+                  <span className="text-xs text-violet-600 dark:text-violet-400">Zone rétrécit</span>
+                )}
+                <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
+                {!connected && <span className="animate-pulse text-xs text-[#C45454]">Déconnecté</span>}
               </div>
             </div>
 
