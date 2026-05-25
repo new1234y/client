@@ -2170,6 +2170,7 @@ export default function App() {
                   totalPhases={gameState.totalPhases}
                   currentPhase={gameState.currentPhase}
                   shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                  coins={me?.coins}
                 />
                 <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
                   {catLocked && isCat && gameState.mapUnlockAt && (
@@ -2192,6 +2193,7 @@ export default function App() {
                   totalPhases={gameState.totalPhases}
                   currentPhase={gameState.currentPhase}
                   shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                  coins={me?.coins}
                 />
               </div>
               <div className="pointer-events-none absolute right-3 top-3 z-[800] hidden md:flex items-center gap-2">
