@@ -5,6 +5,7 @@ export default function GameInfoPanel({
   isSpectator,
   phaseEndsAt,
   nextBaliseAt,
+  baliseExpiresAt,
   currentRadius,
   nextRadius,
   totalPhases,
@@ -14,6 +15,7 @@ export default function GameInfoPanel({
 }) {
   const [zoneTimeLeft, setZoneTimeLeft] = useState(null);
   const [baliseTimeLeft, setBaliseTimeLeft] = useState(null);
+  const baliseTargetAt = baliseExpiresAt || nextBaliseAt;
 
   useEffect(() => {
     if (!phaseEndsAt) {
@@ -32,20 +34,20 @@ export default function GameInfoPanel({
   }, [phaseEndsAt]);
 
   useEffect(() => {
-    if (!nextBaliseAt) {
+    if (!baliseTargetAt) {
       setBaliseTimeLeft(null);
       return;
     }
 
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((nextBaliseAt - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((baliseTargetAt - Date.now()) / 1000));
       setBaliseTimeLeft(remaining);
     };
 
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [nextBaliseAt]);
+  }, [baliseTargetAt]);
 
   const formatTime = (seconds) => {
     if (seconds == null) return "--:--";
@@ -102,7 +104,7 @@ export default function GameInfoPanel({
       )}
 
       {/* Balise timer */}
-      {nextBaliseAt && baliseTimeLeft != null && (
+      {baliseTargetAt && baliseTimeLeft != null && (
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1">
             <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />

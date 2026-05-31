@@ -360,6 +360,23 @@ export default function App() {
   const [showScan, setShowScan] = useState(false);
   const [gameTab, setGameTab] = useState("map");
   const [mapBasemap, setMapBasemap] = useState("osm");
+
+  const prevMeRef = useRef(null);
+  useEffect(() => {
+    const meNow = gameState?.me || null;
+    const prev = prevMeRef.current;
+    if (meNow) {
+      const nowCapturedPlayer = meNow.role === "player" && !!meNow.captured && !meNow.spectator;
+      const prevCapturedPlayer = prev && prev.role === "player" && !!prev.captured && !prev.spectator;
+      if (!prevCapturedPlayer && nowCapturedPlayer) {
+        setShowQr(true);
+      }
+      if (showScan && meNow.role !== "cat") {
+        setShowScan(false);
+      }
+    }
+    prevMeRef.current = meNow;
+  }, [gameState?.me, showQr, showScan]);
   const [recenterTick, setRecenterTick] = useState(0);
   const [zoomInTick, setZoomInTick] = useState(0);
   const [zoomOutTick, setZoomOutTick] = useState(0);
@@ -410,12 +427,8 @@ export default function App() {
       const lastRoom = loadLastRoom();
       const lastNick = loadLastNickname();
       const lastSessionId = localStorage.getItem("chase_gps_last_session");
-      if (lastRoom && lastNick && !resumeCandidate) {
-        setRejoinCandidate({ 
-          roomCode: lastRoom, 
-          nickname: lastNick,
-          sessionId: lastSessionId
-        });
+      if (lastRoom && lastSessionId && lastNick) {
+        setRejoinCandidate({ roomCode: lastRoom, sessionId: lastSessionId, nickname: lastNick });
       }
     } else {
       setRejoinCandidate(null);
@@ -492,7 +505,7 @@ export default function App() {
     console.log('[resetToEntry] Reset complete');
   }, []);
 
-  // Reconnection logic - modified to be manual
+  // Reconnection logic - ensures socket is connected then restores session
   const attemptReconnect = useCallback((s, attempt = 1) => {
     console.log('[attemptReconnect] Called with:', { attempt });
     const saved = loadSession();
@@ -500,6 +513,22 @@ export default function App() {
       console.log('[attemptReconnect] No saved session');
       setIsReconnecting(false);
       setReconnectReason(null);
+      return;
+    }
+
+    if (!s?.connected) {
+      console.log('[attemptReconnect] Socket not connected, opening connection');
+      setIsReconnecting(true);
+      setReconnectReason("lost_connection");
+      try {
+        s.once('connect', () => {
+          console.log('[attemptReconnect] Connected, retrying restore');
+          attemptReconnect(s, attempt);
+        });
+        s.connect();
+      } catch (e) {
+        console.warn('[attemptReconnect] Failed to connect socket', e);
+      }
       return;
     }
 
@@ -587,10 +616,10 @@ export default function App() {
     const s = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 16000,
+      reconnection: false,
+      reconnectionAttempts: 0,
+      reconnectionDelay: 0,
+      reconnectionDelayMax: 0,
     });
     setSocket(s);
     socketRef.current = s;
@@ -598,20 +627,12 @@ export default function App() {
     s.on("connect", () => {
       setConnected(true);
       lastPingRef.current = Date.now();
-      
       const saved = loadSession();
-      if (!saved || stageRef.current === "summary") return;
-      
-      if (stageRef.current === "entry") {
-        setIsReconnecting(true);
-        setReconnectReason("session_found");
-        return;
-      }
-      
-      // If we are in a game stage but just connected, show the modal
-      if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
+      if (saved) {
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
+        setReconnectError(null);
+        attemptReconnect(s);
       }
     });
 
@@ -621,6 +642,7 @@ export default function App() {
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
         setReconnectError(null);
+        attemptReconnect(s);
       }
     });
 
@@ -672,6 +694,16 @@ export default function App() {
 
     s.on("capture_ok", (data) => {
       addNotification(`${data.preyNickname} a été attrapé !`, "success");
+      if (data?.preySessionId && data.preySessionId === sessionIdRef.current) {
+        setShowScan(false);
+        // Only show QR automatically if we are still a player (e.g. to be rescued)
+        setGameState((current) => {
+          if (current?.me?.role !== "cat") {
+            setShowQr(true);
+          }
+          return current;
+        });
+      }
     });
 
     s.on("player_out_of_bounds", (data) => {
@@ -817,9 +849,7 @@ export default function App() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        if (!s.connected) {
-          s.connect();
-        } else {
+        if (s.connected) {
           s.emit("refresh_state");
         }
       }
@@ -913,6 +943,9 @@ export default function App() {
       setErrorBanner("Choisissez un pseudo.");
       return;
     }
+    if (!socket.connected) {
+      socket.connect();
+    }
     unlockAudioAndVibration();
     setErrorBanner(null);
     const reqId = ++entryReqRef.current;
@@ -965,6 +998,9 @@ export default function App() {
       setErrorBanner("Pseudo et code requis.");
       return;
     }
+    if (!socket.connected) {
+      socket.connect();
+    }
     unlockAudioAndVibration();
     setErrorBanner(null);
     setNicknameError(null);
@@ -974,9 +1010,19 @@ export default function App() {
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("join");
     console.log('[onJoin] Emitting join_room for:', roomCodeInput.trim(), trimmedNickname);
+    const codeUpper = roomCodeInput.trim().toUpperCase();
+    const saved = loadSession();
+    const lastRoom = loadLastRoom();
+    const lastSessionId = (() => { try { return localStorage.getItem(LS_LAST_SESSION_KEY) || null; } catch { return null; } })();
+    const payload = { code: codeUpper, nickname: trimmedNickname };
+    if (saved?.roomCode?.toUpperCase() === codeUpper && saved.sessionId) {
+      payload.sessionId = saved.sessionId;
+    } else if (lastRoom && lastSessionId && lastRoom.toUpperCase() === codeUpper) {
+      payload.sessionId = lastSessionId;
+    }
     socket.emit(
       "join_room",
-      { code: roomCodeInput.trim(), nickname: trimmedNickname },
+      payload,
       (res) => {
         console.log('[onJoin] Response:', res);
         if (reqId !== entryReqRef.current) return;
@@ -1059,6 +1105,18 @@ export default function App() {
       if (!res?.ok) setErrorBanner(res?.error || "Impossible de reveler les roles.");
     });
   }, [socket]);
+
+  const baliseExpiresAt = useMemo(() => {
+    const arr = gameState?.balises || [];
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    let min = null;
+    for (const b of arr) {
+      if (b && typeof b.expiresAt === "number") {
+        if (min == null || b.expiresAt < min) min = b.expiresAt;
+      }
+    }
+    return min;
+  }, [gameState?.balises]);
 
   const onBeginHunt = useCallback(() => {
     console.log('[onBeginHunt] Called');
@@ -1149,12 +1207,21 @@ export default function App() {
     clearSession();
     resetToEntry(false);
 
-    if (socket && connected) {
-      socket.emit("leave_room", {}, (res) => {
-        // Already reset UI, just a confirmation
-      });
+    if (socket) {
+      try {
+        socket.emit("leave_room", {}, () => {
+          try { socket.disconnect(); } catch {}
+        });
+        setTimeout(() => {
+          if (socket.connected) {
+            try { socket.disconnect(); } catch {}
+          }
+        }, 300);
+      } catch {
+        try { socket.disconnect(); } catch {}
+      }
     }
-  }, [socket, connected, resetToEntry]);
+  }, [socket, resetToEntry]);
 
   const sendPartyChat = useCallback(
     (msg) => {
@@ -2339,15 +2406,13 @@ export default function App() {
             </li>
           ))}
         </ul>
-        {!isHost && (
-          <button
-            type="button"
-            onClick={leaveGame}
-            className="mt-6 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            Quitter la partie
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={leaveGame}
+          className="mt-6 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          Quitter la partie (hôte)
+        </button>
       </div>
     );
 
@@ -2551,6 +2616,7 @@ export default function App() {
                   isSpectator={me?.spectator}
                   phaseEndsAt={gameState.phaseEndsAt}
                   nextBaliseAt={gameState.nextBaliseAt}
+                  baliseExpiresAt={baliseExpiresAt}
                   currentRadius={gameState.effectiveGlobalRadiusM}
                   nextRadius={gameState.nextPhaseRadiusM}
                   totalPhases={gameState.totalPhases}
@@ -2574,6 +2640,7 @@ export default function App() {
                   isSpectator={me?.spectator}
                   phaseEndsAt={gameState.phaseEndsAt}
                   nextBaliseAt={gameState.nextBaliseAt}
+                  baliseExpiresAt={baliseExpiresAt}
                   currentRadius={gameState.effectiveGlobalRadiusM}
                   nextRadius={gameState.nextPhaseRadiusM}
                   totalPhases={gameState.totalPhases}
@@ -2621,7 +2688,7 @@ export default function App() {
                   setShowShareParty(true);
                 }
               }}
-              onQuit={isHost ? null : leaveGame}
+              onQuit={!isHost ? leaveGame : undefined}
             />
 
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
