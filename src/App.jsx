@@ -31,51 +31,65 @@ const LS_ROOM_KEY = "chase_gps_room";
 const LS_NICKNAME_KEY = "chase_gps_nickname";
 const LS_LAST_NICKNAME_KEY = "chase_gps_last_nickname";
 const LS_LAST_ROOM_KEY = "chase_gps_last_room";
+const LS_LAST_SESSION_KEY = "chase_gps_last_session";
+
 function saveSession(sessionId, roomCode, nickname) {
+  console.log('[saveSession] Called with:', { sessionId, roomCode, nickname });
   try {
     localStorage.setItem(LS_SESSION_KEY, sessionId);
     localStorage.setItem(LS_ROOM_KEY, roomCode);
     localStorage.setItem(LS_NICKNAME_KEY, nickname);
+    console.log('[saveSession] Session saved successfully');
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
 }
 
 function loadSession() {
+  console.log('[loadSession] Called');
   try {
     const sessionId = localStorage.getItem(LS_SESSION_KEY);
     const roomCode = localStorage.getItem(LS_ROOM_KEY);
     const nickname = localStorage.getItem(LS_NICKNAME_KEY);
+    console.log('[loadSession] Loaded:', { sessionId, roomCode, nickname });
     if (sessionId && roomCode) {
       return { sessionId, roomCode, nickname: nickname || "Joueur" };
     }
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
+  console.log('[loadSession] No session found');
   return null;
 }
 
 function clearSession() {
+  console.log('[clearSession] Called');
   try {
     localStorage.removeItem(LS_SESSION_KEY);
     localStorage.removeItem(LS_ROOM_KEY);
     localStorage.removeItem(LS_NICKNAME_KEY);
+    console.log('[clearSession] Session cleared');
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
 }
 
 function saveLastNickname(nickname) {
+  console.log('[saveLastNickname] Called with:', { nickname });
   try {
     localStorage.setItem(LS_LAST_NICKNAME_KEY, nickname);
+    console.log('[saveLastNickname] Saved');
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
 }
 
 function loadLastNickname() {
+  console.log('[loadLastNickname] Called');
   try {
-    return localStorage.getItem(LS_LAST_NICKNAME_KEY) || "";
+    const result = localStorage.getItem(LS_LAST_NICKNAME_KEY) || "";
+    console.log('[loadLastNickname] Result:', result);
+    return result;
   } catch (e) {
     console.warn("localStorage non disponible:", e);
     return "";
@@ -83,8 +97,11 @@ function loadLastNickname() {
 }
 
 function loadLastRoom() {
+  console.log('[loadLastRoom] Called');
   try {
-    return localStorage.getItem(LS_LAST_ROOM_KEY) || "";
+    const result = localStorage.getItem(LS_LAST_ROOM_KEY) || "";
+    console.log('[loadLastRoom] Result:', result);
+    return result;
   } catch (e) {
     console.warn("localStorage non disponible:", e);
     return "";
@@ -92,6 +109,7 @@ function loadLastRoom() {
 }
 
 function roleBadgeText(p) {
+  console.log('[roleBadgeText] Called with:', { role: p.role, originalRole: p.originalRole, spectator: p.spectator });
   if (p.spectator) return "Spectateur";
   if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
   if (p.role === "cat") return "Chat";
@@ -99,57 +117,107 @@ function roleBadgeText(p) {
   return "Joueur";
 }
 
-// Parse URL for room code
 function getCodeFromUrl() {
+  console.log('[getCodeFromUrl] Called');
   try {
     const params = new URLSearchParams(window.location.search);
-    return params.get("code") || "";
+    const result = params.get("code") || "";
+    console.log('[getCodeFromUrl] Result:', result);
+    return result;
   } catch {
+    console.log('[getCodeFromUrl] Error parsing URL');
     return "";
   }
 }
 
 function getRecapIdFromPath() {
+  console.log('[getRecapIdFromPath] Called');
   try {
     const m = window.location.pathname.match(/^\/recap\/([A-Za-z0-9]+)\/?$/);
-    return m ? m[1].toUpperCase() : null;
+    const result = m ? m[1].toUpperCase() : null;
+    console.log('[getRecapIdFromPath] Result:', result);
+    return result;
   } catch {
+    console.log('[getRecapIdFromPath] Error parsing path');
     return null;
   }
 }
 
-function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, lastError }) {
+function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, lastError, reason }) {
   if (!isReconnecting) return null;
+
+  let title = "Reconnexion";
+  let description = "La connexion a été perdue.";
+  let showSpinner = reconnectAttempt > 0;
+
+  if (reason === "lost_connection") {
+    title = "Connexion perdue";
+    description = "Vous avez été déconnecté du serveur.";
+  } else if (reason === "session_found") {
+    title = "Session trouvée";
+    description = "Une partie en cours a été détectée.";
+    showSpinner = false;
+  } else if (reason === "kicked") {
+    title = "Expulsé";
+    description = "Vous avez été expulsé de la partie.";
+    showSpinner = false;
+  }
+
   return (
     <div
-      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Reconnexion en cours"
+      aria-label={title}
     >
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-slate-900">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+        {showSpinner ? (
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+        ) : (
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+            <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+        )}
         <h2 className="mb-2 text-lg font-semibold text-slate-900 dark:text-white">
-          Reconnexion en cours...
+          {title}
         </h2>
-        <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">
-          Tentative {reconnectAttempt}
+        <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+          {description}
         </p>
+        
+        {reconnectAttempt > 0 && (
+          <p className="mb-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+            Tentative {reconnectAttempt}...
+          </p>
+        )}
+        
         {lastError && (
           <p className="mb-4 text-xs text-red-600 dark:text-red-400">{lastError}</p>
         )}
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-500">
-          La connexion a ete perdue. Nous essayons de vous reconnecter automatiquement.
-        </p>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full rounded-xl bg-slate-200 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-          >
-            Annuler et quitter
-          </button>
-        )}
+
+        <div className="flex flex-col gap-2">
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={reconnectAttempt > 0}
+              className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50"
+            >
+              {reason === "session_found" ? "Reprendre" : "Se reconnecter"}
+            </button>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              {reason === "kicked" ? "Ok" : "Quitter"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -299,6 +367,7 @@ export default function App() {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectError, setReconnectError] = useState(null);
+  const [reconnectReason, setReconnectReason] = useState(null);
   const [midJoinWait, setMidJoinWait] = useState(null);
   const [joinRequestQueue, setJoinRequestQueue] = useState([]);
   const [partyChatMessages, setPartyChatMessages] = useState([]);
@@ -340,8 +409,13 @@ export default function App() {
     if (stage === "entry") {
       const lastRoom = loadLastRoom();
       const lastNick = loadLastNickname();
+      const lastSessionId = localStorage.getItem("chase_gps_last_session");
       if (lastRoom && lastNick && !resumeCandidate) {
-        setRejoinCandidate({ roomCode: lastRoom, nickname: lastNick });
+        setRejoinCandidate({ 
+          roomCode: lastRoom, 
+          nickname: lastNick,
+          sessionId: lastSessionId
+        });
       }
     } else {
       setRejoinCandidate(null);
@@ -378,6 +452,7 @@ export default function App() {
   const lastEmit = useRef(0);
 
   const resetToEntry = useCallback((clearStorage = true) => {
+    console.log('[resetToEntry] Called with:', { clearStorage });
     if (clearStorage) {
       clearSession();
     }
@@ -399,6 +474,7 @@ export default function App() {
     setIsReconnecting(false);
     setReconnectAttempt(0);
     setReconnectError(null);
+    setReconnectReason(null);
     setMidJoinWait(null);
     setJoinRequestQueue([]);
     setPartyChatMessages([]);
@@ -413,29 +489,37 @@ export default function App() {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
+    console.log('[resetToEntry] Reset complete');
   }, []);
 
-  // Reconnection with exponential backoff
+  // Reconnection logic - modified to be manual
   const attemptReconnect = useCallback((s, attempt = 1) => {
+    console.log('[attemptReconnect] Called with:', { attempt });
     const saved = loadSession();
     if (!saved) {
+      console.log('[attemptReconnect] No saved session');
       setIsReconnecting(false);
+      setReconnectReason(null);
       return;
     }
 
     setReconnectAttempt(attempt);
+    console.log('[attemptReconnect] Emitting reconnect_session for:', saved.roomCode);
     
     s.emit("reconnect_session", { 
       sessionId: saved.sessionId, 
       roomCode: saved.roomCode 
     }, (res) => {
+      console.log('[attemptReconnect] Response:', res);
       if (res?.ok) {
         setIsReconnecting(false);
         setReconnectAttempt(0);
         setReconnectError(null);
+        setReconnectReason(null);
         setResumeCandidate(null);
         setSessionId(res.sessionId);
         setIsHost(res.isHost);
+        console.log('[attemptReconnect] Reconnect successful, phase:', res.phase);
         
         if (res.phase === "lobby" && res.lobby) {
           setLobby(res.lobby);
@@ -456,6 +540,7 @@ export default function App() {
         }
       } else {
         setReconnectError(res?.error || "Echec de reconnexion");
+        console.log('[attemptReconnect] Reconnect failed:', res?.error);
         
         if (
           res?.error?.includes("expir") ||
@@ -463,18 +548,16 @@ export default function App() {
           res?.error?.includes("n'existe") ||
           res?.error?.includes("termin")
         ) {
+          console.log('[attemptReconnect] Session expired, clearing');
           clearSession();
           setIsReconnecting(false);
+          setReconnectReason(null);
           resetToEntry(false);
           return;
         }
         
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (s.connected) {
-            attemptReconnect(s, attempt + 1);
-          }
-        }, delay);
+        // No automatic retries anymore, let user click again if they want
+        setReconnectAttempt(0);
       }
     });
   }, [resetToEntry]);
@@ -518,22 +601,25 @@ export default function App() {
       
       const saved = loadSession();
       if (!saved || stageRef.current === "summary") return;
+      
       if (stageRef.current === "entry") {
-        setResumeCandidate(saved);
-        setIsReconnecting(false);
-        setReconnectAttempt(0);
-        setReconnectError(null);
+        setIsReconnecting(true);
+        setReconnectReason("session_found");
         return;
       }
-      setIsReconnecting(true);
-      attemptReconnect(s);
+      
+      // If we are in a game stage but just connected, show the modal
+      if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
+        setIsReconnecting(true);
+        setReconnectReason("lost_connection");
+      }
     });
 
     s.on("disconnect", () => {
       setConnected(false);
-      
       if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
         setIsReconnecting(true);
+        setReconnectReason("lost_connection");
         setReconnectError(null);
       }
     });
@@ -544,21 +630,27 @@ export default function App() {
     });
 
     s.on("lobby_update", (payload) => {
+      if (stageRef.current === "entry") return;
       setIsReconnecting(false);
+      setReconnectReason(null);
       setLobby(payload);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "lobby") setStage("lobby");
     });
 
     s.on("roles_reveal", (payload) => {
+      if (stageRef.current === "entry") return;
       setIsReconnecting(false);
+      setReconnectReason(null);
       setRolesReveal(payload);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       setStage("role_reveal");
     });
 
     s.on("game_state", (payload) => {
+      if (stageRef.current === "entry") return;
       setIsReconnecting(false);
+      setReconnectReason(null);
       setGameState(payload);
       setRole(payload.me?.role ?? null);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
@@ -629,8 +721,8 @@ export default function App() {
 
     s.on("kicked", () => {
       clearSession();
-      addNotification("Vous avez ete expulse de la partie.", "error");
-      resetToEntry();
+      setIsReconnecting(true);
+      setReconnectReason("kicked");
     });
 
     s.on("admin_role_changed", (data) => {
@@ -794,6 +886,7 @@ export default function App() {
     };
 
   const unlockAudioAndVibration = useCallback(() => {
+    console.log('[unlockAudioAndVibration] Called');
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = audioCtx.createOscillator();
@@ -803,14 +896,20 @@ export default function App() {
       gain.gain.value = 0; // silent
       osc.start();
       osc.stop(audioCtx.currentTime + 0.1);
-    } catch(e) {}
+      console.log('[unlockAudioAndVibration] Audio unlocked');
+    } catch(e) {
+      console.log('[unlockAudioAndVibration] Audio unlock failed:', e);
+    }
     if (navigator.vibrate) {
       try { navigator.vibrate(1); } catch(e) {}
+      console.log('[unlockAudioAndVibration] Vibration unlocked');
     }
   }, []);
 
   const onCreate = useCallback(() => {
+    console.log('[onCreate] Called with:', { nickname });
     if (!socket || !nickname.trim()) {
+      console.log('[onCreate] Missing socket or nickname');
       setErrorBanner("Choisissez un pseudo.");
       return;
     }
@@ -820,10 +919,13 @@ export default function App() {
     setEntryBusyKind("create");
     const trimmedNickname = nickname.trim();
     saveLastNickname(trimmedNickname);
+    console.log('[onCreate] Emitting create_room for:', trimmedNickname);
     socket.emit("create_room", { nickname: trimmedNickname }, (res) => {
+      console.log('[onCreate] Response:', res);
       if (reqId !== entryReqRef.current) return;
       setEntryBusyKind(null);
       if (!res?.ok) {
+        console.log('[onCreate] Create failed:', res?.error);
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
@@ -836,13 +938,19 @@ export default function App() {
       setIsHost(true);
       setLobby(res.lobby);
       setStage("lobby");
+      console.log('[onCreate] Room created successfully:', res.code);
     });
   }, [socket, nickname]);
 
   const respondJoinRequest = useCallback(
     (requestId, accept) => {
-      if (!socket) return;
+      console.log('[respondJoinRequest] Called with:', { requestId, accept });
+      if (!socket) {
+        console.log('[respondJoinRequest] No socket');
+        return;
+      }
       socket.emit("respond_join_request", { requestId, accept }, (res) => {
+        console.log('[respondJoinRequest] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Action impossible.");
         setJoinRequestQueue((q) => q.filter((x) => x.requestId !== requestId));
       });
@@ -851,7 +959,9 @@ export default function App() {
   );
 
   const onJoin = useCallback(() => {
+    console.log('[onJoin] Called with:', { nickname, roomCodeInput });
     if (!socket || !nickname.trim() || !roomCodeInput.trim()) {
+      console.log('[onJoin] Missing socket, nickname or room code');
       setErrorBanner("Pseudo et code requis.");
       return;
     }
@@ -863,10 +973,12 @@ export default function App() {
     saveLastNickname(trimmedNickname);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("join");
+    console.log('[onJoin] Emitting join_room for:', roomCodeInput.trim(), trimmedNickname);
     socket.emit(
       "join_room",
       { code: roomCodeInput.trim(), nickname: trimmedNickname },
       (res) => {
+        console.log('[onJoin] Response:', res);
         if (reqId !== entryReqRef.current) return;
         setEntryBusyKind(null);
         if (res?.ok) {
@@ -879,9 +991,11 @@ export default function App() {
           setIsHost(res.isHost);
           setLobby(res.lobby);
           setStage("lobby");
+          console.log('[onJoin] Joined room successfully:', res.code);
           return;
         }
         if (res?.joinRequestPossible) {
+          console.log('[onJoin] Join request possible, requesting midgame join');
           socket.emit(
             "request_join_midgame",
             {
@@ -889,6 +1003,7 @@ export default function App() {
               nickname: trimmedNickname,
             },
             (r2) => {
+              console.log('[onJoin] Midgame join response:', r2);
               if (r2?.ok) {
                 setMidJoinWait({ code: roomCodeInput.trim() });
                 setErrorBanner(null);
@@ -919,8 +1034,13 @@ export default function App() {
 
   const pushSettings = useCallback(
     (partial) => {
-      if (!socket) return;
+      console.log('[pushSettings] Called with:', partial);
+      if (!socket) {
+        console.log('[pushSettings] No socket');
+        return;
+      }
       socket.emit("update_settings", partial, (res) => {
+        console.log('[pushSettings] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Mise a jour refusee.");
         else if (res.lobby) setLobby(res.lobby);
       });
@@ -929,24 +1049,39 @@ export default function App() {
   );
 
   const onRevealRoles = useCallback(() => {
-    if (!socket) return;
+    console.log('[onRevealRoles] Called');
+    if (!socket) {
+      console.log('[onRevealRoles] No socket');
+      return;
+    }
     socket.emit("start_roles", {}, (res) => {
+      console.log('[onRevealRoles] Response:', res);
       if (!res?.ok) setErrorBanner(res?.error || "Impossible de reveler les roles.");
     });
   }, [socket]);
 
   const onBeginHunt = useCallback(() => {
-    if (!socket) return;
+    console.log('[onBeginHunt] Called');
+    if (!socket) {
+      console.log('[onBeginHunt] No socket');
+      return;
+    }
     socket.emit("begin_hunt", {}, (res) => {
+      console.log('[onBeginHunt] Response:', res);
       if (!res?.ok) setErrorBanner(res?.error || "Impossible de demarrer la chasse.");
     });
   }, [socket]);
 
   const onScanResult = useCallback(
     (text) => {
-      if (!socket || !text) return;
+      console.log('[onScanResult] Called with:', { text });
+      if (!socket || !text) {
+        console.log('[onScanResult] No socket or text');
+        return;
+      }
       const id = String(text).trim();
       socket.emit("capture_scan", { targetSessionId: id }, (res) => {
+        console.log('[onScanResult] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Capture refusee.");
         else setShowScan(false);
       });
@@ -956,8 +1091,13 @@ export default function App() {
 
   const adminKick = useCallback(
     (targetSessionId) => {
-      if (!socket) return;
+      console.log('[adminKick] Called with:', { targetSessionId });
+      if (!socket) {
+        console.log('[adminKick] No socket');
+        return;
+      }
       socket.emit("admin_kick", { targetSessionId }, (res) => {
+        console.log('[adminKick] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Expulsion refusee.");
       });
     },
@@ -966,8 +1106,13 @@ export default function App() {
 
   const adminSetRole = useCallback(
     (targetSessionId, r) => {
-      if (!socket) return;
+      console.log('[adminSetRole] Called with:', { targetSessionId, role: r });
+      if (!socket) {
+        console.log('[adminSetRole] No socket');
+        return;
+      }
       socket.emit("admin_set_role", { targetSessionId, role: r }, (res) => {
+        console.log('[adminSetRole] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Changement refuse.");
       });
     },
@@ -975,8 +1120,13 @@ export default function App() {
   );
 
   const adminEndGame = useCallback(() => {
-    if (!socket) return;
+    console.log('[adminEndGame] Called');
+    if (!socket) {
+      console.log('[adminEndGame] No socket');
+      return;
+    }
     socket.emit("admin_end_game", {}, (res) => {
+      console.log('[adminEndGame] Response:', res);
       if (!res?.ok) setErrorBanner(res?.error || "Impossible de terminer.");
       else setGameTab("map");
     });
@@ -989,12 +1139,13 @@ export default function App() {
       try {
         localStorage.setItem(LS_LAST_NICKNAME_KEY, saved.nickname);
         localStorage.setItem(LS_LAST_ROOM_KEY, saved.roomCode);
+        localStorage.setItem(LS_LAST_SESSION_KEY, saved.sessionId);
       } catch (e) {
         console.warn("localStorage non disponible:", e);
       }
     }
 
-    // Clear session and reset UI immediately to prevent any auto-reconnect logic
+    // Clear session and reset UI immediately
     clearSession();
     resetToEntry(false);
 
@@ -1154,7 +1305,20 @@ export default function App() {
       isReconnecting={showReconnectModal}
       reconnectAttempt={reconnectAttempt}
       lastError={reconnectError}
-      onCancel={isHost ? null : leaveGame}
+      reason={reconnectReason}
+      onRetry={() => {
+        const s = socketRef.current;
+        if (s) attemptReconnect(s);
+      }}
+      onCancel={() => {
+        if (reconnectReason === "kicked") {
+          setIsReconnecting(false);
+          setReconnectReason(null);
+          resetToEntry();
+        } else {
+          leaveGame();
+        }
+      }}
     />
   );
 
@@ -1232,43 +1396,7 @@ export default function App() {
           </div>
         )}
 
-        {resumeCandidate && connected && (
-          <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">
-              Partie en cours détectée
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Salle <span className="font-mono font-bold">{resumeCandidate.roomCode}</span>
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const s = socketRef.current;
-                  if (!s) return;
-                  setIsReconnecting(true);
-                  setResumeCandidate(null);
-                  attemptReconnect(s);
-                }}
-                className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white"
-              >
-                Reprendre
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  clearSession();
-                  setResumeCandidate(null);
-                }}
-                className="flex-1 rounded-xl bg-slate-200 px-4 py-3 text-sm font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-              >
-                Oublier
-              </button>
-            </div>
-          </div>
-        )}
-
-        {rejoinCandidate && connected && !resumeCandidate && (
+        {rejoinCandidate && connected && !isReconnecting && !resumeCandidate && (
           <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30">
@@ -1286,22 +1414,66 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setNickname(rejoinCandidate.nickname);
-                    setRoomCodeInput(rejoinCandidate.roomCode);
-                    setEntryMode("join");
-                    setRejoinCandidate(null);
-                    // Short delay to ensure state updates before joining
-                    setTimeout(() => onJoin(), 100);
+                    const trimmedNickname = rejoinCandidate.nickname.trim();
+                    const trimmedRoomCode = rejoinCandidate.roomCode.trim();
+                    const existingSessionId = rejoinCandidate.sessionId;
+
+                    unlockAudioAndVibration();
+                    setErrorBanner(null);
+                    setNicknameError(null);
+                    setEntryBusyKind("join");
+
+                    socket.emit(
+                      "join_room",
+                      { 
+                        code: trimmedRoomCode, 
+                        nickname: trimmedNickname,
+                        sessionId: existingSessionId 
+                      },
+                      (res) => {
+                        setEntryBusyKind(null);
+                        if (res?.ok) {
+                          if (window.history.replaceState) {
+                            window.history.replaceState({}, "", window.location.pathname);
+                          }
+                          saveSession(res.sessionId, res.code, trimmedNickname);
+                          setSessionId(res.sessionId);
+                          setIsHost(res.isHost);
+                          
+                          if (res.phase === "lobby" && res.lobby) {
+                            setLobby(res.lobby);
+                            setStage("lobby");
+                          } else if (res.phase === "role_reveal" && res.rolesReveal) {
+                            setRolesReveal(res.rolesReveal);
+                            setStage("role_reveal");
+                          } else if (res.phase === "playing" && res.gameState) {
+                            setGameState(res.gameState);
+                            setRole(res.gameState.me?.role ?? null);
+                            setStage("game");
+                          } else if (res.lobby) {
+                            // Fallback for normal join
+                            setLobby(res.lobby);
+                            setStage("lobby");
+                          }
+                          
+                          setRejoinCandidate(null);
+                          return;
+                        }
+                        setErrorBanner(res?.error || "Impossible de rejoindre.");
+                        setRejoinCandidate(null);
+                      }
+                    );
                   }}
                   className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none"
                 >
-                  Rejoindre maintenant
+                  Oui, rejoindre
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     try {
                       localStorage.removeItem(LS_LAST_ROOM_KEY);
+                      localStorage.removeItem(LS_LAST_SESSION_KEY);
                     } catch (e) {
                       console.warn("localStorage non disponible:", e);
                     }
@@ -1309,7 +1481,7 @@ export default function App() {
                   }}
                   className="w-full rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 >
-                  Ignorer
+                  Non, ignorer
                 </button>
               </div>
             </div>
