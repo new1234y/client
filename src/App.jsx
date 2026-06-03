@@ -18,7 +18,6 @@ import ConfigHint from "./components/ui/ConfigHint.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
 import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
-import ZoneShrinkAnimation from "./components/game/ZoneShrinkAnimation.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
 import CircularLobby from "./components/CircularLobby.jsx";
 
@@ -399,7 +398,6 @@ export default function App() {
   const [recapData, setRecapData] = useState(null);
   const [recapErr, setRecapErr] = useState(false);
   const [recapLoading, setRecapLoading] = useState(() => Boolean(getRecapIdFromPath()));
-  const [showZoneShrinkAnimation, setShowZoneShrinkAnimation] = useState(false);
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const outOfBoundsAudioRef = useRef(null);
   const lastNicknameRef = useRef("");
@@ -677,12 +675,6 @@ export default function App() {
       setRole(payload.me?.role ?? null);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "playing") setStage("game");
-      
-      // Trigger zone shrink animation when radius changes
-      if (payload.settings?.shrinkZoneEnabled && payload.effectiveGlobalRadiusM) {
-        setShowZoneShrinkAnimation(true);
-        setTimeout(() => setShowZoneShrinkAnimation(false), 2000);
-      }
     });
 
     s.on("game_finished", (data) => {
@@ -1105,6 +1097,23 @@ export default function App() {
       if (!res?.ok) setErrorBanner(res?.error || "Impossible de reveler les roles.");
     });
   }, [socket]);
+
+  const adminAddTime = useCallback(
+    (minutes) => {
+      console.log('[adminAddTime] Called with:', minutes);
+      if (!socket) {
+        console.log('[adminAddTime] No socket');
+        return;
+      }
+      const m = Math.max(1, Math.floor(Number(minutes) || 0));
+      socket.emit("admin_add_time", { minutes: m }, (res) => {
+        console.log('[adminAddTime] Response:', res);
+        if (!res?.ok) setErrorBanner(res?.error || "Ajout de temps refusé.");
+        else addNotification(`+${m} min ajoutées à la partie`, "success");
+      });
+    },
+    [socket, addNotification]
+  );
 
   const baliseExpiresAt = useMemo(() => {
     const arr = gameState?.balises || [];
@@ -1955,71 +1964,26 @@ export default function App() {
               <p className="mb-2 text-xs font-bold uppercase text-slate-500">
                 Options avancées
               </p>
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/80">
+                <label className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${settings.timeLimitEnabled ? "cursor-pointer border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/80" : "cursor-not-allowed border-slate-200 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-900/40"}`}>
                   <span className="text-sm text-slate-800 dark:text-slate-100">
                     Zone globale qui rétrécit
                   </span>
                   <input
                     type="checkbox"
-                    checked={!!settings.shrinkZoneEnabled}
+                    checked={!!settings.shrinkZoneEnabled && !!settings.timeLimitEnabled}
+                    disabled={!settings.timeLimitEnabled}
                     onChange={(e) =>
                       pushSettings({ shrinkZoneEnabled: e.target.checked })
                     }
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 disabled:opacity-50 dark:border-slate-500"
                   />
                 </label>
                 <ConfigHint>
-                  Le cercle autorisé se resserre par paliers jusqu’au rayon minimum, pour resserrer la partie sur la fin.
+                  Le cercle autorisé se resserre vers une ou plusieurs zones finales pour terminer la partie.
                 </ConfigHint>
                 {settings.shrinkZoneEnabled && (
-                  <div className="mt-2 space-y-2 pl-1">
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
-                      Durée jusqu&apos;au rayon min (min) :{" "}
-                      {settings.shrinkDurationMinutes ?? 15}
-                    </label>
-                    <SliderWithParticles
-                      type="range"
-                      min={3}
-                      max={60}
-                      step={1}
-                      value={settings.shrinkDurationMinutes ?? 15}
-                      onChange={(e) =>
-                        pushSettings({
-                          shrinkDurationMinutes: Number(e.target.value),
-                        })
-                      }
-                      className="w-full accent-matte-blue"
-                    />
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
-                      Rayon minimum (m) : {settings.shrinkMinRadiusM ?? 100}
-                    </label>
-                    <SliderWithParticles
-                      type="range"
-                      min={30}
-                      max={800}
-                      step={10}
-                      value={settings.shrinkMinRadiusM ?? 100}
-                      onChange={(e) =>
-                        pushSettings({
-                          shrinkMinRadiusM: Number(e.target.value),
-                        })
-                      }
-                      className="w-full accent-matte-blue"
-                    />
-                    <label className="text-xs text-slate-600 dark:text-slate-400">
-                      Paliers : {settings.shrinkPhases ?? 5}
-                    </label>
-                    <SliderWithParticles
-                      type="range"
-                      min={2}
-                      max={12}
-                      step={1}
-                      value={settings.shrinkPhases ?? 5}
-                      onChange={(e) =>
-                        pushSettings({ shrinkPhases: Number(e.target.value) })
-                      }
-                      className="w-full accent-matte-blue"
-                    />
+                  <div className="mt-2 space-y-2 pl-1 text-xs text-orange-600 dark:text-orange-400">
+                    Les zones se réduiront automatiquement en fonction du temps limite défini pour la partie.
                   </div>
                 )}
 
@@ -2030,9 +1994,14 @@ export default function App() {
                   <input
                     type="checkbox"
                     checked={!!settings.timeLimitEnabled}
-                    onChange={(e) =>
-                      pushSettings({ timeLimitEnabled: e.target.checked })
-                    }
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      const patch = { timeLimitEnabled: enabled };
+                      if (!enabled && settings.shrinkZoneEnabled) {
+                        patch.shrinkZoneEnabled = false;
+                      }
+                      pushSettings(patch);
+                    }}
                     className="h-5 w-5 rounded border-slate-300 text-indigo-600 dark:border-slate-500"
                   />
                 </label>
@@ -2362,6 +2331,37 @@ export default function App() {
         <ConfigHint>
           Arrête la chasse immédiatement et affiche le résumé pour chaque participant connecté.
         </ConfigHint>
+        <div className="mt-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+          <p className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Ajouter du temps</p>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={60}
+              step={1}
+              placeholder="Minutes"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.currentTarget.value;
+                  if (val) adminAddTime(val);
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-700"
+              onClick={(e) => {
+                const wrapper = e.currentTarget.parentElement;
+                const input = wrapper?.querySelector('input[type="number"]');
+                if (input && input.value) adminAddTime(input.value);
+              }}
+            >
+              + Temps
+            </button>
+          </div>
+          <ConfigHint>Réajuste automatiquement les prochaines zones sans jamais agrandir la zone actuelle. La dernière zone reste fixe un long moment.</ConfigHint>
+        </div>
         <ul className="mt-6 space-y-4">
           {rosterList.map((p) => (
             <li
@@ -2581,6 +2581,8 @@ export default function App() {
                         currentRadius={gameState.effectiveGlobalRadiusM}
                         nextRadius={gameState.nextPhaseRadiusM}
                         phaseEndsAt={gameState.phaseEndsAt}
+                        shrinkStartsAt={gameState.shrinkStartsAt}
+                        phaseState={gameState.zonePhaseState}
                         totalPhases={gameState.totalPhases || 5}
                         currentPhase={gameState.currentPhase || 1}
                       />
@@ -2747,7 +2749,6 @@ export default function App() {
             }}
           />
         )}
-        <ZoneShrinkAnimation isActive={showZoneShrinkAnimation} />
       </div>
     );
   }

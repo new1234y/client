@@ -4,26 +4,29 @@ export default function ZonePhaseIndicator({
   currentRadius, 
   nextRadius, 
   phaseEndsAt,
+  shrinkStartsAt,
+  phaseState,
   totalPhases = 5,
   currentPhase = 1,
 }) {
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
-    if (!phaseEndsAt) {
+    const timerTarget = phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
+    if (!timerTarget) {
       setTimeLeft(null);
       return;
     }
 
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((timerTarget - Date.now()) / 1000));
       setTimeLeft(remaining);
     };
 
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [phaseEndsAt]);
+  }, [phaseEndsAt, shrinkStartsAt, phaseState]);
 
   if (!currentRadius) return null;
 
@@ -74,8 +77,16 @@ export default function ZonePhaseIndicator({
         )}
       </div>
 
-      {/* Time until next phase */}
-      {timeLeft != null && timeLeft > 0 && (
+      {/* Phase status */}
+      <div className="h-4 w-px bg-slate-700" />
+      <div className="text-xs text-slate-300">
+        {phaseState === "waiting" && "Attente"}
+        {phaseState === "shrinking" && "Rétrécissement"}
+        {phaseState === "stopped" && "Arrêté"}
+      </div>
+
+      {/* Time until shrink start or end */}
+      {timeLeft != null && timeLeft > 0 && phaseState !== "stopped" && (
         <>
           <div className="h-4 w-px bg-slate-700" />
           <div className="flex items-center gap-1 text-xs">

@@ -26,6 +26,7 @@ import {
 import { BASEMAPS } from "../../lib/map/basemaps.js";
 import { offsetMeters } from "../../lib/map/geoOffset.js";
 import AnimatedCircle from "./AnimatedCircle.jsx";
+import { Polyline } from "react-leaflet";
 import GlobalCircle from "./GlobalCircle.jsx";
 import PlayerCircle from "./PlayerCircle.jsx";
 import BaliseCircle from "./BaliseCircle.jsx";
@@ -126,11 +127,14 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
     }
     if (p.kind === "circle" && p.center && p.radiusM != null) {
       const isAdmin = keyPrefix === "admin";
+      const isOutOfBounds = !!p.outOfBounds;
       const color = p.disconnected
         ? "#94a3b8"
-        : isAdmin
-          ? "#7c3aed"
-          : "#fb923c";
+        : isOutOfBounds
+          ? "#ef4444" // red border
+          : isAdmin
+            ? "#7c3aed"
+            : "#fb923c";
       const fillColor = p.disconnected
         ? "#cbd5e1"
         : isAdmin
@@ -229,8 +233,10 @@ export default function GameMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const initialZoom = me?.lat != null ? 17 : gameState?.gameCenter ? 14 : 6;
-  const gc = gameState?.gameCenter;
+  const initialZoom = me?.lat != null ? 17 : gameState?.effectiveGlobalCenter ? 14 : 6;
+  const gc = gameState?.effectiveGlobalCenter || gameState?.gameCenter;
+  const nextGc = gameState?.nextPhaseCenter;
+  const nextGr = gameState?.nextPhaseRadiusM;
   const gr =
     gameState?.effectiveGlobalRadiusM ??
     gameState?.settings?.globalRadiusM;
@@ -411,8 +417,37 @@ export default function GameMap({
         <GlobalCircle
           center={{ lat: gc.lat, lng: gc.lng }}
           radius={gr}
+          nextCenter={nextGc ? { lat: nextGc.lat, lng: nextGc.lng } : null}
+          nextRadius={nextGr}
+          player={me?.lat != null && me?.lng != null ? { lat: me.lat, lng: me.lng } : null}
+          hideNextWhenInside
         />
       )}
+
+      {/* Line to next safe zone if we are a player and NOT already inside it */}
+      {(() => {
+        const hasCoords = Number.isFinite(me?.lat) && Number.isFinite(me?.lng);
+        const hasNext = Number.isFinite(nextGc?.lat) && Number.isFinite(nextGc?.lng);
+        const hasRadius = Number.isFinite(nextGr);
+        if (!hasCoords || !hasNext || !hasRadius) return null;
+        const R = 6371000;
+        const dLat = ((nextGc.lat - me.lat) * Math.PI) / 180;
+        const dLon = ((nextGc.lng - me.lng) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos((me.lat * Math.PI) / 180) * Math.cos((nextGc.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (dist <= nextGr) return null;
+        return (
+          <Polyline
+            positions={[[me.lat, me.lng], [nextGc.lat, nextGc.lng]]}
+            pathOptions={{
+              color: "#10b981",
+              weight: 2,
+              dashArray: "5, 5",
+              opacity: 0.7
+            }}
+          />
+        );
+      })()}
 
       {myJam?.center && myJam?.radiusM != null && (
         <PlayerCircle

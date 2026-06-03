@@ -183,7 +183,7 @@ function PodiumPillar({ place, player, accent }) {
     <div className="flex flex-1 flex-col items-center justify-end gap-2 sm:gap-4 text-center">
       <div className="space-y-0.5 sm:space-y-1">
         <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">#{place}</p>
-        <div className="flex items-center justify-center gap-1 sm:gap-2 text-sm sm:text-lg font-bold text-slate-800">
+        <div className="flex items-center justify-center gap-1 sm:gap-2 text-sm sm:text-lg font-bold text-slate-800 dark:text-slate-100">
           {crown && (
             <span role="img" aria-label="crown" className="text-amber-400 text-sm sm:text-base">
               👑
@@ -191,15 +191,21 @@ function PodiumPillar({ place, player, accent }) {
           )}
           <span className="truncate max-w-[8ch] sm:max-w-[11ch] md:max-w-[16ch]">{player.nickname}</span>
         </div>
-        <p className="text-[10px] sm:text-xs font-medium text-slate-500">
-          {player.catTimeLabel}
-        </p>
+        <div className="flex items-center justify-center gap-2">
+          <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400">
+            {player.catTimeLabel}
+          </p>
+          <span className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-yellow-600 dark:text-yellow-400">
+            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            {player.coins}
+          </span>
+        </div>
       </div>
       <div
         className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${baseColor} shadow-[0_10px_25px_sm:shadow-[0_20px_35px_rgba(0,0,0,0.15)]`}
       >
         <div className="flex h-full items-end justify-center">
-          <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/90 py-1 sm:py-2 text-[10px] sm:text-sm font-bold text-slate-700">
+          <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/90 py-1 sm:py-2 text-[10px] sm:text-sm font-bold text-slate-700 dark:bg-white/70">
             {player.badgeLabel}
           </div>
         </div>
@@ -271,6 +277,7 @@ function SummaryPodiumView({
               ? "Insaisissable"
               : "Résilient",
           stats: analyticsRow,
+          coins: analyticsRow.coins ?? data.coins ?? 0,
         };
       })
       .filter(Boolean);
@@ -297,15 +304,15 @@ function SummaryPodiumView({
   const lastSurvivor = playersById[gameAnalytics.lastSurvivorSessionId];
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
       <ConfettiField seed={summary?.code} />
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 pb-8 pt-8 sm:px-8">
-        <header className="flex flex-col gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.08)] backdrop-blur">
+        <header className="flex flex-col gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-slate-900/80">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Résumé de partie</p>
-              <h1 className="text-3xl font-black text-slate-900">{summary?.code || "—"}</h1>
-              <p className="text-sm font-medium text-slate-500">
+              <h1 className="text-3xl font-black text-slate-900 dark:text-white">{summary?.code || "—"}</h1>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 {gameMode === "infection"
                   ? "Mode Infection · Dernier survivant en vedette"
                   : "Mode Tag Swap · Classement par temps passé en chat"}
@@ -324,7 +331,7 @@ function SummaryPodiumView({
                 <button
                   type="button"
                   onClick={copyRecap}
-                  className="rounded-full border border-[#2563EB]/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] transition hover:bg-[#2563EB]/10"
+                  className="rounded-full border border-[#2563EB]/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] transition hover:bg-[#2563EB]/10 dark:text-indigo-300 dark:border-indigo-500/40 dark:hover:bg-indigo-500/10"
                 >
                   {copied ? "Lien copié" : "Copier le lien"}
                 </button>
@@ -389,14 +396,14 @@ function SummaryPodiumView({
             </div>
           ) : (
             <div className="flex h-full flex-col justify-between gap-8">
-              <div className="relative rounded-[40px] bg-white/80 p-8 shadow-[0_40px_60px_rgba(15,23,42,0.08)]">
+              <div className="relative rounded-[40px] bg-white/80 p-8 shadow-[0_40px_60px_rgba(15,23,42,0.08)] dark:bg-slate-900/80">
                 <p className="text-center text-xs font-semibold uppercase tracking-[0.5em] text-[#2563EB]">
                   WIN!
                 </p>
-                <h2 className="mt-2 text-center text-3xl font-black text-slate-900">
+                <h2 className="mt-2 text-center text-3xl font-black text-slate-900 dark:text-white">
                   Classement des meilleurs survivants
                 </h2>
-                <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-center md:gap-10">
+                <div className="mt-8 flex flex-row flex-wrap items-end justify-center gap-4 sm:gap-6 md:gap-10">
                   <PodiumPillar
                     place={2}
                     player={topThree[1] || topThree[0] || null}
@@ -415,7 +422,7 @@ function SummaryPodiumView({
                 </div>
               </div>
               {others.length > 0 && (
-                <div className="rounded-3xl bg-white/70 p-6 shadow-[0_25px_45px_rgba(15,23,42,0.08)]">
+                <div className="rounded-3xl bg-white/70 p-6 shadow-[0_25px_45px_rgba(15,23,42,0.08)] dark:bg-slate-900/70">
                   <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
                     Suite du classement
                   </p>
@@ -423,9 +430,9 @@ function SummaryPodiumView({
                     {others.map((player, idx) => (
                       <li
                         key={player.sessionId}
-                        className="flex flex-col rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm"
+                        className="flex flex-col rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                       >
-                        <span className="flex items-center justify-between font-semibold text-slate-800">
+                        <span className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-100">
                           <span className="flex items-center gap-2">
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#DBEAFE] font-bold text-slate-700">
                               {idx + 4}
@@ -436,9 +443,15 @@ function SummaryPodiumView({
                             {player.badgeLabel}
                           </span>
                         </span>
-                        <span className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#2563EB]">
-                          {player.catTimeLabel}
-                        </span>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-xs font-medium uppercase tracking-[0.2em] text-[#2563EB]">
+                            {player.catTimeLabel}
+                          </span>
+                          <span className="flex items-center gap-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+                            {player.coins}
+                          </span>
+                        </div>
                         <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
                           <span>Vitesse max&nbsp;: {formatSpeedKmh(player.stats?.maxSpeedKmh)}</span>
                           <span>Distance&nbsp;: {formatDistance(player.stats?.distanceMeters)}</span>
@@ -454,7 +467,7 @@ function SummaryPodiumView({
           )}
         </main>
       </div>
-      <footer className="relative z-10 flex flex-wrap items-center justify-center gap-3 bg-white/80 px-6 py-6 shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur">
+      <footer className="relative z-10 flex flex-wrap items-center justify-center gap-3 bg-white/80 px-6 py-6 shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:bg-slate-900/80">
         <button
           type="button"
           onClick={onLeave}
@@ -465,7 +478,7 @@ function SummaryPodiumView({
         <button
           type="button"
           onClick={onShowStats}
-          className="rounded-full border border-slate-900/20 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-slate-800 transition hover:bg-slate-900 hover:text-white"
+          className="rounded-full border border-slate-900/20 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-slate-800 transition hover:bg-slate-900 hover:text-white dark:text-slate-100 dark:border-slate-600"
         >
           Statistiques
         </button>
@@ -862,7 +875,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
           </MapContainer>
 
           {/* ═══ TOP-LEFT OVERLAY: Info + Controls Toggle ═══ */}
-          <div className="pointer-events-none absolute left-3 top-3 z-[1000] flex flex-col gap-2">
+          <div className="pointer-events-none absolute left-3 top-3 z-[20000] flex flex-col gap-2">
             <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/95 px-3 py-2 shadow-lg backdrop-blur dark:bg-slate-900/95">
               <div>
                 <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Récap</h1>
@@ -882,7 +895,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
           </div>
 
           {/* ═══ TOP-RIGHT OVERLAY: Actions ═══ */}
-          <div className="pointer-events-none absolute right-3 top-3 z-[1000] flex flex-col gap-2">
+          <div className="pointer-events-none absolute right-3 top-3 z-[20000] flex flex-col gap-2">
             <button
               type="button"
               onClick={() => setShareOpen(true)}
