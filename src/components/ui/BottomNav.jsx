@@ -11,28 +11,27 @@ export default function BottomNav({
   onQuit,
 }) {
   const tabCls = (active, disabled) =>
-    `flex flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 text-[11px] font-semibold transition ${
+    `flex flex-1 flex-col items-center justify-center gap-1 rounded-full px-4 py-2 text-[11px] font-semibold transition ${
       disabled
         ? "opacity-30"
         : active
-          ? "bg-[#5B7FA5]/10 text-[#5B7FA5]"
-          : "text-slate-500"
+          ? "bg-amber-100/50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+          : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
     }`;
 
   const iconCls = "h-6 w-6";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-[max(0.6rem,env(safe-area-inset-bottom))] md:hidden">
-      <nav className="relative w-[min(420px,calc(100vw-1.25rem))] rounded-[26px] bg-white/95 px-2 py-2 shadow-xl ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-950/90 dark:ring-slate-700/80">
-        <div className="flex items-center gap-2">
+    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-6 md:hidden">
+      <nav className="relative rounded-[40px] bg-white/80 p-2 shadow-sm ring-1 ring-slate-200/50 backdrop-blur-xl dark:bg-slate-900/80 dark:ring-slate-800/50">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             disabled={!canShowMap}
             onClick={() => {
-              onChatToggle(false);
               onTabChange("map");
             }}
-            className={tabCls(activeTab === "map" && !chatOpen, !canShowMap)}
+            className={tabCls(activeTab === "map", !canShowMap)}
             aria-current={activeTab === "map" ? "page" : undefined}
           >
             <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
@@ -48,11 +47,10 @@ export default function BottomNav({
           <button
             type="button"
             onClick={() => {
-              onChatToggle(false);
-              onTabChange("players");
+              onTabChange("social");
             }}
-            className={tabCls(activeTab === "players" && !chatOpen, false)}
-            aria-current={activeTab === "players" ? "page" : undefined}
+            className={tabCls(activeTab === "social", false)}
+            aria-current={activeTab === "social" ? "page" : undefined}
           >
             <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
               <path
@@ -61,16 +59,16 @@ export default function BottomNav({
                 d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128H5.228A2 2 0 013 17.16v-.088c0-2.052 1.622-3.82 3.837-4.1a9.77 9.77 0 016.326 0A4.49 4.49 0 0115 16.057v3.071zM12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
               />
             </svg>
-            Joueurs
+            Social
           </button>
 
-          <div className="relative -mt-7 flex h-16 w-16 shrink-0 items-center justify-center">
+          <div className="relative -mt-6 flex h-[60px] w-[60px] shrink-0 items-center justify-center">
             <button
               type="button"
               onClick={onCenterAction}
               disabled={!centerAction}
-              className={`flex h-16 w-16 items-center justify-center rounded-[24px] text-white shadow-lg ring-1 ring-white/60 transition active:scale-[0.98] ${
-                centerAction ? "bg-[#5B7FA5]" : "bg-slate-300"
+              className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-white shadow-md transition active:scale-[0.96] ${
+                centerAction ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-slate-200 dark:bg-slate-800"
               }`}
               aria-label={
                 centerAction === "scan"
@@ -113,23 +111,19 @@ export default function BottomNav({
           <button
             type="button"
             onClick={() => {
-              if (chatOpen) onChatToggle(false);
-              else {
-                onTabChange("players");
-                onChatToggle(true);
-              }
+              onTabChange("powers");
             }}
-            className={tabCls(chatOpen, false)}
-            aria-expanded={chatOpen}
+            className={tabCls(activeTab === "powers" && !chatOpen, false)}
+            aria-current={activeTab === "powers" ? "page" : undefined}
           >
             <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            Chat
+            Super
           </button>
 
           {showAdmin && (

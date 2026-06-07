@@ -22,6 +22,7 @@ import {
   iconPreyOutOfBounds,
   iconDisconnected,
   iconChatLocation,
+  iconGhost,
 } from "../../lib/map/icons.js";
 import { BASEMAPS } from "../../lib/map/basemaps.js";
 import { offsetMeters } from "../../lib/map/geoOffset.js";
@@ -128,21 +129,26 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
     if (p.kind === "circle" && p.center && p.radiusM != null) {
       const isAdmin = keyPrefix === "admin";
       const isOutOfBounds = !!p.outOfBounds;
-      const color = p.disconnected
+      const isGhost = !!p.invisible;
+      const color = isGhost
         ? "#94a3b8"
-        : isOutOfBounds
-          ? "#ef4444" // red border
+        : p.disconnected
+          ? "#94a3b8"
+          : isOutOfBounds
+            ? "#ef4444"
+            : isAdmin
+              ? "#7c3aed"
+              : "#fb923c";
+      const fillColor = isGhost
+        ? "#e5e7eb"
+        : p.disconnected
+          ? "#cbd5e1"
           : isAdmin
-            ? "#7c3aed"
-            : "#fb923c";
-      const fillColor = p.disconnected
-        ? "#cbd5e1"
-        : isAdmin
-          ? "#a78bfa"
-          : "#f97316";
-      const fillOpacity = p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26;
+            ? "#a78bfa"
+            : "#f97316";
+      const fillOpacity = isGhost ? 0.18 : p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26;
 
-      return (
+      const circleEl = (
         <PlayerCircle
           key={`${keyPrefix}-${p.sessionId}`}
           center={p.center}
@@ -159,6 +165,32 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
             },
           }}
         />
+      );
+
+      if (!isGhost) return circleEl;
+
+      // For invisible prey, also show a big ghost marker at the center
+      const ghostMarker = (
+        <Marker
+          key={`${keyPrefix}-ghost-${p.sessionId}`}
+          position={[p.center.lat, p.center.lng]}
+          icon={iconGhost}
+          eventHandlers={{
+            click: (e) => {
+              L.DomEvent.stopPropagation(e);
+              if (onPlayerClick) {
+                onPlayerClick({ ...p, role: "player" });
+              }
+            },
+          }}
+        />
+      );
+
+      return (
+        <>
+          {circleEl}
+          {ghostMarker}
+        </>
       );
     }
     return null;
@@ -284,12 +316,15 @@ export default function GameMap({
 
   const clusterItems = useMemo(() => {
     const items = [];
+    const selfInvisible = me?.invisUntil && me.invisUntil > Date.now();
     if (me?.lat != null && me?.lng != null) {
       items.push({
         key: `me-${mySessionId}`,
         lat: me.lat,
         lng: me.lng,
-        icon: pickMarkerIcon(iconSelf, iconSelfOutOfBounds, false, me.outOfBounds),
+        icon: selfInvisible
+          ? iconGhost
+          : pickMarkerIcon(iconSelf, iconSelfOutOfBounds, false, me.outOfBounds),
         playerData: { ...me, sessionId: mySessionId },
       });
     }
@@ -298,9 +333,10 @@ export default function GameMap({
       if (a.lat == null || a.lng == null) continue;
       const disc = Boolean(a.disconnected);
       const isAllyMe = a.sessionId === mySessionId;
+      const ghost = Boolean(a.invisible);
       const ic = pickMarkerIcon(
-        isAllyMe ? iconSelf : iconAlly,
-        isAllyMe ? iconSelfOutOfBounds : iconAllyOutOfBounds,
+        ghost ? iconGhost : isAllyMe ? iconSelf : iconAlly,
+        ghost ? iconGhost : isAllyMe ? iconSelfOutOfBounds : iconAllyOutOfBounds,
         disc,
         Boolean(a.outOfBounds)
       );
@@ -317,9 +353,10 @@ export default function GameMap({
       if (c.lat == null || c.lng == null) continue;
       const disc = Boolean(c.disconnected);
       const isCatMe = c.sessionId === mySessionId;
+      const ghost = Boolean(c.invisible);
       const ic = pickMarkerIcon(
-        isCatMe ? iconSelf : iconCat,
-        isCatMe ? iconSelfOutOfBounds : iconCatOutOfBounds,
+        ghost ? iconGhost : isCatMe ? iconSelf : iconCat,
+        ghost ? iconGhost : isCatMe ? iconSelfOutOfBounds : iconCatOutOfBounds,
         disc,
         Boolean(c.outOfBounds)
       );
@@ -413,14 +450,15 @@ export default function GameMap({
       <FlyToFocus center={focusCenter} zoom={focusZoom} tick={focusTick} />
       <ZoomOnTicks zoomInTick={zoomInTick} zoomOutTick={zoomOutTick} />
 
-      {gc && gr != null && (
+      {gc && gr != null && !(
+        me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()
+      ) && (
         <GlobalCircle
           center={{ lat: gc.lat, lng: gc.lng }}
           radius={gr}
           nextCenter={nextGc ? { lat: nextGc.lat, lng: nextGc.lng } : null}
           nextRadius={nextGr}
           player={me?.lat != null && me?.lng != null ? { lat: me.lat, lng: me.lng } : null}
-          hideNextWhenInside
         />
       )}
 

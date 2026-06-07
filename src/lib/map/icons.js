@@ -57,6 +57,13 @@ export const iconPreyOutOfBounds = div(
   36
 );
 
+// Invisible / ghost position (last known point)
+export const iconGhost = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:rgba(15,23,42,0.72);border:3px solid rgba(148,163,184,0.9);box-shadow:0 0 10px rgba(148,163,184,0.7);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 20v-8a5 5 0 0110 0v8l-2-1.5L13 20l-2-1.5L9 20l-2-1.5z" fill="#e5e7eb"/><circle cx="10" cy="11" r="1" fill="#020617"/><circle cx="14" cy="11" r="1" fill="#020617"/><path d="M10 14s1 1 2 1 2-1 2-1" stroke="#020617" stroke-width="1" stroke-linecap="round"/></svg></span>`,
+  "pin-ghost",
+  38
+);
+
 /** Déconnecté temporairement (dernière position) */
 export const iconDisconnected = div(
   `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#64748b;border:3px dashed #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.35);opacity:.88"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"><path d="M2 12h4m12 0h4M5.6 5.6l2.8 2.8m7.2 7.2l2.8 2.8M5.6 18.4l2.8-2.8m7.2-7.2l2.8-2.8"/><line x1="4" y1="4" x2="20" y2="20"/></svg></span>`,

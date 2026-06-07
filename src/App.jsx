@@ -13,9 +13,12 @@ import SharePartyModal from "./components/game/SharePartyModal.jsx";
 import GameTimer from "./components/game/GameTimer.jsx";
 import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
 import GameInfoPanel from "./components/game/GameInfoPanel.jsx";
+import PowerCard from "./components/powers/PowerCard.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
+import DiscreteSlider from "./components/ui/DiscreteSlider.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
+import AnimatedPrice from "./components/ui/AnimatedPrice.jsx";
 import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
@@ -400,6 +403,7 @@ export default function App() {
   const [recapLoading, setRecapLoading] = useState(() => Boolean(getRecapIdFromPath()));
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const outOfBoundsAudioRef = useRef(null);
+  const noiseAudioRef = useRef(null);
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
@@ -410,6 +414,36 @@ export default function App() {
   const [reconnectUiNow, setReconnectUiNow] = useState(() => Date.now());
   const [focusCenter, setFocusCenter] = useState(null);
   const [focusTick, setFocusTick] = useState(0);
+  const [localCooldowns, setLocalCooldowns] = useState({});
+
+  useEffect(() => {
+    if (gameState?.me?.powerCooldowns) {
+      setLocalCooldowns(prev => {
+        const next = { ...prev };
+        let changed = false;
+        for (const [k, v] of Object.entries(gameState.me.powerCooldowns)) {
+          if (next[k] !== v) {
+            next[k] = v;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [gameState?.me?.powerCooldowns]);
+  const [invisScope, setInvisScope] = useState("self"); // self | single
+  const [invisTargetId, setInvisTargetId] = useState("");
+  const [selectedInvisTargets, setSelectedInvisTargets] = useState([]); // sessionIds
+  const [exactPosTargetMode, setExactPosTargetMode] = useState("single"); // single | all
+  const [selectedExactPosTargets, setSelectedExactPosTargets] = useState([]); // sessionIds
+  const [exactPosDuration, setExactPosDuration] = useState(1); // 1 | 5 | 15 | 30
+  const [noiseTargetMode, setNoiseTargetMode] = useState("single"); // single | all
+  const [selectedNoiseTargets, setSelectedNoiseTargets] = useState([]); // sessionIds
+  const [noiseDuration, setNoiseDuration] = useState(30); // 10 | 30 | 60
+  const [noiseVolume, setNoiseVolume] = useState("medium"); // low | medium | high
+  const [freezeTargetMode, setFreezeTargetMode] = useState("single"); // single | all
+  const [selectedFreezeTargets, setSelectedFreezeTargets] = useState([]); // cat sessionIds
+  const [freezeDuration, setFreezeDuration] = useState(20);
   const lastPingRef = useRef(Date.now());
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
@@ -747,6 +781,47 @@ export default function App() {
       clearSession();
       setIsReconnecting(true);
       setReconnectReason("kicked");
+    });
+
+    s.on("play_noise", ({ durationSec, by }) => {
+      try {
+        // Stop previous
+        if (noiseAudioRef.current) {
+          const { audioCtx, osc, gain, stopTimer } = noiseAudioRef.current;
+          try { clearTimeout(stopTimer); } catch {}
+          try { gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15); } catch {}
+          try { osc.stop(audioCtx.currentTime + 0.2); } catch {}
+          noiseAudioRef.current = null;
+        }
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "square";
+        osc.frequency.value = 600;
+        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+        // Ramp pattern: pulsing beeps
+        for (let i = 0; i < durationSec; i += 1) {
+          const t0 = audioCtx.currentTime + i * 1.0;
+          gain.gain.setValueAtTime(0.18, t0);
+          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+        }
+        const stopTimer = setTimeout(() => {
+          try { gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); } catch {}
+          try { osc.stop(audioCtx.currentTime + 0.12); } catch {}
+          noiseAudioRef.current = null;
+        }, Math.max(1, durationSec) * 1000 + 150);
+        noiseAudioRef.current = { audioCtx, osc, gain, stopTimer };
+        addNotification(`Bruit déclenché par ${by || "un adversaire"}`, "warning", Math.min(10000, durationSec * 1000));
+      } catch (e) {
+        console.warn("AudioContext non disponible pour bruit", e);
+      }
+    });
+
+    s.on("immobilized", ({ until, by, durationSec }) => {
+      const secs = Math.max(1, Math.round((until - Date.now()) / 1000) || durationSec || 0);
+      addNotification(`Immobilisé ${secs}s${by ? ` par ${by}` : ""}`, "error", Math.min(8000, secs * 1000));
     });
 
     s.on("admin_role_changed", (data) => {
@@ -2300,6 +2375,57 @@ export default function App() {
     const catLocked = Boolean(gameState.catMapLocked);
     const showMapTab = !catLocked || me?.role !== "cat" || me?.spectator;
     const capturedPrey = me?.captured && me?.role === "player";
+    const powerCosts = (gameState?.powerCosts) || {
+      noise: 20,
+      invisibility_self: 40,
+      invisibility_single: 70,
+      invisibility_all_role: 130,
+      zone_morph_player: 120,
+      zone_morph_cat: 100,
+      no_boundaries: 80,
+      freeze_cats_single: 45,
+      freeze_cats_multi: 80,
+      freeze_cats_all: 140,
+    };
+
+    const isCooldown = (key) => (localCooldowns?.[key] || 0) > Date.now();
+    const cooldownUntil = (key) => localCooldowns?.[key] || 0;
+    const setCd = (key, secs) => setLocalCooldowns((m) => ({ ...m, [key]: Date.now() + secs * 1000 }));
+
+    const sameRoleAliveCount = (gameState.roster || []).filter((p) => p.role === role && !p.spectator && !p.captured).length;
+    const catAliveCount = (gameState.roster || []).filter((p) => p.role === "cat" && !p.spectator && !p.captured).length;
+    const canTeamInvisibility = sameRoleAliveCount > 1;
+    const canTeamFreezeCats = catAliveCount > 1;
+
+    // Lock Sans limites until 5 mins
+    const noBoundariesUnlockAt = gameState?.huntStartedAt ? gameState.huntStartedAt + 5 * 60 * 1000 : 0;
+    const isNoBoundariesEarlyLocked = Date.now() < noBoundariesUnlockAt;
+    const noBoundariesCurrentLockUntil = isNoBoundariesEarlyLocked 
+      ? noBoundariesUnlockAt 
+      : (me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()) 
+        ? me.outOfBoundsOverrideUntil 
+        : cooldownUntil("no_boundaries");
+    const estimatedFreezeCost = (() => {
+      if (freezeTargetMode === "all") return Number(powerCosts.freeze_cats_all || 140);
+      if (selectedFreezeTargets.length > 1) return Number(powerCosts.freeze_cats_multi || 80);
+      return Number(powerCosts.freeze_cats_single || 45);
+    })();
+    const estimatedNoiseCost = (() => {
+      const base = Number(powerCosts.noise || 20);
+      const durationSec = noiseDuration <= 10 ? 10 : noiseDuration >= 60 ? 60 : 30;
+      const durationFactor = durationSec === 10 ? 0.5 : durationSec === 60 ? 1.8 : 1.0;
+      const volumeFactor = noiseVolume === "low" ? 0.7 : noiseVolume === "high" ? 1.4 : 1.0;
+
+      let count = 0;
+      if (noiseTargetMode === "all") {
+        count = (rosterList || []).filter((p) => p.role !== role && !p.spectator).length;
+      } else {
+        count = selectedNoiseTargets.length || 1; // minimum 1 pour afficher un ordre de grandeur
+      }
+      if (count <= 0) return 0;
+      const raw = base * durationFactor * volumeFactor * count;
+      return Math.max(1, Math.ceil(raw));
+    })();
 
     const renderAdminPanel = () => (
       <div className="h-full overflow-auto p-4">
@@ -2371,6 +2497,24 @@ export default function App() {
               <div className="font-medium text-slate-900 dark:text-white">
                 {p.nickname}
                 {p.sessionId === sessionId ? " (vous)" : ""}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-yellow-400/20 px-2 py-0.5 text-xs font-bold text-yellow-700 dark:bg-yellow-300/20 dark:text-yellow-300">{p.coins || 0} pièces</span>
+                <div className="flex flex-wrap gap-1">
+                  {[-10, -5, -1, +1, +5, +10].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 transition active:scale-[0.98] ${d > 0 ? "bg-emerald-500 text-white ring-emerald-600 hover:bg-emerald-600" : "bg-rose-500 text-white ring-rose-600 hover:bg-rose-600"}`}
+                      onClick={() => socket?.emit("admin_adjust_coins", { targetSessionId: p.sessionId, delta: d }, (res) => {
+                        if (res?.ok) addNotification(`${d > 0 ? "+" : ""}${d} pièces pour ${p.nickname}`, "success");
+                        else addNotification(res?.error || "Action refusée", "error");
+                      })}
+                    >
+                      {d > 0 ? `+${d}` : d}
+                    </button>
+                  ))}
+                </div>
               </div>
               <p className="text-xs text-slate-500">{roleBadgeText(p)}</p>
               {p.sessionId !== sessionId && (
@@ -2511,7 +2655,7 @@ export default function App() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* Main content area */}
             <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-900">
-              {gameTab === "players" && (
+              {gameTab === "social" && (
                 <div className="h-full overflow-auto p-4 pb-24">
                   <div className="mb-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
@@ -2533,6 +2677,7 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-slate-900 dark:text-white">
                             {p.nickname}
+                            {p.invisible && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">ghost</span>}
                             {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
                           </span>
                           {p.coins !== undefined && p.coins > 0 && (
@@ -2549,21 +2694,483 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
+                  <div className="mt-6 h-[1px] w-full bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-4">
+                    <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Chat</h2>
+                    <div className="h-full p-0">
+                      <PartyChatPanel
+                        fillHeight
+                        variant="discussion"
+                        messages={partyChatMessages}
+                        sessionId={sessionId}
+                        onSend={sendPartyChat}
+                        position={position}
+                        disabled={!socket}
+                        onFocusLocation={onFocusChatLocation}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {gameTab === "chat" && (
-                <div className="h-full p-4 pb-24">
-                  <PartyChatPanel
-                    fillHeight
-                    variant="discussion"
-                    messages={partyChatMessages}
-                    sessionId={sessionId}
-                    onSend={sendPartyChat}
-                    position={position}
-                    disabled={!socket}
-                    onFocusLocation={onFocusChatLocation}
-                  />
+              {gameTab === "powers" && (
+                <div className="h-full overflow-auto p-4 pb-24">
+                  <div className="mb-6 flex items-center justify-between">
+                    <h2 className="text-[28px] leading-tight font-medium text-slate-900 tracking-tight dark:text-white">Super pouvoirs</h2>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    <PowerCard
+                      title="Invisibilité"
+                      emoji="👻"
+                      stars={4}
+                      gradient={["#6366F1", "#A78BFA"]}
+                      costText={invisScope === "self" ? `${powerCosts.invisibility_self}` : `${powerCosts.invisibility_single * Math.max(1, selectedInvisTargets?.length || 1)}`}
+                      details={<>
+                        Devenez invisible pendant 5 minutes. Tous ne voient plus que la <b>dernière position en fantôme</b> de la personne ciblée.
+                      </>}
+                      onUse={() => {
+                        if (isCooldown("invisibility")) return;
+                        const scope = invisScope === "self" ? "self" : "multi";
+                        const body =
+                          scope === "self"
+                            ? { kind: "invisibility", scope, durationSec: 300 }
+                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: 300 };
+                        if (scope === "multi" && !selectedInvisTargets?.length) {
+                          addNotification("Choisissez au moins une cible", "error");
+                          return;
+                        }
+                        socket?.emit("use_power", body, (res) => {
+                          if (res?.ok) {
+                            setCd("invisibility", 120);
+                            addNotification("Invisibilité activée", "success");
+                          } else {
+                            addNotification(res?.error || "Erreur", "error");
+                          }
+                        });
+                      }}
+                      locked={isCooldown("invisibility")}
+                      lockReason="Recharge"
+                      lockUntil={cooldownUntil("invisibility")}
+                    >
+                      <div className="space-y-4 text-xs text-slate-600 dark:text-slate-300">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Qui rendre invisible :</span>
+                          <div className="flex bg-slate-100 p-0.5 rounded-full dark:bg-slate-800">
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                invisScope === "self"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setInvisScope("self")}
+                            >
+                              Moi
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                invisScope === "single"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setInvisScope("single")}
+                            >
+                              Cible
+                            </button>
+                          </div>
+                        </div>
+                        {invisScope === "single" && (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Choisir les cibles
+                            </div>
+                            <div className="max-h-32 space-y-1.5 overflow-y-auto text-[13px]">
+                              {rosterList
+                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
+                                .map((p) => {
+                                  const checked = (selectedInvisTargets || []).includes(p.sessionId);
+                                  return (
+                                    <div
+                                      key={p.sessionId}
+                                      onClick={() => {
+                                        setSelectedInvisTargets((prev) => {
+                                          const l = prev || [];
+                                          if (checked) return l.filter((id) => id !== p.sessionId);
+                                          return [...l, p.sessionId];
+                                        });
+                                      }}
+                                      className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
+                                        checked 
+                                          ? "bg-indigo-50 border border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-500/30 shadow-inner" 
+                                          : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                      }`}
+                                    >
+                                      <span className={`truncate font-semibold ${checked ? "text-indigo-900 dark:text-indigo-200" : "text-slate-700 dark:text-slate-200"}`}>
+                                        {p.nickname}
+                                      </span>
+                                      {checked && <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.8)]" />}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </PowerCard>
+
+                    <PowerCard
+                      title="Bruit fantôme"
+                      emoji="🔊"
+                      stars={2}
+                      gradient={["#F43F5E", "#FB923C"]}
+                      costText={`${powerCosts.noise} - 300+`}
+                      locked={isCooldown("noise")}
+                      lockReason="Recharge"
+                      lockUntil={cooldownUntil("noise")}
+                      details={<>
+                        Joue un son désagréable sur un ou plusieurs téléphones adverses. Le prix dépend de la <b>durée</b>, du <b>volume</b> et du <b>nombre de cibles</b>.
+                      </>}
+                      onUse={() => {
+                        if (isCooldown("noise")) return;
+                        const targets =
+                          noiseTargetMode === "all"
+                            ? (rosterList || [])
+                                .filter((p) => p.sessionId !== me?.sessionId && !p.spectator)
+                                .map((p) => p.sessionId)
+                            : selectedNoiseTargets;
+                        if (!targets.length) {
+                          addNotification("Choisissez au moins une cible", "error");
+                          return;
+                        }
+                        const durationSec = noiseDuration;
+                        const volume = noiseVolume;
+                        socket?.emit(
+                          "use_power",
+                          {
+                            kind: "noise",
+                            targetSessionIds: targets,
+                            durationSec,
+                            volume,
+                          },
+                          (res) => {
+                            if (res?.ok) {
+                              setCd("noise", 60);
+                              addNotification("Bruit déclenché", "success");
+                            } else {
+                              addNotification(res?.error || "Erreur", "error");
+                            }
+                          }
+                        );
+                      }}
+                    >
+                      <div className="space-y-4 text-xs text-slate-700 dark:text-slate-200">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Cibles :</span>
+                          <div className="flex bg-slate-100 p-0.5 rounded-full dark:bg-slate-800">
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                noiseTargetMode === "all"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setNoiseTargetMode("all")}
+                            >
+                              Tous
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                noiseTargetMode === "single"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setNoiseTargetMode("single")}
+                            >
+                              Choix
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {noiseTargetMode === "single" && (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Choisir les cibles
+                            </div>
+                            <div className="max-h-32 space-y-1.5 overflow-y-auto text-[13px]">
+                              {rosterList
+                                .filter((p) => p.sessionId !== me?.sessionId && !p.spectator)
+                                .map((p) => {
+                                  const checked = selectedNoiseTargets.includes(p.sessionId);
+                                  return (
+                                    <div
+                                      key={p.sessionId}
+                                      onClick={() => {
+                                        setSelectedNoiseTargets((prev) => {
+                                          if (checked) return prev.filter((id) => id !== p.sessionId);
+                                          return [...prev, p.sessionId];
+                                        });
+                                      }}
+                                      className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
+                                        checked 
+                                          ? "bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-500/30 shadow-inner" 
+                                          : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                      }`}
+                                    >
+                                      <span className={`truncate font-semibold ${checked ? "text-amber-900 dark:text-amber-200" : "text-slate-700 dark:text-slate-200"}`}>
+                                        {p.nickname}
+                                      </span>
+                                      {checked && <div className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.8)]" />}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {noiseTargetMode === "all" && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[13px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200 text-center">
+                            Tous les joueurs seront ciblés.
+                          </div>
+                        )}
+
+                        <div className="space-y-4 pt-2">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
+                            <DiscreteSlider 
+                              options={[
+                                { label: '10s', value: 10 },
+                                { label: '30s', value: 30 },
+                                { label: '1min', value: 60 }
+                              ]}
+                              value={noiseDuration}
+                              onChange={setNoiseDuration}
+                              color="amber"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">Volume</span>
+                            <DiscreteSlider 
+                              options={[
+                                { label: 'Bas', value: 'low' },
+                                { label: 'Moyen', value: 'medium' },
+                                { label: 'Fort', value: 'high' }
+                              ]}
+                              value={noiseVolume}
+                              onChange={setNoiseVolume}
+                              color="amber"
+                            />
+                          </div>
+                        </div>
+
+                        <AnimatedPrice value={estimatedNoiseCost} />
+                      </div>
+                    </PowerCard>
+
+                    {role === "player" ? (
+                      <>
+                        <PowerCard
+                          title="Cercle de brouillage"
+                          emoji="📡"
+                          gradient={["#10B981", "#34D399"]}
+                          costText={`${powerCosts.zone_morph_player}`}
+                          details={<>
+                            Agrandit le cercle de brouillage des joueurs. Si les chats l'ont réduit au maximum, vous pouvez le ramener directement à l'extrême opposé si vous avez assez de pièces.
+                          </>}
+                          onUse={() =>
+                            socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
+                              if (res?.ok) {
+                                addNotification("Cercle de brouillage ajusté", "success");
+                              } else {
+                                addNotification(res?.error || "Erreur", "error");
+                              }
+                            })
+                          }
+                        />
+
+                        <PowerCard
+                          title="Sans limites"
+                          emoji="🚫"
+                          gradient={["#0EA5E9", "#22D3EE"]}
+                          costText={`${powerCosts.no_boundaries}`}
+                          locked={isCooldown("no_boundaries") || (me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now())}
+                          lockReason="Recharge"
+                          lockUntil={
+                            me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()
+                              ? me.outOfBoundsOverrideUntil
+                              : cooldownUntil("no_boundaries")
+                          }
+                          details={<>
+                            Ignore les limites de la carte pendant 10 minutes. Utilisable seulement après quelques minutes de jeu.
+                          </>}
+                          onUse={() =>
+                            socket?.emit(
+                              "use_power",
+                              { kind: "no_boundaries", durationSec: 600 },
+                              (res) => {
+                                if (res?.ok) {
+                                  setCd("no_boundaries", 300);
+                                  addNotification("Limites désactivées (10 min)", "success");
+                                } else {
+                                  addNotification(res?.error || "Erreur", "error");
+                                }
+                              }
+                            )
+                          }
+                        />
+
+                        <PowerCard
+                          title="Immobiliser un joueur"
+                          emoji="🧊"
+                          stars={3}
+                          gradient={["#3B82F6", "#60A5FA"]}
+                          locked={isCooldown("freeze_cats")}
+                          lockReason="Recharge"
+                          lockUntil={cooldownUntil("freeze_cats")}
+                          details={<>
+                            Cache la carte du joueur ciblé pendant un court instant. Idéal pour s'échapper ou bloquer un adversaire.
+                          </>}
+                          onUse={() => {
+                            if (isCooldown("freeze_cats")) return;
+                            const targetIds =
+                              freezeTargetMode === "all"
+                                ? []
+                                : selectedFreezeTargets;
+                            if (freezeTargetMode === "single" && !targetIds.length) {
+                              addNotification("Choisissez au moins une cible", "error");
+                              return;
+                            }
+                            const scope =
+                              freezeTargetMode === "all"
+                                ? "all"
+                                : targetIds.length > 1
+                                  ? "multi"
+                                  : "single";
+                            const payload =
+                              scope === "all"
+                                ? { kind: "freeze_cats", scope, durationSec: freezeDuration }
+                                : scope === "multi"
+                                  ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDuration }
+                                  : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDuration };
+                            socket?.emit("use_power", payload, (res) => {
+                              if (res?.ok) {
+                                setCd("freeze_cats", 90);
+                                addNotification("Joueurs immobilisés", "success");
+                              } else {
+                                addNotification(res?.error || "Erreur", "error");
+                              }
+                            });
+                          }}
+                        >
+                          <div className="space-y-4 text-xs text-slate-700 dark:text-slate-200">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">Cibles :</span>
+                              <div className="flex bg-slate-100 p-0.5 rounded-full dark:bg-slate-800">
+                                <button
+                                  type="button"
+                                  className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                    freezeTargetMode === "all"
+                                      ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                      : "text-slate-600 dark:text-slate-400"
+                                  }`}
+                                  onClick={() => setFreezeTargetMode("all")}
+                                >
+                                  Tous
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                    freezeTargetMode === "single"
+                                      ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                      : "text-slate-600 dark:text-slate-400"
+                                  }`}
+                                  onClick={() => setFreezeTargetMode("single")}
+                                >
+                                  Choix
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {freezeTargetMode === "single" && (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                  Choisir les cibles
+                                </div>
+                                <div className="max-h-28 space-y-1.5 overflow-y-auto text-[13px]">
+                                  {rosterList
+                                    .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
+                                    .map((p) => {
+                                      const checked = selectedFreezeTargets.includes(p.sessionId);
+                                      return (
+                                        <div
+                                          key={p.sessionId}
+                                          onClick={() => {
+                                            setSelectedFreezeTargets((prev) => {
+                                              if (checked) return prev.filter((id) => id !== p.sessionId);
+                                              return [...prev, p.sessionId];
+                                            });
+                                          }}
+                                          className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
+                                            checked 
+                                              ? "bg-blue-50 border border-blue-200 dark:bg-blue-900/30 dark:border-blue-500/30 shadow-inner" 
+                                              : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                          }`}
+                                        >
+                                          <span className={`truncate font-semibold ${checked ? "text-blue-900 dark:text-blue-200" : "text-slate-700 dark:text-slate-200"}`}>
+                                            {p.nickname}
+                                          </span>
+                                          {checked && <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.8)]" />}
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {freezeTargetMode === "all" && (
+                              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] font-semibold text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200 text-center">
+                                Tous les autres joueurs seront immobilisés.
+                              </div>
+                            )}
+                            
+                            <div className="space-y-4 pt-2">
+                              <div className="flex flex-col gap-1">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
+                                <DiscreteSlider 
+                                  options={[
+                                    { label: '10s', value: 10 },
+                                    { label: '20s', value: 20 },
+                                    { label: '40s', value: 40 }
+                                  ]}
+                                  value={freezeDuration}
+                                  onChange={setFreezeDuration}
+                                  color="indigo"
+                                />
+                              </div>
+                            </div>
+                            
+                            <AnimatedPrice value={estimatedFreezeCost} />
+                          </div>
+                        </PowerCard>
+                      </>
+                    ) : (
+                      <>
+                        <PowerCard
+                          title="Réduire la zone"
+                          emoji="📉"
+                          gradient={["#EF4444", "#F97316"]}
+                          stars={5}
+                          costText={`${powerCosts.zone_morph_cat}`}
+                          details={<>
+                            Jusqu’à 2 utilisations. Si la zone est déjà agrandie, la première utilisation la ramène à la normale.
+                          </>}
+                          onUse={() => socket?.emit("use_power", { kind: "zone_morph" }, (res) => { res?.ok ? addNotification("Zone modifiée", "success") : addNotification(res?.error || "Erreur", "error"); })}
+                        />
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2667,14 +3274,8 @@ export default function App() {
             <BottomNav
               activeTab={gameTab}
               onTabChange={setGameTab}
-              chatOpen={gameTab === "chat"}
-              onChatToggle={(open) => {
-                if (open) {
-                  setGameTab("chat");
-                } else {
-                  setGameTab("map");
-                }
-              }}
+              chatOpen={gameTab === "social"}
+              onChatToggle={() => {}}
               canShowMap={showMapTab}
               showAdmin={isHost}
               centerAction={isCat && !catLocked ? "scan" : isPrey || capturedPrey ? "qr" : null}
@@ -2693,11 +3294,29 @@ export default function App() {
               onQuit={!isHost ? leaveGame : undefined}
             />
 
+            {/* Overlay d'immobilisation (malus fort visuel) */}
+            {me?.immobilizedUntil && me.immobilizedUntil > Date.now() && (
+              <div className="pointer-events-auto fixed inset-0 z-[1900] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+                <div className="relative mx-4 max-w-sm rounded-2xl bg-slate-900/90 p-6 text-center text-slate-100 shadow-2xl ring-2 ring-indigo-500/60">
+                  <div className="mb-3 flex items-center justify-center">
+                    <div className="h-12 w-12 animate-pulse rounded-full bg-indigo-500/80 text-2xl">🧊</div>
+                  </div>
+                  <h3 className="mb-2 text-lg font-extrabold tracking-wide">IMMOBILISÉ</h3>
+                  <p className="mb-3 text-sm text-slate-200">
+                    Ta carte est gelée pendant un court instant. Attends la fin du malus pour retrouver la vue de la chasse.
+                  </p>
+                  <p className="text-xs font-semibold uppercase text-indigo-300">
+                    Temps restant : {Math.max(1, Math.round((me.immobilizedUntil - Date.now()) / 1000))} s
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
             <div className="hidden shrink-0 border-b border-slate-200 bg-slate-100/90 dark:border-slate-800 dark:bg-slate-900/90 md:flex">
               {tabBtn("map", "Carte", !showMapTab)}
-              {tabBtn("chat", "Chat")}
-              {tabBtn("players", "Joueurs")}
+              {tabBtn("social", "Social")}
+              {tabBtn("powers", "Super")}
               {isHost && tabBtn("admin", "Admin")}
             </div>
 
@@ -2737,7 +3356,7 @@ export default function App() {
 
         {showQr && <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />}
         {showScan && <ScannerModal onScan={onScanResult} onClose={() => setShowScan(false)} />}
-        {selectedPlayer && (
+        {selectedPlayer && gameTab !== "powers" && (
           <PlayerSheet
             player={selectedPlayer}
             roomCode={currentRoomCode}
