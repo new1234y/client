@@ -404,6 +404,7 @@ export default function App() {
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const outOfBoundsAudioRef = useRef(null);
   const noiseAudioRef = useRef(null);
+  const sharedAudioContextRef = useRef(null);
   const [activeNoise, setActiveNoise] = useState(null); // { startedAt, durationSec, volume, by }
   const [noiseUiNow, setNoiseUiNow] = useState(() => Date.now());
   const lastNicknameRef = useRef("");
@@ -497,6 +498,27 @@ export default function App() {
   useEffect(() => {
     const id = setInterval(() => setGhostUiNow(Date.now()), 500);
     return () => clearInterval(id);
+  }, []);
+
+  // Global audio unlock on user interaction (required for iOS)
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === 'suspended') {
+        sharedAudioContextRef.current.resume();
+        console.log('[Global unlock] AudioContext resumed');
+      }
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
   }, []);
 
   useEffect(() => {
@@ -757,20 +779,38 @@ export default function App() {
       if (data.sessionId === sessionIdRef.current) {
         setIsOutOfBounds(true);
         addNotification(`Vous êtes sorti de la zone de jeu!`, "error", 5000);
+        
+        // Vibration - stronger pattern for mobile
         if (navigator.vibrate) {
-          navigator.vibrate([300, 150, 300]);
+          navigator.vibrate([300, 100, 300, 100, 300]);
         }
+        
         try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          // Use shared AudioContext or create new one
+          let audioCtx = sharedAudioContextRef.current;
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            sharedAudioContextRef.current = audioCtx;
+          }
+          
+          // Resume if suspended (required for iOS)
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.type = "square";
           osc.frequency.value = 300;
-          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          
+          // Maximum volume for mobile (1.0 instead of 0.2)
+          gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
           osc.start();
           outOfBoundsAudioRef.current = { audioCtx, osc, gain };
+          
+          console.log('[player_out_of_bounds] Sound playing, volume: 1.0, AudioContext state:', audioCtx.state);
         } catch (e) {
           console.warn("AudioContext non disponible ou bloque", e);
         }
@@ -814,14 +854,26 @@ export default function App() {
           try { osc.stop(audioCtx.currentTime + 0.2); } catch {}
           noiseAudioRef.current = null;
         }
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Use shared AudioContext or create new one
+        let audioCtx = sharedAudioContextRef.current;
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          sharedAudioContextRef.current = audioCtx;
+        }
+        
+        // Resume if suspended (required for iOS)
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = "square";
         osc.frequency.value = 600;
 
-        // 3 niveaux de volume
-        const baseGain = volume === "low" ? 0.08 : volume === "high" ? 0.3 : 0.18;
+        // Maximum volume for mobile - all levels use higher volume
+        const baseGain = volume === "low" ? 0.5 : volume === "high" ? 1.0 : 0.8;
         gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
         osc.connect(gain).connect(audioCtx.destination);
         osc.start();
@@ -849,11 +901,13 @@ export default function App() {
         // Vibration supplémentaire en fonction du volume si supportée
         try {
           if (navigator.vibrate) {
-            if (volume === "low") navigator.vibrate([120, 80, 120]);
-            else if (volume === "high") navigator.vibrate([300, 120, 300, 120, 300]);
-            else navigator.vibrate([200, 100, 200]);
+            if (volume === "low") navigator.vibrate([150, 80, 150]);
+            else if (volume === "high") navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
+            else navigator.vibrate([200, 100, 200, 100, 200]);
           }
         } catch {}
+        
+        console.log('[play_noise] Sound playing, volume:', volume, 'baseGain:', baseGain, 'AudioContext state:', audioCtx.state);
       } catch (e) {
         console.warn("AudioContext non disponible pour bruit", e);
       }
@@ -1025,7 +1079,18 @@ export default function App() {
   const unlockAudioAndVibration = useCallback(() => {
     console.log('[unlockAudioAndVibration] Called');
     try {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Create or reuse shared AudioContext
+      if (!sharedAudioContextRef.current) {
+        sharedAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const audioCtx = sharedAudioContextRef.current;
+      
+      // Resume if suspended (required for iOS)
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      
+      // Play a silent sound to unlock audio
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
@@ -1033,7 +1098,7 @@ export default function App() {
       gain.gain.value = 0; // silent
       osc.start();
       osc.stop(audioCtx.currentTime + 0.1);
-      console.log('[unlockAudioAndVibration] Audio unlocked');
+      console.log('[unlockAudioAndVibration] Audio unlocked, state:', audioCtx.state);
     } catch(e) {
       console.log('[unlockAudioAndVibration] Audio unlock failed:', e);
     }
