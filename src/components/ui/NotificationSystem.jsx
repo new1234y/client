@@ -31,8 +31,11 @@ const typeStyles = {
   success: "bg-emerald-600 text-white",
   warning: "bg-amber-500 text-slate-900",
   error: "bg-red-600 text-white",
+  // Notifications de roster (entrées/sorties)
   player_left: "bg-slate-700 text-white",
   player_joined: "bg-sky-600 text-white",
+  // Notifications de jeu (événements globaux comme ghost, capture spéciale, etc.)
+  game_info: "bg-purple-600 text-white",
 };
 
 const typeIcons = {
@@ -64,6 +67,11 @@ const typeIcons = {
   player_joined: (
     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+    </svg>
+  ),
+  game_info: (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
     </svg>
   ),
 };

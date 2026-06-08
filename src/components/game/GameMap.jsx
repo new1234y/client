@@ -41,6 +41,24 @@ function RecenterOnDemand({ center, zoom, tick }) {
   return null;
 }
 
+function BaliseLureSelector({ enabled, onSelect }) {
+  useMapEvents({
+    click: (e) => {
+      if (!enabled) return;
+      try {
+        const { lat, lng } = e.latlng || {};
+        if (typeof lat !== "number" || !isFinite(lat)) return;
+        if (typeof lng !== "number" || !isFinite(lng)) return;
+        if (onSelect) onSelect(lat, lng);
+      } catch (err) {
+        // On log l'erreur mais on évite de casser toute la carte
+        console.error("Erreur lors de la sélection balise-leurre:", err);
+      }
+    },
+  });
+  return null;
+}
+
 function ZoomOnTicks({ zoomInTick, zoomOutTick }) {
   const map = useMap();
   useEffect(() => {
@@ -127,28 +145,25 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
       );
     }
     if (p.kind === "circle" && p.center && p.radiusM != null) {
+      // Avec le nouveau ghost, le backend ne renvoie plus de joueurs invisibles dans les cercles;
+      // on dessine simplement le cercle normal.
       const isAdmin = keyPrefix === "admin";
       const isOutOfBounds = !!p.outOfBounds;
-      const isGhost = !!p.invisible;
-      const color = isGhost
+      const color = p.disconnected
         ? "#94a3b8"
-        : p.disconnected
-          ? "#94a3b8"
-          : isOutOfBounds
-            ? "#ef4444"
-            : isAdmin
-              ? "#7c3aed"
-              : "#fb923c";
-      const fillColor = isGhost
-        ? "#e5e7eb"
-        : p.disconnected
-          ? "#cbd5e1"
+        : isOutOfBounds
+          ? "#ef4444"
           : isAdmin
-            ? "#a78bfa"
-            : "#f97316";
-      const fillOpacity = isGhost ? 0.18 : p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26;
+            ? "#7c3aed"
+            : "#fb923c";
+      const fillColor = p.disconnected
+        ? "#cbd5e1"
+        : isAdmin
+          ? "#a78bfa"
+          : "#f97316";
+      const fillOpacity = p.disconnected ? 0.12 : isAdmin ? 0.18 : 0.26;
 
-      const circleEl = (
+      return (
         <PlayerCircle
           key={`${keyPrefix}-${p.sessionId}`}
           center={p.center}
@@ -165,32 +180,6 @@ function renderPreyDiscs(list, keyPrefix, onPlayerClick = null, mySessionId) {
             },
           }}
         />
-      );
-
-      if (!isGhost) return circleEl;
-
-      // For invisible prey, also show a big ghost marker at the center
-      const ghostMarker = (
-        <Marker
-          key={`${keyPrefix}-ghost-${p.sessionId}`}
-          position={[p.center.lat, p.center.lng]}
-          icon={iconGhost}
-          eventHandlers={{
-            click: (e) => {
-              L.DomEvent.stopPropagation(e);
-              if (onPlayerClick) {
-                onPlayerClick({ ...p, role: "player" });
-              }
-            },
-          }}
-        />
-      );
-
-      return (
-        <>
-          {circleEl}
-          {ghostMarker}
-        </>
       );
     }
     return null;
@@ -252,6 +241,9 @@ export default function GameMap({
   focusTick = 0,
   focusZoom = 18,
   onPlayerClick = null,
+  baliseLureSelecting = false,
+  baliseLureTarget = null,
+  onBaliseLureSelect = null,
 }) {
   const [expandKey, setExpandKey] = useState(null);
   const [mapError, setMapError] = useState(null);
@@ -406,6 +398,27 @@ export default function GameMap({
 
   if (!gameState) return null;
 
+  const shouldShowBaliseLureMarker = useMemo(() => {
+    if (!baliseLureTarget || role !== "cat") return false;
+    if (!balises || !balises.length) return true;
+    const toRad = (v) => (v * Math.PI) / 180;
+    const R = 6371000;
+    for (const b of balises) {
+      const dLat = toRad(b.lat - baliseLureTarget.lat);
+      const dLon = toRad(b.lng - baliseLureTarget.lng);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(baliseLureTarget.lat)) *
+          Math.cos(toRad(b.lat)) *
+          Math.sin(dLon / 2) ** 2;
+      const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (d < 25) {
+        // La balise réelle est apparue très proche de la cible : on masque le marqueur de sélection
+        return false;
+      }
+    }
+    return true;
+  }, [baliseLureTarget, role, balises]);
+
   const handleTileError = () => {
     setMapError("Impossible de charger la carte. Vérifiez votre connexion internet.");
   };
@@ -415,7 +428,7 @@ export default function GameMap({
       {mapError && (
         <div className="absolute left-0 right-0 top-3 z-[2000] mx-auto max-w-md rounded-xl bg-red-100 px-4 py-3 text-center text-sm text-red-900 shadow-lg dark:bg-red-950/90 dark:text-red-100">
           {mapError}
-          <button 
+          <button
             type="button"
             onClick={() => setMapError(null)}
             className="ml-2 font-semibold underline"
@@ -424,6 +437,7 @@ export default function GameMap({
           </button>
         </div>
       )}
+
       <MapContainer
         center={initialCenter}
         zoom={initialZoom}
@@ -449,6 +463,26 @@ export default function GameMap({
       />
       <FlyToFocus center={focusCenter} zoom={focusZoom} tick={focusTick} />
       <ZoomOnTicks zoomInTick={zoomInTick} zoomOutTick={zoomOutTick} />
+
+      {shouldShowBaliseLureMarker && (
+        <CircleMarker
+          center={[baliseLureTarget.lat, baliseLureTarget.lng]}
+          radius={14}
+          pathOptions={{
+            color: "#a855f7",
+            fillColor: "#c4b5fd",
+            fillOpacity: 0.55,
+            weight: 3,
+          }}
+        />
+      )}
+
+      <BaliseLureSelector
+        enabled={role === "cat" && baliseLureSelecting}
+        onSelect={(lat, lng) => {
+          if (onBaliseLureSelect) onBaliseLureSelect(lat, lng);
+        }}
+      />
 
       {gc && gr != null && !(
         me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()
@@ -498,6 +532,8 @@ export default function GameMap({
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
+              // En mode balise-leurre, le clic doit servir uniquement à placer la balise, pas à ouvrir la fiche joueur
+              if (baliseLureSelecting) return;
               if (onPlayerClick && me) {
                 onPlayerClick({ ...me, sessionId: mySessionId });
               }
@@ -527,13 +563,23 @@ export default function GameMap({
         items={clusterItems}
         expandKey={expandKey}
         setExpandKey={setExpandKey}
-        onPlayerClick={onPlayerClick}
+        onPlayerClick={baliseLureSelecting ? null : onPlayerClick}
       />
 
       {role === "cat" &&
-        renderPreyDiscs(gameState.preyForCat || [], "cat", onPlayerClick, mySessionId)}
+        renderPreyDiscs(
+          gameState.preyForCat || [],
+          "cat",
+          baliseLureSelecting ? null : onPlayerClick,
+          mySessionId
+        )}
 
-      {renderPreyDiscs(gameState.adminPreyPreview || [], "admin", onPlayerClick, mySessionId)}
+      {renderPreyDiscs(
+        gameState.adminPreyPreview || [],
+        "admin",
+        baliseLureSelecting ? null : onPlayerClick,
+        mySessionId
+      )}
 
       {chatGeoMarkers.locations.map((m) => (
         <Marker

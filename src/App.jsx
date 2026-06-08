@@ -404,6 +404,8 @@ export default function App() {
   const [isOutOfBounds, setIsOutOfBounds] = useState(false);
   const outOfBoundsAudioRef = useRef(null);
   const noiseAudioRef = useRef(null);
+  const [activeNoise, setActiveNoise] = useState(null); // { startedAt, durationSec, volume, by }
+  const [noiseUiNow, setNoiseUiNow] = useState(() => Date.now());
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
@@ -444,12 +446,25 @@ export default function App() {
   const [freezeTargetMode, setFreezeTargetMode] = useState("single"); // single | all
   const [selectedFreezeTargets, setSelectedFreezeTargets] = useState([]); // cat sessionIds
   const [freezeDuration, setFreezeDuration] = useState(20);
+  const [invisDurationSec, setInvisDurationSec] = useState(300); // 60-900
+  const [baliseLureSelecting, setBaliseLureSelecting] = useState(false);
+  const [baliseLureTarget, setBaliseLureTarget] = useState(null);
+  const [ghostUiNow, setGhostUiNow] = useState(() => Date.now());
   const lastPingRef = useRef(Date.now());
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
   stageRef.current = stage;
   sessionIdRef.current = sessionId;
   isHostRef.current = isHost;
+
+  // Tick pour les overlays liés au bruit (timer barre de progression)
+  useEffect(() => {
+    if (!activeNoise) return;
+    const id = setInterval(() => {
+      setNoiseUiNow(Date.now());
+    }, 250);
+    return () => clearInterval(id);
+  }, [activeNoise]);
 
   useEffect(() => {
     setShowShareParty(false);
@@ -477,6 +492,12 @@ export default function App() {
     const id = setInterval(() => setReconnectUiNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [isReconnecting]);
+
+  // Tick pour les barres de temps (ghost)
+  useEffect(() => {
+    const id = setInterval(() => setGhostUiNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -783,7 +804,7 @@ export default function App() {
       setReconnectReason("kicked");
     });
 
-    s.on("play_noise", ({ durationSec, by }) => {
+    s.on("play_noise", ({ durationSec, volume = "medium", by }) => {
       try {
         // Stop previous
         if (noiseAudioRef.current) {
@@ -798,13 +819,16 @@ export default function App() {
         const gain = audioCtx.createGain();
         osc.type = "square";
         osc.frequency.value = 600;
+
+        // 3 niveaux de volume
+        const baseGain = volume === "low" ? 0.08 : volume === "high" ? 0.3 : 0.18;
         gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
         osc.connect(gain).connect(audioCtx.destination);
         osc.start();
         // Ramp pattern: pulsing beeps
         for (let i = 0; i < durationSec; i += 1) {
           const t0 = audioCtx.currentTime + i * 1.0;
-          gain.gain.setValueAtTime(0.18, t0);
+          gain.gain.setValueAtTime(baseGain, t0);
           gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
         }
         const stopTimer = setTimeout(() => {
@@ -813,15 +837,31 @@ export default function App() {
           noiseAudioRef.current = null;
         }, Math.max(1, durationSec) * 1000 + 150);
         noiseAudioRef.current = { audioCtx, osc, gain, stopTimer };
-        addNotification(`Bruit déclenché par ${by || "un adversaire"}`, "warning", Math.min(10000, durationSec * 1000));
+
+        // Enregistrer un effet visuel fort côté UI
+        setActiveNoise({
+          startedAt: Date.now(),
+          durationSec: Math.max(1, durationSec || 1),
+          volume,
+          by: by || "un adversaire",
+        });
+
+        // Vibration supplémentaire en fonction du volume si supportée
+        try {
+          if (navigator.vibrate) {
+            if (volume === "low") navigator.vibrate([120, 80, 120]);
+            else if (volume === "high") navigator.vibrate([300, 120, 300, 120, 300]);
+            else navigator.vibrate([200, 100, 200]);
+          }
+        } catch {}
       } catch (e) {
         console.warn("AudioContext non disponible pour bruit", e);
       }
     });
 
     s.on("immobilized", ({ until, by, durationSec }) => {
-      const secs = Math.max(1, Math.round((until - Date.now()) / 1000) || durationSec || 0);
-      addNotification(`Immobilisé ${secs}s${by ? ` par ${by}` : ""}`, "error", Math.min(8000, secs * 1000));
+      // L'overlay d'immobilisation est déjà géré côté UI via me.immobilizedUntil ;
+      // pas de notification toast supplémentaire ici pour garder un impact visuel fort.
     });
 
     s.on("admin_role_changed", (data) => {
@@ -1389,6 +1429,26 @@ export default function App() {
       };
     });
   }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, rolesReveal?.players, role, isHost]);
+
+  // Suivi des changements d'invisibilité pour notifications
+  const prevInvisStateRef = useRef(new Map());
+  useEffect(() => {
+    const currentMap = new Map();
+    for (const p of rosterList || []) {
+      const sessionId = p.sessionId;
+      const wasInvisible = prevInvisStateRef.current.get(sessionId) === true;
+      const isInvisible = Boolean(p.invisible);
+      currentMap.set(sessionId, isInvisible);
+      if (wasInvisible !== isInvisible && p.nickname) {
+        if (isInvisible) {
+          addNotification(`${p.nickname} passe en mode ghost 👻`, "game_info");
+        } else {
+          addNotification(`${p.nickname} redevient visible`, "game_info");
+        }
+      }
+    }
+    prevInvisStateRef.current = currentMap;
+  }, [rosterList, addNotification]);
 
   const geoChatItems = useMemo(() => {
     return (partyChatMessages || [])
@@ -2388,6 +2448,34 @@ export default function App() {
       freeze_cats_all: 140,
     };
 
+    const powerLimits = gameState.powerLimits || {};
+    const powerUses = gameState.powerUses || {};
+
+    const formatUsage = (key) => {
+      const used = Number(powerUses?.[key] || 0);
+      const max = Number(powerLimits?.[key] || 0);
+      if (max > 0) return `${used}/${max}`;
+      if (used > 0) return `${used}`;
+      return null;
+    };
+
+    // État du cercle de brouillage (zone jam des joueurs)
+    const jamBase = Number(gameState.jamRadiusBaseM || gameState.settings?.jamRadiusM || 80);
+    const jamScale = Number(gameState.jamRadiusScale || 1);
+    const jamRadius = jamBase * jamScale;
+    let jamLabel = "Normal";
+    let jamLevel = "normal"; // small | normal | large
+    if (jamScale < 0.99) {
+      jamLabel = "Rétréci";
+      jamLevel = "small";
+    } else if (jamScale > 1.01) {
+      jamLabel = "Agrandit";
+      jamLevel = "large";
+    }
+
+    const jamIsMin = jamScale <= 0.51; // proche du palier min côté serveur (0.5)
+    const jamIsMax = jamScale >= 1.49; // proche du palier max côté serveur (1.5)
+
     const isCooldown = (key) => (localCooldowns?.[key] || 0) > Date.now();
     const cooldownUntil = (key) => localCooldowns?.[key] || 0;
     const setCd = (key, secs) => setLocalCooldowns((m) => ({ ...m, [key]: Date.now() + secs * 1000 }));
@@ -2397,7 +2485,7 @@ export default function App() {
     const canTeamInvisibility = sameRoleAliveCount > 1;
     const canTeamFreezeCats = catAliveCount > 1;
 
-    // Lock Sans limites until 5 mins
+    // Lock Sans limites until 5 mins (évite le message "disponible plus tard")
     const noBoundariesUnlockAt = gameState?.huntStartedAt ? gameState.huntStartedAt + 5 * 60 * 1000 : 0;
     const isNoBoundariesEarlyLocked = Date.now() < noBoundariesUnlockAt;
     const noBoundariesCurrentLockUntil = isNoBoundariesEarlyLocked 
@@ -2425,6 +2513,42 @@ export default function App() {
       if (count <= 0) return 0;
       const raw = base * durationFactor * volumeFactor * count;
       return Math.max(1, Math.ceil(raw));
+    })();
+
+    // Bornes théoriques min/max de coût pour affichage (en fonction des paramètres extrêmes)
+    const noiseMinCost = (() => {
+      const base = Number(powerCosts.noise || 20);
+      const durationFactor = 0.5; // 10s
+      const volumeFactor = 0.7; // low
+      const count = 1;
+      return Math.max(1, Math.ceil(base * durationFactor * volumeFactor * count));
+    })();
+    const noiseMaxCost = (() => {
+      const base = Number(powerCosts.noise || 20);
+      const durationFactor = 1.8; // 60s
+      const volumeFactor = 1.4; // high
+      const maxTargets = (rosterList || []).filter((p) => p.role !== role && !p.spectator).length || 1;
+      return Math.max(1, Math.ceil(base * durationFactor * volumeFactor * maxTargets));
+    })();
+
+    const freezeMinCost = Number(powerCosts.freeze_cats_single || 45);
+    const freezeMaxCost = Number(powerCosts.freeze_cats_all || powerCosts.freeze_cats_multi || freezeMinCost);
+
+    const invisMinCost = Number(powerCosts.invisibility_self || 40);
+    const invisMaxCost = Number(powerCosts.invisibility_all_role || powerCosts.invisibility_single || invisMinCost);
+
+    const estimatedInvisCost = (() => {
+      const durationSec = Math.max(30, Math.min(900, Number(invisDurationSec) || 300));
+      const durationFactor = Math.pow(durationSec / 300, 1.6);
+      if (invisScope === "self") {
+        const base = Number(powerCosts.invisibility_self || 40);
+        return Math.max(1, Math.round(base * durationFactor));
+      }
+      // multi: on utilise le même schéma que le backend (single/multi)
+      const base = Number(powerCosts.invisibility_single || 70);
+      const count = (selectedInvisTargets || []).length || 1;
+      const perTarget = Math.max(1, Math.round(base * durationFactor));
+      return perTarget * count;
     })();
 
     const renderAdminPanel = () => (
@@ -2672,27 +2796,51 @@ export default function App() {
                   </div>
                   <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Participants</h2>
                   <ul className="space-y-3">
-                    {rosterList.map((p) => (
-                      <li key={p.sessionId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer rounded-[8px] bg-white p-4 ring-1 ring-slate-200 active:scale-[0.98] dark:bg-slate-800 dark:ring-slate-700">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-slate-900 dark:text-white">
-                            {p.nickname}
-                            {p.invisible && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">ghost</span>}
-                            {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
-                          </span>
-                          {p.coins !== undefined && p.coins > 0 && (
-                            <div className="flex items-center gap-1">
-                              <svg className="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
-                              </svg>
-                              <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{p.coins}</span>
+                    {rosterList.map((p) => {
+                      let ghostRemaining = null;
+                      let ghostProgress = 0;
+                      if (p.invisible && p.invisUntil && p.invisSince && p.invisUntil > ghostUiNow) {
+                        const total = p.invisUntil - p.invisSince;
+                        const rest = p.invisUntil - ghostUiNow;
+                        if (total > 0) ghostProgress = 1 - rest / total;
+                        ghostRemaining = Math.max(1, Math.round(rest / 1000));
+                      }
+                      return (
+                        <li key={p.sessionId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer rounded-[8px] bg-white p-4 ring-1 ring-slate-200 active:scale-[0.98] dark:bg-slate-800 dark:ring-slate-700">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-slate-900 dark:text-white">
+                              {p.nickname}
+                              {p.invisible && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">ghost</span>}
+                              {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
+                            </span>
+                            {p.coins !== undefined && p.coins > 0 && (
+                              <div className="flex items-center gap-1">
+                                <svg className="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
+                                </svg>
+                                <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{p.coins}</span>
+                              </div>
+                            )}
+                          </div>
+                          {p.disconnected && <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Déconnecté</span>}
+                          <p className={`mt-1 text-sm ${p.role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>{roleBadgeText(p)}</p>
+                          {ghostRemaining != null && (
+                            <div className="mt-2">
+                              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                                <span>Ghost encore</span>
+                                <span className="font-semibold">{ghostRemaining}s</span>
+                              </div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                <div
+                                  className="h-full rounded-full bg-slate-500/80 dark:bg-slate-300"
+                                  style={{ width: `${Math.max(6, Math.min(100, ghostProgress * 100))}%` }}
+                                />
+                              </div>
                             </div>
                           )}
-                        </div>
-                        {p.disconnected && <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Déconnecté</span>}
-                        <p className={`mt-1 text-sm ${p.role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>{roleBadgeText(p)}</p>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                   <div className="mt-6 h-[1px] w-full bg-slate-200 dark:bg-slate-700" />
                   <div className="mt-4">
@@ -2724,17 +2872,20 @@ export default function App() {
                       emoji="👻"
                       stars={4}
                       gradient={["#6366F1", "#A78BFA"]}
-                      costText={invisScope === "self" ? `${powerCosts.invisibility_self}` : `${powerCosts.invisibility_single * Math.max(1, selectedInvisTargets?.length || 1)}`}
+                      costText={`${invisMinCost} - ${invisMaxCost}`}
+                      usageLabel={formatUsage("invisibility")}
                       details={<>
-                        Devenez invisible pendant 5 minutes. Tous ne voient plus que la <b>dernière position en fantôme</b> de la personne ciblée.
+                        Devenez invisible pendant un certain temps. Le coût dépend de la <b>durée</b> et du <b>nombre de cibles</b>.
+                        <br />
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">Coût estimé actuel : ~{estimatedInvisCost} pièces.</span>
                       </>}
                       onUse={() => {
                         if (isCooldown("invisibility")) return;
                         const scope = invisScope === "self" ? "self" : "multi";
                         const body =
                           scope === "self"
-                            ? { kind: "invisibility", scope, durationSec: 300 }
-                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: 300 };
+                            ? { kind: "invisibility", scope, durationSec: invisDurationSec }
+                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: invisDurationSec };
                         if (scope === "multi" && !selectedInvisTargets?.length) {
                           addNotification("Choisissez au moins une cible", "error");
                           return;
@@ -2816,6 +2967,21 @@ export default function App() {
                             </div>
                           </div>
                         )}
+
+                        <div className="space-y-1 pt-1">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
+                          <DiscreteSlider
+                            options={[
+                              { label: "1 min", value: 60 },
+                              { label: "5 min", value: 300 },
+                              { label: "10 min", value: 600 },
+                              { label: "15 min", value: 900 },
+                            ]}
+                            value={invisDurationSec}
+                            onChange={setInvisDurationSec}
+                            color="indigo"
+                          />
+                        </div>
                       </div>
                     </PowerCard>
 
@@ -2824,10 +2990,11 @@ export default function App() {
                       emoji="🔊"
                       stars={2}
                       gradient={["#F43F5E", "#FB923C"]}
-                      costText={`${powerCosts.noise} - 300+`}
+                      costText={`${noiseMinCost} - ${noiseMaxCost}`}
                       locked={isCooldown("noise")}
                       lockReason="Recharge"
                       lockUntil={cooldownUntil("noise")}
+                      usageLabel={formatUsage("noise")}
                       details={<>
                         Joue un son désagréable sur un ou plusieurs téléphones adverses. Le prix dépend de la <b>durée</b>, du <b>volume</b> et du <b>nombre de cibles</b>.
                       </>}
@@ -2972,54 +3139,60 @@ export default function App() {
                     {role === "player" ? (
                       <>
                         <PowerCard
-                          title="Cercle de brouillage"
+                          title="Agrandir le cercle de brouillage"
                           emoji="📡"
                           gradient={["#10B981", "#34D399"]}
                           costText={`${powerCosts.zone_morph_player}`}
+                          locked={jamIsMax}
+                          lockReason={jamIsMax ? "Déjà au plus grand" : ""}
                           details={<>
                             Agrandit le cercle de brouillage des joueurs. Si les chats l'ont réduit au maximum, vous pouvez le ramener directement à l'extrême opposé si vous avez assez de pièces.
                           </>}
-                          onUse={() =>
+                          onUse={() => {
+                            if (jamIsMax) return; // évite d'envoyer une requête inutile
                             socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
                               if (res?.ok) {
                                 addNotification("Cercle de brouillage ajusté", "success");
-                              } else {
-                                addNotification(res?.error || "Erreur", "error");
-                              }
-                            })
-                          }
-                        />
-
-                        <PowerCard
-                          title="Sans limites"
-                          emoji="🚫"
-                          gradient={["#0EA5E9", "#22D3EE"]}
-                          costText={`${powerCosts.no_boundaries}`}
-                          locked={isCooldown("no_boundaries") || (me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now())}
-                          lockReason="Recharge"
-                          lockUntil={
-                            me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()
-                              ? me.outOfBoundsOverrideUntil
-                              : cooldownUntil("no_boundaries")
-                          }
-                          details={<>
-                            Ignore les limites de la carte pendant 10 minutes. Utilisable seulement après quelques minutes de jeu.
-                          </>}
-                          onUse={() =>
-                            socket?.emit(
-                              "use_power",
-                              { kind: "no_boundaries", durationSec: 600 },
-                              (res) => {
-                                if (res?.ok) {
-                                  setCd("no_boundaries", 300);
-                                  addNotification("Limites désactivées (10 min)", "success");
-                                } else {
-                                  addNotification(res?.error || "Erreur", "error");
+                              } else if (res?.error) {
+                                // On supprime le cas "Déjà au maximum" côté UX : on se contente de bloquer le bouton
+                                if (!/Déjà au maximum/i.test(res.error)) {
+                                  addNotification(res.error, "error");
                                 }
                               }
-                            )
-                          }
-                        />
+                            });
+                          }}
+                        >
+                          <div className="mt-2 space-y-1 text-xs text-slate-700 dark:text-slate-200">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-semibold">État du cercle de brouillage</span>
+                              <div className="flex items-center gap-2">
+                                {["small", "normal", "large"].map((lvl) => {
+                                  const active = lvl === jamLevel;
+                                  const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
+                                  return (
+                                    <div key={lvl} className="flex flex-col items-center text-[10px]">
+                                      <div
+                                        className={`h-2 w-6 rounded-full transition-all ${
+                                          active
+                                            ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                                            : "bg-slate-300 dark:bg-slate-700"
+                                        }`}
+                                      />
+                                      <span className={`mt-0.5 ${active ? "font-semibold text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
+                                        {label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            {jamIsMax && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Le cercle est déjà au palier le plus grand.
+                              </p>
+                            )}
+                          </div>
+                        </PowerCard>
 
                         <PowerCard
                           title="Immobiliser un joueur"
@@ -3158,16 +3331,103 @@ export default function App() {
                     ) : (
                       <>
                         <PowerCard
-                          title="Réduire la zone"
-                          emoji="📉"
+                          title="Réduire le cercle de brouillage"
+                          emoji="📡"
                           gradient={["#EF4444", "#F97316"]}
                           stars={5}
                           costText={`${powerCosts.zone_morph_cat}`}
+                          usageLabel={formatUsage("zone_morph_cat")}
+                          locked={jamIsMin}
+                          lockReason={jamIsMin ? "Déjà au plus petit" : ""}
                           details={<>
-                            Jusqu’à 2 utilisations. Si la zone est déjà agrandie, la première utilisation la ramène à la normale.
+                            Rétrécit le cercle de brouillage des joueurs (zone floue autour d'eux). Si les joueurs l'ont agrandi, une première utilisation le ramène à la normale, puis le réduit encore.
                           </>}
-                          onUse={() => socket?.emit("use_power", { kind: "zone_morph" }, (res) => { res?.ok ? addNotification("Zone modifiée", "success") : addNotification(res?.error || "Erreur", "error"); })}
-                        />
+                          onUse={() => {
+                            if (jamIsMin) return;
+                            socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
+                              if (res?.ok) {
+                                addNotification("Zone modifiée", "success");
+                              } else if (res?.error) {
+                                if (!/Déjà au minimum/i.test(res.error)) {
+                                  addNotification(res.error || "Erreur", "error");
+                                }
+                              }
+                            });
+                          }}
+                        >
+                          <div className="mt-2 space-y-1 text-xs text-slate-700 dark:text-slate-200">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-semibold">État du cercle de brouillage</span>
+                              <div className="flex items-center gap-2">
+                                {["small", "normal", "large"].map((lvl) => {
+                                  const active = lvl === jamLevel;
+                                  const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
+                                  return (
+                                    <div key={lvl} className="flex flex-col items-center text-[10px]">
+                                      <div
+                                        className={`h-2 w-6 rounded-full transition-all ${
+                                          active
+                                            ? "bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.8)]"
+                                            : "bg-slate-300 dark:bg-slate-700"
+                                        }`}
+                                      />
+                                      <span className={`mt-0.5 ${active ? "font-semibold text-orange-600 dark:text-orange-300" : "text-slate-500 dark:text-slate-400"}`}>
+                                        {label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            {jamIsMin && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Le cercle est déjà au palier le plus petit.
+                              </p>
+                            )}
+                          </div>
+                        </PowerCard>
+
+                        <PowerCard
+                          title="Balise-leurre"
+                          emoji="🎯"
+                          gradient={["#8B5CF6", "#EC4899"]}
+                          stars={4}
+                          costText={`${powerCosts.balise_leurre || 60}`}
+                          locked={Boolean(powerLimits?.balise_leurre) && Number(powerUses?.balise_leurre || 0) >= Number(powerLimits?.balise_leurre || 1)}
+                          lockReason="Utilisation unique"
+                          lockUntil={null}
+                          usageLabel={formatUsage("balise_leurre")}
+                          details={<>
+                            Permet de programmer en secret l'emplacement de la <b>prochaine balise</b> qui apparaîtra dans la partie. Utilisable une seule fois.
+                            Touchez la carte pour choisir l'emplacement du leurre.
+                          </>}
+                          onUse={() => {
+                            if (Boolean(powerLimits?.balise_leurre) && Number(powerUses?.balise_leurre || 0) >= Number(powerLimits?.balise_leurre || 1)) {
+                              addNotification("Pouvoir déjà utilisé.", "error");
+                              return;
+                            }
+                            setBaliseLureSelecting(true);
+                            addNotification("Touchez la carte pour choisir l'emplacement du leurre.", "info", 6000);
+                          }}
+                        >
+                          <div className="space-y-2 text-xs text-slate-700 dark:text-slate-200">
+                            <p>
+                              Quand le mode est actif, touchez la carte pour placer un marqueur violet. Ensuite, le jeu utilisera ce point pour la prochaine balise au lieu d'un emplacement aléatoire.
+                            </p>
+                            {baliseLureTarget && (
+                              <>
+                                <p className="text-[11px] text-purple-600 dark:text-purple-300">
+                                  Position sélectionnée prête pour la prochaine balise.
+                                </p>
+                                {gameState.nextBaliseAt && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    Prochaine balise dans {Math.max(0, Math.floor((gameState.nextBaliseAt - Date.now()) / 1000))}s.
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </PowerCard>
                       </>
                     )}
                   </div>
@@ -3202,6 +3462,15 @@ export default function App() {
                     onZoomIn={() => setZoomInTick((n) => n + 1)}
                     onZoomOut={() => setZoomOutTick((n) => n + 1)}
                   />
+                  {baliseLureSelecting && role === "cat" && (
+                    <div className="pointer-events-none absolute inset-x-0 top-3 z-[1200] flex justify-center">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-purple-600/90 px-4 py-1.5 text-xs font-semibold text-white shadow-lg">
+                        <span>Mode balise-leurre actif</span>
+                        <span className="text-purple-100">Touchez la carte pour choisir l'emplacement de la prochaine balise.</span>
+                      </div>
+                    </div>
+                  )}
+
                   <GameMap
                     gameState={gameState}
                     role={role}
@@ -3214,11 +3483,24 @@ export default function App() {
                     focusCenter={focusCenter}
                     focusTick={focusTick}
                     onPlayerClick={setSelectedPlayer}
+                    baliseLureSelecting={baliseLureSelecting}
+                    baliseLureTarget={baliseLureTarget}
+                    onBaliseLureSelect={(lat, lng) => {
+                      setBaliseLureTarget({ lat, lng });
+                      setBaliseLureSelecting(false);
+                      socket?.emit("use_power", { kind: "balise_leurre", lat, lng }, (res) => {
+                        if (res?.ok) {
+                          addNotification("Balise-leurre programmée", "success");
+                        } else {
+                          addNotification(res?.error || "Erreur", "error");
+                        }
+                      });
+                    }}
                   />
                 </div>
               )}
 
-              {/* Floating info bar above dock */}
+              {/* Floating info bar above dock (mobile) */}
               <div className="pointer-events-none absolute bottom-20 left-0 right-0 z-[800] flex flex-col items-center gap-2 px-4 md:hidden">
                 <GameInfoPanel
                   role={role}
@@ -3233,6 +3515,31 @@ export default function App() {
                   shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
                   coins={me?.coins}
                 />
+                <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
+                  <div className="flex flex-col gap-0.5 text-[11px]">
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">Cercle de brouillage</span>
+                    <div className="flex items-center gap-2">
+                      {["small", "normal", "large"].map((lvl) => {
+                        const active = lvl === jamLevel;
+                        const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
+                        return (
+                          <div key={lvl} className="flex flex-col items-center text-[10px]">
+                            <div
+                              className={`h-1.5 w-6 rounded-full transition-all ${
+                                active
+                                  ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                                  : "bg-slate-300 dark:bg-slate-700"
+                              }`}
+                            />
+                            <span className={`mt-0.5 ${active ? "font-semibold text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
                 <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
                   {catLocked && isCat && gameState.mapUnlockAt && (
                     <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
@@ -3263,9 +3570,29 @@ export default function App() {
                   <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
                 )}
                 {gameState.timeLimitEndsAt && <GameTimer endsAt={gameState.timeLimitEndsAt} />}
-                {gameState.settings?.shrinkZoneEnabled && (
-                  <span className="text-xs text-violet-600 dark:text-violet-400">Zone rétrécit</span>
-                )}
+                <div className="pointer-events-auto flex flex-col gap-0.5 rounded-[8px] bg-white/90 px-2 py-1 text-[11px] shadow dark:bg-slate-900/90">
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">Cercle de brouillage</span>
+                  <div className="flex items-center gap-2">
+                    {["small", "normal", "large"].map((lvl) => {
+                      const active = lvl === jamLevel;
+                      const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
+                      return (
+                        <div key={lvl} className="flex flex-col items-center text-[10px]">
+                          <div
+                            className={`h-1.5 w-6 rounded-full transition-all ${
+                              active
+                                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                                : "bg-slate-300 dark:bg-slate-700"
+                            }`}
+                          />
+                          <span className={`mt-0.5 ${active ? "font-semibold text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
+                            {label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
                 {!connected && <span className="animate-pulse text-xs text-[#C45454]">Déconnecté</span>}
               </div>
@@ -3293,6 +3620,92 @@ export default function App() {
               }}
               onQuit={!isHost ? leaveGame : undefined}
             />
+
+            {/* Overlay de bruit fantôme : impact visuel fort au-dessus de l'interface */}
+            {activeNoise && (() => {
+              const elapsedMs = Math.max(0, noiseUiNow - activeNoise.startedAt);
+              const totalMs = Math.max(1, activeNoise.durationSec * 1000);
+              const remainingSec = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
+              const progress = Math.min(1, elapsedMs / totalMs);
+
+              if (elapsedMs > totalMs) {
+                // Termine automatiquement l'effet au prochain render
+                if (activeNoise) {
+                  setTimeout(() => setActiveNoise(null), 0);
+                }
+              }
+
+              const volumeLabel = activeNoise.volume === "low" ? "Bas" : activeNoise.volume === "high" ? "Fort" : "Moyen";
+
+              return elapsedMs <= totalMs ? (
+                <div className="pointer-events-none fixed inset-x-0 top-0 z-[1850] flex justify-center">
+                  <div className="pointer-events-auto mt-4 w-[min(420px,90%)] animate-[wiggle_0.6s_ease-in-out_infinite] rounded-2xl bg-amber-500/95 px-4 py-3 text-xs font-semibold text-amber-950 shadow-2xl ring-2 ring-amber-300/80 dark:bg-amber-400/95 dark:text-amber-950">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-700/90 text-lg text-amber-100 shadow-md">
+                          {activeNoise.volume === "high" ? "🔊" : activeNoise.volume === "low" ? "🔈" : "🔉"}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] uppercase tracking-[0.18em]">Bruit fantôme</span>
+                          <span className="text-[12px] font-bold">{activeNoise.by} fait tout vibrer ({volumeLabel})</span>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-700/90 px-2 py-0.5 text-[11px] font-bold text-amber-100 tabular-nums">
+                        {remainingSec}s
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200/80">
+                      <div
+                        className="h-full rounded-full bg-amber-700 transition-[width] duration-200 ease-out"
+                        style={{ width: `${Math.max(8, (1 - progress) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Panneau compact pour le joueur en mode ghost */}
+            {me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince && (
+              (() => {
+                const total = me.invisUntil - me.invisSince;
+                const rest = me.invisUntil - ghostUiNow;
+                if (total <= 0 || rest <= 0) return null;
+                const progress = 1 - rest / total;
+                const remainingSec = Math.max(1, Math.round(rest / 1000));
+                return (
+                  <div className="pointer-events-none fixed inset-x-0 top-16 z-[1500] flex justify-center px-4">
+                    <div className="pointer-events-auto inline-flex max-w-md flex-1 items-center gap-3 rounded-2xl bg-slate-900/90 px-4 py-3 text-xs text-slate-100 shadow-lg ring-1 ring-slate-700/80">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold uppercase tracking-wide text-[11px] text-slate-300">Mode ghost actif</span>
+                          <span className="text-[11px] font-semibold text-slate-100">{remainingSec}s</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-700">
+                          <div
+                            className="h-full rounded-full bg-slate-300"
+                            style={{ width: `${Math.max(6, Math.min(100, progress * 100))}%` }}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          socket?.emit("use_power", { kind: "invisibility_cancel" }, (res) => {
+                            if (!res?.ok && res?.error) {
+                              addNotification(res.error, "error");
+                            }
+                          });
+                        }}
+                        className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-900 hover:bg-white"
+                      >
+                        Revenir visible
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()
+            )}
 
             {/* Overlay d'immobilisation (malus fort visuel) */}
             {me?.immobilizedUntil && me.immobilizedUntil > Date.now() && (
