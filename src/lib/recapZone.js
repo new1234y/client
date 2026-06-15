@@ -1,37 +1,59 @@
-/** Rayon global à l'instant t (même logique paliers que le serveur). */
-export function effectiveGlobalRadiusAtTime(summary, absT) {
-  console.log('[effectiveGlobalRadiusAtTime] Called with:', { summary, absT });
-  const R0 = Number(summary?.globalRadiusM) || 500;
-  const s = summary?.settingsSnapshot || {};
+function zoneFromPhases(summary, absT) {
   const hunt = summary?.huntStartedAt;
-  if (!s.shrinkZoneEnabled || !hunt) {
-    console.log('[effectiveGlobalRadiusAtTime] Shrink zone disabled or no hunt start, returning R0:', R0);
-    return R0;
+  const phases = summary?.shrinkPhasesList;
+  const R0 = Number(summary?.globalRadiusM) || 500;
+  const center = summary?.gameCenter;
+
+  if (!summary?.settingsSnapshot?.shrinkZoneEnabled || !hunt || !phases?.length) {
+    return { radius: R0, center: center || null };
   }
-  const durMs = Math.max(
-    60000,
-    (Number(s.shrinkDurationMinutes) || 15) * 60 * 1000
-  );
-  const Rmin = Math.min(
-    R0,
-    Math.max(20, Number(s.shrinkMinRadiusM) || 80)
-  );
-  const phases = Math.max(
-    2,
-    Math.min(20, Math.floor(Number(s.shrinkPhases)) || 5)
-  );
-  const radii = [];
-  for (let i = 0; i < phases; i++) {
-    radii.push(R0 + (Rmin - R0) * (i / Math.max(1, phases - 1)));
-  }
+
   const elapsed = absT - hunt;
-  if (elapsed <= 0) {
-    console.log('[effectiveGlobalRadiusAtTime] Elapsed time <= 0, returning R0:', R0);
-    return R0;
+  if (elapsed <= 0) return { radius: R0, center: center || null };
+
+  let phase = phases[phases.length - 1];
+  for (let i = 0; i < phases.length; i++) {
+    if (elapsed < phases[i].endTime) {
+      phase = phases[i];
+      break;
+    }
   }
-  const segMs = durMs / phases;
-  const idx = Math.min(phases - 1, Math.floor(elapsed / segMs));
-  const result = radii[idx];
-  console.log('[effectiveGlobalRadiusAtTime] Result:', result);
-  return result;
+
+  const phaseDuration = phase.endTime - phase.startTime;
+  const shrinkStart = phase.startTime + phaseDuration * (phase.waitRatio || 0);
+
+  if (elapsed < shrinkStart) {
+    return {
+      radius: phase.startZone?.radius ?? R0,
+      center: phase.startZone?.center ?? center,
+    };
+  }
+  if (elapsed < phase.endTime && phase.shrinkRatio > 0) {
+    const progress =
+      (elapsed - shrinkStart) / (phaseDuration * phase.shrinkRatio);
+    const sz = phase.startZone;
+    const ez = phase.endZone;
+    if (!sz || !ez) return { radius: R0, center };
+    return {
+      radius: sz.radius + (ez.radius - sz.radius) * progress,
+      center: {
+        lat: sz.center.lat + (ez.center.lat - sz.center.lat) * progress,
+        lng: sz.center.lng + (ez.center.lng - sz.center.lng) * progress,
+      },
+    };
+  }
+  return {
+    radius: phase.endZone?.radius ?? R0,
+    center: phase.endZone?.center ?? center,
+  };
+}
+
+/** Rayon global à l'instant t (aligné serveur si shrinkPhasesList présent). */
+export function effectiveGlobalRadiusAtTime(summary, absT) {
+  return zoneFromPhases(summary, absT).radius;
+}
+
+/** Centre de zone à l'instant t. */
+export function effectiveZoneCenterAtTime(summary, absT) {
+  return zoneFromPhases(summary, absT).center;
 }

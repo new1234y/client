@@ -15,7 +15,7 @@ export default function BottomNav({
       disabled
         ? "opacity-30"
         : active
-          ? "bg-amber-100/50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+        ? "bg-gradient-to-r from-[#FDE68A]/60 to-[#FBBF24]/40 text-amber-950 dark:from-amber-900/40 dark:to-amber-800/30 dark:text-amber-100"
           : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
     }`;
 
@@ -23,7 +23,7 @@ export default function BottomNav({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-6 md:hidden">
-      <nav className="relative rounded-[40px] bg-white/80 p-2 shadow-sm ring-1 ring-slate-200/50 backdrop-blur-xl dark:bg-slate-900/80 dark:ring-slate-800/50">
+      <nav className="relative rounded-[40px] bg-gradient-to-r from-white/90 via-[#FFF5D7]/80 to-white/90 p-2 shadow-lg ring-1 ring-amber-100/60 backdrop-blur-xl dark:from-slate-900/90 dark:via-slate-900/80 dark:to-slate-800/90 dark:ring-slate-700">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -67,8 +67,10 @@ export default function BottomNav({
               type="button"
               onClick={onCenterAction}
               disabled={!centerAction}
-              className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-white shadow-md transition active:scale-[0.96] ${
-                centerAction ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-slate-200 dark:bg-slate-800"
+              className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-white shadow-lg transition active:scale-[0.96] ${
+                centerAction
+                  ? "bg-gradient-to-br from-[#FB7185] to-[#F97316] dark:from-[#FBBF24] dark:to-[#F97316] dark:text-slate-900"
+                  : "bg-slate-200 dark:bg-slate-800"
               }`}
               aria-label={
                 centerAction === "scan"

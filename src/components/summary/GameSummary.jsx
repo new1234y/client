@@ -15,6 +15,7 @@ import {
   Circle,
   Marker,
   Popup,
+  useMap,
 } from "react-leaflet";
 import "../../lib/map/leafletFix.js";
 import { BASEMAPS } from "../../lib/map/basemaps.js";
@@ -25,6 +26,7 @@ import {
 } from "../../lib/map/icons.js";
 import {
   effectiveGlobalRadiusAtTime,
+  effectiveZoneCenterAtTime,
 } from "../../lib/recapZone.js";
 
 function formatClock(t) {
@@ -202,7 +204,7 @@ function PodiumPillar({ place, player, accent }) {
         </div>
       </div>
       <div
-        className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${baseColor} shadow-[0_10px_25px_sm:shadow-[0_20px_35px_rgba(0,0,0,0.15)]`}
+        className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${baseColor} shadow-[0_10px_25px_rgba(0,0,0,0.12)] sm:shadow-[0_20px_35px_rgba(0,0,0,0.15)]`}
       >
         <div className="flex h-full items-end justify-center">
           <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/90 py-1 sm:py-2 text-[10px] sm:text-sm font-bold text-slate-700 dark:bg-white/70">
@@ -487,6 +489,26 @@ function SummaryPodiumView({
   );
 }
 
+function RecapFitBounds({ paths, center }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts = [];
+    for (const track of Object.values(paths || {})) {
+      for (const p of track || []) {
+        if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) pts.push([p.lat, p.lng]);
+      }
+    }
+    if (center?.lat != null && center?.lng != null) pts.push([center.lat, center.lng]);
+    if (pts.length < 2) return;
+    try {
+      map.fitBounds(pts, { padding: [48, 48], maxZoom: 17 });
+    } catch {
+      /* ignore */
+    }
+  }, [map, paths, center]);
+  return null;
+}
+
 function segmentUntil(pts, absT) {
   const out = [];
   for (const p of pts || []) {
@@ -649,6 +671,11 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     return r > 0 ? r : 0;
   }, [summary, absT]);
 
+  const zoneCenter = useMemo(() => {
+    if (!summary) return null;
+    return effectiveZoneCenterAtTime(summary, absT) || summary.gameCenter;
+  }, [summary, absT]);
+
   const timelineSorted = useMemo(
     () => [...(summary?.timeline || [])].sort((a, b) => a.t - b.t),
     [summary]
@@ -808,8 +835,27 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         copyRecap={copyRecap}
       />
     ) : (
-      <div className="flex h-full min-h-0 flex-col bg-[#FAFAFA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        {/* ═══ FULL SCREEN MAP ═══ */}
+      <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-[#FFF5D7]/30 via-white to-[#FDECF4]/30 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
+        {/* Stats band */}
+        <div className="shrink-0 border-b border-amber-100/80 bg-white/90 px-3 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Récap · {summary.code}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                {formatDurationMs(analytics.game?.durationMs)} · {formatDistance(analytics.game?.totalDistanceMeters)} · {players.length} joueurs · {timelineSorted.length} événements
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => setActiveView("podium")} className="rounded-full bg-[#FDE68A] px-3 py-1 text-[10px] font-bold text-amber-900">Podium</button>
+              <button type="button" onClick={() => setShowPanel((v) => !v)} className="rounded-full bg-[#BFDBFE] px-3 py-1 text-[10px] font-bold text-blue-900">{showPanel ? "Masquer" : "Détails"}</button>
+              <button type="button" onClick={() => setShareOpen(true)} disabled={!publicRecapUrl && !shareBusy} className="rounded-full bg-[#2563EB] px-3 py-1 text-[10px] font-bold text-white disabled:opacity-50">Partager</button>
+              <button type="button" onClick={downloadStats} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">JSON</button>
+              <button type="button" onClick={onLeave} className="rounded-full bg-rose-100 px-3 py-1 text-[10px] font-bold text-rose-700">Quitter</button>
+              <button type="button" onClick={toggleTheme} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold dark:bg-slate-700">{theme === "dark" ? "☀" : "🌙"}</button>
+            </div>
+          </div>
+        </div>
+
         <div className="relative min-h-0 flex-1">
           <MapContainer
             center={center}
@@ -820,11 +866,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             attributionControl
           >
             <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
-            {showZone &&
-              summary.gameCenter &&
-              zoneR > 0 && (
+            <RecapFitBounds paths={summary.paths} center={summary.gameCenter} />
+            {showZone && zoneCenter && zoneR > 0 && (
                 <Circle
-                  center={[summary.gameCenter.lat, summary.gameCenter.lng]}
+                  center={[zoneCenter.lat, zoneCenter.lng]}
                   radius={zoneR}
                   pathOptions={{
                     color: "#5B7FA5",
@@ -874,69 +919,15 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             ))}
           </MapContainer>
 
-          {/* ═══ TOP-LEFT OVERLAY: Info + Controls Toggle ═══ */}
-          <div className="pointer-events-none absolute left-3 top-3 z-[20000] flex flex-col gap-2">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/95 px-3 py-2 shadow-lg backdrop-blur dark:bg-slate-900/95">
-              <div>
-                <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">Récap</h1>
-                <p className="font-mono text-xs font-semibold text-[#5B7FA5]">{summary.code}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowPanel(!showPanel)}
-              className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-[8px] bg-white/95 shadow-lg backdrop-blur dark:bg-slate-900/95"
-            >
-              <svg className="h-5 w-5 text-slate-700 dark:text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-              </svg>
-            </button>
-          </div>
-
-          {/* ═══ TOP-RIGHT OVERLAY: Actions ═══ */}
-          <div className="pointer-events-none absolute right-3 top-3 z-[20000] flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              disabled={!publicRecapUrl && !shareBusy}
-              className="pointer-events-auto rounded-[8px] bg-[#2563EB] px-3 py-2 text-xs font-semibold text-white shadow-lg disabled:opacity-50"
-            >
-              {shareBusy ? "…" : "Partager"}
-            </button>
-            <button
-              type="button"
-              onClick={downloadStats}
-              className="pointer-events-auto rounded-[8px] bg-white/95 px-3 py-2 text-xs font-semibold text-slate-800 shadow-lg backdrop-blur transition hover:bg-slate-100 dark:bg-slate-900/95 dark:text-slate-100"
-            >
-              Télécharger
-            </button>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="pointer-events-auto rounded-[8px] bg-white/95 px-3 py-2 text-xs font-medium shadow-lg backdrop-blur dark:bg-slate-900/95 dark:text-slate-200"
-            >
-              {theme === "dark" ? "Clair" : "Sombre"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView("podium")}
-              className="pointer-events-auto rounded-[8px] bg-white/95 px-3 py-2 text-xs font-medium text-slate-700 shadow-lg backdrop-blur transition hover:bg-slate-200 dark:bg-slate-900/95 dark:text-slate-200"
-            >
-              Podium
-            </button>
-            <button
-              type="button"
-              onClick={onLeave}
-              className="pointer-events-auto rounded-[8px] bg-white/95 px-3 py-2 text-xs font-medium text-rose-600 shadow-lg backdrop-blur transition hover:bg-rose-100 dark:bg-slate-900/95 dark:text-rose-300"
-            >
-              Quitter
-            </button>
-          </div>
-
-          {/* ═══ COLLAPSIBLE PANEL (Players, Layers, Timeline) ═══ */}
           {showPanel && (
-            <div className="absolute bottom-20 left-3 right-3 z-[1000] max-h-[55vh] overflow-auto rounded-[8px] bg-white/95 p-3 shadow-xl backdrop-blur dark:bg-slate-900/95 sm:left-3 sm:right-auto sm:w-80">
+            <div className="absolute bottom-24 left-3 right-3 z-[1000] max-h-[45vh] overflow-auto rounded-3xl bg-white/95 p-4 shadow-xl backdrop-blur dark:bg-slate-900/95 sm:left-auto sm:right-3 sm:w-96">
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#2563EB]">Détails de la partie</p>
+            <div className="mb-3 grid grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded-2xl bg-[#FFF5D7] p-2"><span className="text-slate-500">Mode</span><p className="font-bold">{summary.settingsSnapshot?.gameMode || "tag_swap"}</p></div>
+              <div className="rounded-2xl bg-[#DBEAFE] p-2"><span className="text-slate-500">Zone init.</span><p className="font-bold">{summary.globalRadiusM}m</p></div>
+              <div className="rounded-2xl bg-[#FECACA] p-2"><span className="text-slate-500">Brouillages</span><p className="font-bold">{analytics.game?.totalJamEvents ?? 0}</p></div>
+              <div className="rounded-2xl bg-[#D1FAE5] p-2"><span className="text-slate-500">Captures</span><p className="font-bold">{timelineSorted.filter((e) => e.type === "captured").length}</p></div>
+            </div>
             {/* Basemap selector */}
             <div className="mb-3 flex flex-wrap gap-1.5">
               {Object.entries(BASEMAPS).map(([id, b]) => (
@@ -958,28 +949,38 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             {/* Players */}
             <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Joueurs</p>
             <div className="mb-3 space-y-1.5">
-              {players.map((p) => (
+              {players.map((p) => {
+                const st = analytics.players?.[p.sessionId] || {};
+                return (
                 <label
                   key={p.sessionId}
-                  className="flex cursor-pointer items-center justify-between gap-2 rounded-[8px] border border-slate-200 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800/90"
+                  className="flex cursor-pointer flex-col gap-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800/90"
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ background: summary.colors?.[p.sessionId] || "#94a3b8" }}
-                    />
-                    <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-                      {p.nickname}
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: summary.colors?.[p.sessionId] || "#94a3b8" }}
+                      />
+                      <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {p.nickname}
+                      </span>
                     </span>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 dark:border-slate-500 dark:bg-slate-900"
+                      checked={!!visible[p.sessionId]}
+                      onChange={() => togglePlayer(p.sessionId)}
+                    />
                   </span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 rounded border-slate-300 dark:border-slate-500 dark:bg-slate-900"
-                    checked={!!visible[p.sessionId]}
-                    onChange={() => togglePlayer(p.sessionId)}
-                  />
+                  <span className="grid grid-cols-2 gap-x-2 text-[10px] text-slate-500">
+                    <span>Dist. {formatDistance(st.distanceMeters)}</span>
+                    <span>Vmax {formatSpeedKmh(st.maxSpeedKmh)}</span>
+                    <span>Chat {formatDurationMs(st.catTimeMs ?? p.totalCatTimeMs)}</span>
+                    <span>🪙 {st.coins ?? p.coins ?? 0}</span>
+                  </span>
                 </label>
-              ))}
+              );})}
             </div>
 
             {/* Layers */}
@@ -1045,9 +1046,8 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
 
         {/* ═══ BOTTOM TRANSPORT BAR ═══ */}
-        <div className="shrink-0 border-t border-slate-200 bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="shrink-0 border-t border-amber-100/80 bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           <div className="flex items-center gap-2">
-            {/* Play button */}
             <button
               type="button"
               onClick={() => {
@@ -1055,7 +1055,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                 setPlaying(true);
               }}
               disabled={playing}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-[#2563EB] text-white shadow disabled:opacity-40"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#60A5FA] to-[#2563EB] text-white shadow disabled:opacity-40"
               title="Lecture"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">

@@ -10,9 +10,6 @@ import ScannerModal from "./components/game/ScannerModal.jsx";
 import MapControls from "./components/game/MapControls.jsx";
 import CityZonePicker from "./components/game/CityZonePicker.jsx";
 import SharePartyModal from "./components/game/SharePartyModal.jsx";
-import GameTimer from "./components/game/GameTimer.jsx";
-import ZonePhaseIndicator from "./components/game/ZonePhaseIndicator.jsx";
-import GameInfoPanel from "./components/game/GameInfoPanel.jsx";
 import PowerCard from "./components/powers/PowerCard.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
@@ -23,6 +20,14 @@ import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
 import CircularLobby from "./components/CircularLobby.jsx";
+import CoinFeed from "./components/game/CoinFeed.jsx";
+import MapHud from "./components/game/MapHud.jsx";
+import CoinsBadge from "./components/game/CoinsBadge.jsx";
+import SocialPanel from "./components/game/SocialPanel.jsx";
+import AdminPanel from "./components/game/AdminPanel.jsx";
+import { ensureSocketReady } from "./lib/backend.js";
+import { resolvePlayerMapFocus } from "./lib/resolvePlayerMapFocus.js";
+import { playGhostNoiseSound } from "./lib/playGhostNoiseSound.js";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
@@ -413,10 +418,12 @@ export default function App() {
   const reconnectTimeoutRef = useRef(null);
   const entryReqRef = useRef(0);
   const onJoinRef = useRef(null);
-  const [reconnectBlockAt, setReconnectBlockAt] = useState(0);
+  const reconnectRetryRef = useRef(null);
   const [reconnectUiNow, setReconnectUiNow] = useState(() => Date.now());
   const [focusCenter, setFocusCenter] = useState(null);
   const [focusTick, setFocusTick] = useState(0);
+  const [focusZoom, setFocusZoom] = useState(18);
+  const [highlightSessionId, setHighlightSessionId] = useState(null);
   const [localCooldowns, setLocalCooldowns] = useState({});
 
   useEffect(() => {
@@ -463,6 +470,10 @@ export default function App() {
     if (!activeNoise) return;
     const id = setInterval(() => {
       setNoiseUiNow(Date.now());
+      const elapsed = Date.now() - activeNoise.startedAt;
+      if (elapsed > activeNoise.durationSec * 1000) {
+        setActiveNoise(null);
+      }
     }, 250);
     return () => clearInterval(id);
   }, [activeNoise]);
@@ -484,12 +495,7 @@ export default function App() {
   }, [stage, resumeCandidate]);
 
   useEffect(() => {
-    if (!isReconnecting) {
-      setReconnectUiNow(Date.now());
-      setReconnectBlockAt(0);
-      return;
-    }
-    setReconnectBlockAt(Date.now() + 5000);
+    if (!isReconnecting) return;
     const id = setInterval(() => setReconnectUiNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [isReconnecting]);
@@ -582,88 +588,96 @@ export default function App() {
 
   // Reconnection logic - ensures socket is connected then restores session
   const attemptReconnect = useCallback((s, attempt = 1) => {
-    console.log('[attemptReconnect] Called with:', { attempt });
     const saved = loadSession();
     if (!saved) {
-      console.log('[attemptReconnect] No saved session');
       setIsReconnecting(false);
       setReconnectReason(null);
       return;
     }
 
+    const tryRestore = () => {
+      setReconnectAttempt(attempt);
+      s.emit(
+        "reconnect_session",
+        { sessionId: saved.sessionId, roomCode: saved.roomCode },
+        (res) => {
+          if (res?.ok) {
+            if (reconnectRetryRef.current) {
+              clearTimeout(reconnectRetryRef.current);
+              reconnectRetryRef.current = null;
+            }
+            setIsReconnecting(false);
+            setReconnectAttempt(0);
+            setReconnectError(null);
+            setReconnectReason(null);
+            setResumeCandidate(null);
+            setSessionId(res.sessionId);
+            setIsHost(res.isHost);
+
+            if (res.phase === "lobby" && res.lobby) {
+              setLobby(res.lobby);
+              if (res.lobby.partyChat) setPartyChatMessages(res.lobby.partyChat);
+              setStage("lobby");
+            } else if (res.phase === "role_reveal" && res.rolesReveal) {
+              setRolesReveal(res.rolesReveal);
+              if (res.rolesReveal.partyChat) setPartyChatMessages(res.rolesReveal.partyChat);
+              setStage("role_reveal");
+            } else if (res.phase === "playing" && res.gameState) {
+              setGameState(res.gameState);
+              if (res.gameState.partyChat) setPartyChatMessages(res.gameState.partyChat);
+              setRole(res.gameState.me?.role ?? null);
+              setStage("game");
+            } else if (res.phase === "finished") {
+              clearSession();
+              resetToEntry(false);
+            }
+            return;
+          }
+
+          setReconnectError(res?.error || "Échec de reconnexion");
+
+          if (
+            res?.error?.includes("expir") ||
+            res?.error?.includes("n'existe plus") ||
+            res?.error?.includes("n'existe") ||
+            res?.error?.includes("termin")
+          ) {
+            clearSession();
+            setIsReconnecting(false);
+            setReconnectReason(null);
+            resetToEntry(false);
+            return;
+          }
+
+          if (attempt < 6) {
+            const delay = Math.min(8000, 1000 * attempt);
+            reconnectRetryRef.current = setTimeout(() => {
+              attemptReconnect(s, attempt + 1);
+            }, delay);
+          } else {
+            setReconnectAttempt(0);
+          }
+        }
+      );
+    };
+
     if (!s?.connected) {
-      console.log('[attemptReconnect] Socket not connected, opening connection');
       setIsReconnecting(true);
       setReconnectReason("lost_connection");
-      try {
-        s.once('connect', () => {
-          console.log('[attemptReconnect] Connected, retrying restore');
-          attemptReconnect(s, attempt);
+      ensureSocketReady(s)
+        .then(() => tryRestore())
+        .catch(() => {
+          if (attempt < 6) {
+            const delay = Math.min(8000, 1000 * attempt);
+            reconnectRetryRef.current = setTimeout(() => {
+              attemptReconnect(s, attempt + 1);
+            }, delay);
+          }
         });
-        s.connect();
-      } catch (e) {
-        console.warn('[attemptReconnect] Failed to connect socket', e);
-      }
       return;
     }
 
-    setReconnectAttempt(attempt);
-    console.log('[attemptReconnect] Emitting reconnect_session for:', saved.roomCode);
-    
-    s.emit("reconnect_session", { 
-      sessionId: saved.sessionId, 
-      roomCode: saved.roomCode 
-    }, (res) => {
-      console.log('[attemptReconnect] Response:', res);
-      if (res?.ok) {
-        setIsReconnecting(false);
-        setReconnectAttempt(0);
-        setReconnectError(null);
-        setReconnectReason(null);
-        setResumeCandidate(null);
-        setSessionId(res.sessionId);
-        setIsHost(res.isHost);
-        console.log('[attemptReconnect] Reconnect successful, phase:', res.phase);
-        
-        if (res.phase === "lobby" && res.lobby) {
-          setLobby(res.lobby);
-          if (res.lobby.partyChat) setPartyChatMessages(res.lobby.partyChat);
-          setStage("lobby");
-        } else if (res.phase === "role_reveal" && res.rolesReveal) {
-          setRolesReveal(res.rolesReveal);
-          if (res.rolesReveal.partyChat) setPartyChatMessages(res.rolesReveal.partyChat);
-          setStage("role_reveal");
-        } else if (res.phase === "playing" && res.gameState) {
-          setGameState(res.gameState);
-          if (res.gameState.partyChat) setPartyChatMessages(res.gameState.partyChat);
-          setRole(res.gameState.me?.role ?? null);
-          setStage("game");
-        } else if (res.phase === "finished") {
-          clearSession();
-          resetToEntry(false);
-        }
-      } else {
-        setReconnectError(res?.error || "Echec de reconnexion");
-        console.log('[attemptReconnect] Reconnect failed:', res?.error);
-        
-        if (
-          res?.error?.includes("expir") ||
-          res?.error?.includes("n'existe plus") ||
-          res?.error?.includes("n'existe") ||
-          res?.error?.includes("termin")
-        ) {
-          console.log('[attemptReconnect] Session expired, clearing');
-          clearSession();
-          setIsReconnecting(false);
-          setReconnectReason(null);
-          resetToEntry(false);
-          return;
-        }
-        
-        // No automatic retries anymore, let user click again if they want
-        setReconnectAttempt(0);
-      }
-    });
+    tryRestore();
   }, [resetToEntry]);
 
   // Auto-switch to join mode if URL has code
@@ -792,25 +806,32 @@ export default function App() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             sharedAudioContextRef.current = audioCtx;
           }
-          
+
           // Resume if suspended (required for iOS)
           if (audioCtx.state === 'suspended') {
             audioCtx.resume();
           }
-          
+
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.type = "square";
-          osc.frequency.value = 300;
-          
-          // Maximum volume for mobile (1.0 instead of 0.2)
-          gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+          osc.frequency.value = 400;
+
+          // Pulsing sound pattern for better awareness
+          gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+          const now = audioCtx.currentTime;
+          for (let i = 0; i < 100; i++) { // Pulse for about 10 seconds
+            const t = now + i * 0.1;
+            gain.gain.setValueAtTime(0.8, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+          }
+
           osc.start();
           outOfBoundsAudioRef.current = { audioCtx, osc, gain };
-          
-          console.log('[player_out_of_bounds] Sound playing, volume: 1.0, AudioContext state:', audioCtx.state);
+
+          console.log('[player_out_of_bounds] Pulsing sound playing, AudioContext state:', audioCtx.state);
         } catch (e) {
           console.warn("AudioContext non disponible ou bloque", e);
         }
@@ -845,72 +866,16 @@ export default function App() {
     });
 
     s.on("play_noise", ({ durationSec, volume = "medium", by }) => {
-      try {
-        // Stop previous
-        if (noiseAudioRef.current) {
-          const { audioCtx, osc, gain, stopTimer } = noiseAudioRef.current;
-          try { clearTimeout(stopTimer); } catch {}
-          try { gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15); } catch {}
-          try { osc.stop(audioCtx.currentTime + 0.2); } catch {}
-          noiseAudioRef.current = null;
-        }
-        
-        // Use shared AudioContext or create new one
-        let audioCtx = sharedAudioContextRef.current;
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          sharedAudioContextRef.current = audioCtx;
-        }
-        
-        // Resume if suspended (required for iOS)
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-        
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "square";
-        osc.frequency.value = 600;
-
-        // Maximum volume for mobile - all levels use higher volume
-        const baseGain = volume === "low" ? 0.5 : volume === "high" ? 1.0 : 0.8;
-        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start();
-        // Ramp pattern: pulsing beeps
-        for (let i = 0; i < durationSec; i += 1) {
-          const t0 = audioCtx.currentTime + i * 1.0;
-          gain.gain.setValueAtTime(baseGain, t0);
-          gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
-        }
-        const stopTimer = setTimeout(() => {
-          try { gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); } catch {}
-          try { osc.stop(audioCtx.currentTime + 0.12); } catch {}
-          noiseAudioRef.current = null;
-        }, Math.max(1, durationSec) * 1000 + 150);
-        noiseAudioRef.current = { audioCtx, osc, gain, stopTimer };
-
-        // Enregistrer un effet visuel fort côté UI
-        setActiveNoise({
-          startedAt: Date.now(),
-          durationSec: Math.max(1, durationSec || 1),
-          volume,
-          by: by || "un adversaire",
-        });
-
-        // Vibration supplémentaire en fonction du volume si supportée
-        try {
-          if (navigator.vibrate) {
-            if (volume === "low") navigator.vibrate([150, 80, 150]);
-            else if (volume === "high") navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
-            else navigator.vibrate([200, 100, 200, 100, 200]);
-          }
-        } catch {}
-        
-        console.log('[play_noise] Sound playing, volume:', volume, 'baseGain:', baseGain, 'AudioContext state:', audioCtx.state);
-      } catch (e) {
+      playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, durationSec, volume).catch((e) => {
         console.warn("AudioContext non disponible pour bruit", e);
-      }
+      });
+
+      setActiveNoise({
+        startedAt: Date.now(),
+        durationSec: Math.max(1, durationSec || 1),
+        volume,
+        by: by || "un adversaire",
+      });
     });
 
     s.on("immobilized", ({ until, by, durationSec }) => {
@@ -1008,11 +973,23 @@ export default function App() {
       resetToEntry();
     });
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        if (s.connected) {
-          s.emit("refresh_state");
-        }
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        await ensureSocketReady(s, { wake: true });
+      } catch {
+        /* retry on next visibility */
+      }
+      if (s.connected) {
+        s.emit("refresh_state");
+      } else if (
+        stageRef.current === "lobby" ||
+        stageRef.current === "role_reveal" ||
+        stageRef.current === "game"
+      ) {
+        setIsReconnecting(true);
+        setReconnectReason("lost_connection");
+        attemptReconnect(s);
       }
     };
 
@@ -1027,8 +1004,9 @@ export default function App() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(heartbeatCheck);
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+      if (reconnectRetryRef.current) {
+        clearTimeout(reconnectRetryRef.current);
+        reconnectRetryRef.current = null;
       }
       s.removeAllListeners();
       s.close();
@@ -1108,15 +1086,10 @@ export default function App() {
     }
   }, []);
 
-  const onCreate = useCallback(() => {
-    console.log('[onCreate] Called with:', { nickname });
+  const onCreate = useCallback(async () => {
     if (!socket || !nickname.trim()) {
-      console.log('[onCreate] Missing socket or nickname');
       setErrorBanner("Choisissez un pseudo.");
       return;
-    }
-    if (!socket.connected) {
-      socket.connect();
     }
     unlockAudioAndVibration();
     setErrorBanner(null);
@@ -1124,17 +1097,21 @@ export default function App() {
     setEntryBusyKind("create");
     const trimmedNickname = nickname.trim();
     saveLastNickname(trimmedNickname);
-    console.log('[onCreate] Emitting create_room for:', trimmedNickname);
+    try {
+      await ensureSocketReady(socket);
+    } catch {
+      if (reqId !== entryReqRef.current) return;
+      setEntryBusyKind(null);
+      setErrorBanner("Serveur injoignable. Réessayez dans quelques secondes.");
+      return;
+    }
     socket.emit("create_room", { nickname: trimmedNickname }, (res) => {
-      console.log('[onCreate] Response:', res);
       if (reqId !== entryReqRef.current) return;
       setEntryBusyKind(null);
       if (!res?.ok) {
-        console.log('[onCreate] Create failed:', res?.error);
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
-      // Clear code from URL on successful create
       if (window.history.replaceState) {
         window.history.replaceState({}, "", window.location.pathname);
       }
@@ -1143,7 +1120,6 @@ export default function App() {
       setIsHost(true);
       setLobby(res.lobby);
       setStage("lobby");
-      console.log('[onCreate] Room created successfully:', res.code);
     });
   }, [socket, nickname]);
 
@@ -1163,15 +1139,10 @@ export default function App() {
     [socket]
   );
 
-  const onJoin = useCallback(() => {
-    console.log('[onJoin] Called with:', { nickname, roomCodeInput });
+  const onJoin = useCallback(async () => {
     if (!socket || !nickname.trim() || !roomCodeInput.trim()) {
-      console.log('[onJoin] Missing socket, nickname or room code');
       setErrorBanner("Pseudo et code requis.");
       return;
-    }
-    if (!socket.connected) {
-      socket.connect();
     }
     unlockAudioAndVibration();
     setErrorBanner(null);
@@ -1181,7 +1152,6 @@ export default function App() {
     saveLastNickname(trimmedNickname);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("join");
-    console.log('[onJoin] Emitting join_room for:', roomCodeInput.trim(), trimmedNickname);
     const codeUpper = roomCodeInput.trim().toUpperCase();
     const saved = loadSession();
     const lastRoom = loadLastRoom();
@@ -1192,15 +1162,21 @@ export default function App() {
     } else if (lastRoom && lastSessionId && lastRoom.toUpperCase() === codeUpper) {
       payload.sessionId = lastSessionId;
     }
+    try {
+      await ensureSocketReady(socket);
+    } catch {
+      if (reqId !== entryReqRef.current) return;
+      setEntryBusyKind(null);
+      setErrorBanner("Serveur injoignable. Réessayez dans quelques secondes.");
+      return;
+    }
     socket.emit(
       "join_room",
       payload,
       (res) => {
-        console.log('[onJoin] Response:', res);
         if (reqId !== entryReqRef.current) return;
         setEntryBusyKind(null);
         if (res?.ok) {
-          // Clear code from URL on successful join
           if (window.history.replaceState) {
             window.history.replaceState({}, "", window.location.pathname);
           }
@@ -1209,11 +1185,9 @@ export default function App() {
           setIsHost(res.isHost);
           setLobby(res.lobby);
           setStage("lobby");
-          console.log('[onJoin] Joined room successfully:', res.code);
           return;
         }
         if (res?.joinRequestPossible) {
-          console.log('[onJoin] Join request possible, requesting midgame join');
           socket.emit(
             "request_join_midgame",
             {
@@ -1221,7 +1195,6 @@ export default function App() {
               nickname: trimmedNickname,
             },
             (r2) => {
-              console.log('[onJoin] Midgame join response:', r2);
               if (r2?.ok) {
                 setMidJoinWait({ code: roomCodeInput.trim() });
                 setErrorBanner(null);
@@ -1235,7 +1208,6 @@ export default function App() {
           );
           return;
         }
-        // Check if error is about duplicate nickname
         if (res?.error?.toLowerCase().includes("pseudo") || res?.error?.toLowerCase().includes("déjà") || res?.error?.toLowerCase().includes("nom")) {
           setNicknameError(res?.error || "Ce pseudo est déjà utilisé.");
         } else {
@@ -1465,6 +1437,13 @@ export default function App() {
       for (const p of gameState?.preyForCat || []) {
         if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
           locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        } else if (p.sessionId && p.kind === "circle" && p.center) {
+          locationMap.set(p.sessionId, {
+            lat: p.center.lat,
+            lng: p.center.lng,
+            mapKind: "circle",
+            radiusM: p.radiusM,
+          });
         }
       }
     }
@@ -1474,8 +1453,27 @@ export default function App() {
       for (const p of gameState?.adminPreyPreview || []) {
         if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
           locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        } else if (p.sessionId && p.kind === "circle" && p.center) {
+          locationMap.set(p.sessionId, {
+            lat: p.center.lat,
+            lng: p.center.lng,
+            mapKind: "circle",
+            radiusM: p.radiusM,
+          });
         }
       }
+    }
+
+    // Spectateurs avec position
+    for (const s of gameState?.spectators || []) {
+      if (s.sessionId && s.lat != null && s.lng != null) {
+        locationMap.set(s.sessionId, { lat: s.lat, lng: s.lng });
+      }
+    }
+
+    // Position du joueur courant (gameState.me)
+    if (sessionId && gameState?.me?.lat != null && gameState?.me?.lng != null) {
+      locationMap.set(sessionId, { lat: gameState.me.lat, lng: gameState.me.lng });
     }
 
     // Merge location data into roster
@@ -1493,7 +1491,7 @@ export default function App() {
         coins,
       };
     });
-  }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, rolesReveal?.players, role, isHost]);
+  }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, gameState?.spectators, gameState?.me, rolesReveal?.players, role, isHost, sessionId]);
 
   // Suivi des changements d'invisibilité pour notifications
   const prevInvisStateRef = useRef(new Map());
@@ -1540,8 +1538,24 @@ export default function App() {
     if (!Number.isFinite(la) || !Number.isFinite(lo)) return;
     setGameTab("map");
     setFocusCenter([la, lo]);
+    setFocusZoom(18);
     setFocusTick((n) => n + 1);
   }, []);
+
+  const onShowPlayerOnMap = useCallback(
+    (mapFocus, playerSessionId) => {
+      if (!mapFocus || mapFocus.type === "unavailable" || mapFocus.type === "hidden") return;
+      setGameTab("map");
+      setFocusCenter([mapFocus.lat, mapFocus.lng]);
+      setFocusZoom(mapFocus.zoom ?? 18);
+      setFocusTick((n) => n + 1);
+      if (playerSessionId) {
+        setHighlightSessionId(playerSessionId);
+        setTimeout(() => setHighlightSessionId(null), 8000);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (!rolesReveal?.players || !sessionId) return;
@@ -1573,8 +1587,7 @@ export default function App() {
     };
   }, [recapSlug]);
 
-  const showReconnectModal =
-    isReconnecting && (stage === "game" ? reconnectUiNow >= reconnectBlockAt : true);
+  const showReconnectModal = isReconnecting;
 
   const reconnectModal = (
     <ReconnectModal
@@ -1764,7 +1777,17 @@ export default function App() {
           </div>
         )}
 
-        <div className="mb-4 flex rounded-xl bg-slate-200/80 p-1 dark:bg-slate-800/80">
+        <div
+          className="mx-auto w-full max-w-md space-y-4 rounded-3xl bg-gradient-to-br from-white via-[#FFF5D7]/30 to-[#FDECF4]/40 p-5 shadow-lg ring-1 ring-amber-100/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:ring-slate-700"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !entryBusyKind) {
+              e.preventDefault();
+              if (entryMode === "create") onCreate();
+              else onJoin();
+            }
+          }}
+        >
+        <div className="mb-2 flex rounded-2xl bg-slate-200/80 p-1 dark:bg-slate-800/80">
           <button
             type="button"
             onClick={() => {
@@ -1773,7 +1796,7 @@ export default function App() {
               setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+            className={`flex-1 rounded-xl py-3 text-sm font-bold transition-colors ${
               entryMode === "create"
                 ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
                 : "text-slate-600 dark:text-slate-400"
@@ -1789,7 +1812,7 @@ export default function App() {
               setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
-            className={`flex-1 rounded-lg py-3 text-sm font-bold transition-colors ${
+            className={`flex-1 rounded-xl py-3 text-sm font-bold transition-colors ${
               entryMode === "join"
                 ? "bg-white text-indigo-700 shadow dark:bg-slate-900 dark:text-indigo-300"
                 : "text-slate-600 dark:text-slate-400"
@@ -1846,18 +1869,18 @@ export default function App() {
             type="button"
             onClick={onCreate}
             disabled={Boolean(entryBusyKind)}
-            className="w-full rounded-[8px] bg-[#5B7FA5] py-4 text-base font-semibold text-white transition-colors hover:bg-[#4A6A8A]"
+            className="w-full rounded-2xl bg-gradient-to-r from-[#60A5FA] to-[#2563EB] py-4 text-base font-bold text-white shadow-lg"
           >
-            {entryBusyKind === "create" ? "Création…" : "Creer ma partie"}
+            {entryBusyKind === "create" ? "Réveil du serveur…" : "Creer ma partie"}
           </button>
         ) : (
           <button
             type="button"
             onClick={onJoin}
             disabled={Boolean(entryBusyKind)}
-            className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+            className="w-full rounded-2xl bg-gradient-to-r from-[#34D399] to-[#10B981] py-4 text-base font-bold text-white shadow-lg"
           >
-            {entryBusyKind === "join" ? "Connexion…" : "Rejoindre la partie"}
+            {entryBusyKind === "join" ? "Réveil du serveur…" : "Rejoindre la partie"}
           </button>
         )}
 
@@ -1868,11 +1891,12 @@ export default function App() {
               entryReqRef.current += 1;
               setEntryBusyKind(null);
             }}
-            className="mt-3 w-full rounded-xl bg-slate-200 py-3 text-sm font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+            className="w-full rounded-xl bg-slate-200 py-3 text-sm font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
           >
             Annuler
           </button>
         )}
+        </div>
 
         {/* Game history section */}
         {midJoinWait && (
@@ -2541,6 +2565,33 @@ export default function App() {
     const jamIsMin = jamScale <= 0.51; // proche du palier min côté serveur (0.5)
     const jamIsMax = jamScale >= 1.49; // proche du palier max côté serveur (1.5)
 
+    // Effet de pouvoir actif pour l'extension du HUD
+    let hudPowerEffect = null;
+    let hudPowerUiNow = Date.now();
+    if (activeNoise) {
+      const elapsed = Date.now() - activeNoise.startedAt;
+      if (elapsed <= activeNoise.durationSec * 1000) {
+        hudPowerEffect = { kind: "noise", ...activeNoise };
+        hudPowerUiNow = noiseUiNow;
+      }
+    } else if (me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince) {
+      hudPowerEffect = {
+        kind: "ghost",
+        invisUntil: me.invisUntil,
+        invisSince: me.invisSince,
+      };
+      hudPowerUiNow = ghostUiNow;
+    } else if (me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow) {
+      hudPowerEffect = { kind: "immobilized", until: me.immobilizedUntil };
+      hudPowerUiNow = ghostUiNow;
+    } else if (jamLevel !== "normal") {
+      hudPowerEffect = {
+        kind: "jam",
+        label: jamLabel,
+        radiusM: jamRadius,
+      };
+    }
+
     const isCooldown = (key) => (localCooldowns?.[key] || 0) > Date.now();
     const cooldownUntil = (key) => localCooldowns?.[key] || 0;
     const setCd = (key, secs) => setLocalCooldowns((m) => ({ ...m, [key]: Date.now() + secs * 1000 }));
@@ -2617,136 +2668,26 @@ export default function App() {
     })();
 
     const renderAdminPanel = () => (
-      <div className="h-full overflow-auto p-4">
-        <div className="mb-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
-          <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-[#5B7FA5]">{currentRoomCode}</p>
-        </div>
-        <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">
-          Contrôle hôte
-        </h2>
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-          Actions visibles par tous : expliquez-les si besoin pour éviter les surprises.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                "Terminer la partie pour tout le monde et afficher le récapitulatif ?"
-              )
-            ) {
-              adminEndGame();
-            }
-          }}
-          className="mb-2 w-full rounded-xl border border-red-300 bg-red-50 py-3 text-sm font-semibold text-red-800 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
-        >
-          Fermer la partie (récap pour tous)
-        </button>
-        <ConfigHint>
-          Arrête la chasse immédiatement et affiche le résumé pour chaque participant connecté.
-        </ConfigHint>
-        <div className="mt-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-          <p className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Ajouter du temps</p>
-          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={60}
-              step={1}
-              placeholder="Minutes"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = e.currentTarget.value;
-                  if (val) adminAddTime(val);
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-700"
-              onClick={(e) => {
-                const wrapper = e.currentTarget.parentElement;
-                const input = wrapper?.querySelector('input[type="number"]');
-                if (input && input.value) adminAddTime(input.value);
-              }}
-            >
-              + Temps
-            </button>
-          </div>
-          <ConfigHint>Réajuste automatiquement les prochaines zones sans jamais agrandir la zone actuelle. La dernière zone reste fixe un long moment.</ConfigHint>
-        </div>
-        <ul className="mt-6 space-y-4">
-          {rosterList.map((p) => (
-            <li
-              key={p.sessionId}
-              className="rounded-2xl bg-slate-100 p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
-            >
-              <div className="font-medium text-slate-900 dark:text-white">
-                {p.nickname}
-                {p.sessionId === sessionId ? " (vous)" : ""}
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-yellow-400/20 px-2 py-0.5 text-xs font-bold text-yellow-700 dark:bg-yellow-300/20 dark:text-yellow-300">{p.coins || 0} pièces</span>
-                <div className="flex flex-wrap gap-1">
-                  {[-10, -5, -1, +1, +5, +10].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 transition active:scale-[0.98] ${d > 0 ? "bg-emerald-500 text-white ring-emerald-600 hover:bg-emerald-600" : "bg-rose-500 text-white ring-rose-600 hover:bg-rose-600"}`}
-                      onClick={() => socket?.emit("admin_adjust_coins", { targetSessionId: p.sessionId, delta: d }, (res) => {
-                        if (res?.ok) addNotification(`${d > 0 ? "+" : ""}${d} pièces pour ${p.nickname}`, "success");
-                        else addNotification(res?.error || "Action refusée", "error");
-                      })}
-                    >
-                      {d > 0 ? `+${d}` : d}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-slate-500">{roleBadgeText(p)}</p>
-              {p.sessionId !== sessionId && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white dark:bg-orange-600"
-                      onClick={() => adminSetRole(p.sessionId, "cat")}
-                    >
-                      Chat
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white dark:bg-sky-600"
-                      onClick={() => adminSetRole(p.sessionId, "player")}
-                    >
-                      Joueur
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-red-100 px-3 py-2 text-xs font-semibold text-red-800 dark:bg-red-950 dark:text-red-200"
-                      onClick={() => adminKick(p.sessionId)}
-                    >
-                      Expulser
-                    </button>
-                  </div>
-                  <ConfigHint>
-                    Chat / Joueur : corrige le camp en cours de partie. Expulser : retire la personne sans attendre la fin.
-                  </ConfigHint>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          onClick={leaveGame}
-          className="mt-6 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
-        >
-          Quitter la partie (hôte)
-        </button>
-      </div>
+      <AdminPanel
+        roomCode={currentRoomCode}
+        rosterList={rosterList}
+        sessionId={sessionId}
+        onEndGame={() => {
+          if (window.confirm("Terminer la partie pour tout le monde et afficher le récapitulatif ?")) {
+            adminEndGame();
+          }
+        }}
+        onAddTime={adminAddTime}
+        onAdjustCoins={(targetSessionId, delta, nickname) => {
+          socket?.emit("admin_adjust_coins", { targetSessionId, delta }, (res) => {
+            if (res?.ok) addNotification(`${delta > 0 ? "+" : ""}${delta} pièces pour ${nickname}`, "success");
+            else addNotification(res?.error || "Action refusée", "error");
+          });
+        }}
+        onSetRole={adminSetRole}
+        onKick={adminKick}
+        onLeave={leaveGame}
+      />
     );
 
     const tabBtn = (id, label, disabled = false, variant = "top") => {
@@ -2845,84 +2786,21 @@ export default function App() {
             {/* Main content area */}
             <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-900">
               {gameTab === "social" && (
-                <div className="h-full overflow-auto p-4 pb-24">
-                  <div className="mb-4 rounded-[8px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Code de la partie</p>
-                    <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-[#5B7FA5]">{currentRoomCode}</p>
-                  </div>
-                  <div className="mb-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowShareParty(true)}
-                      className="w-full rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4A6A8A]"
-                    >
-                      Partager
-                    </button>
-                  </div>
-                  <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Participants</h2>
-                  <ul className="space-y-3">
-                    {rosterList.map((p) => {
-                      let ghostRemaining = null;
-                      let ghostProgress = 0;
-                      if (p.invisible && p.invisUntil && p.invisSince && p.invisUntil > ghostUiNow) {
-                        const total = p.invisUntil - p.invisSince;
-                        const rest = p.invisUntil - ghostUiNow;
-                        if (total > 0) ghostProgress = 1 - rest / total;
-                        ghostRemaining = Math.max(1, Math.round(rest / 1000));
-                      }
-                      return (
-                        <li key={p.sessionId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer rounded-[8px] bg-white p-4 ring-1 ring-slate-200 active:scale-[0.98] dark:bg-slate-800 dark:ring-slate-700">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-slate-900 dark:text-white">
-                              {p.nickname}
-                              {p.invisible && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">ghost</span>}
-                              {p.sessionId === sessionId && <span className="ml-1 text-xs text-[#5B7FA5]">(vous)</span>}
-                            </span>
-                            {p.coins !== undefined && p.coins > 0 && (
-                              <div className="flex items-center gap-1">
-                                <svg className="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.39-2.1 1.39-1.6 0-2.23-.72-2.32-1.64H8.04c.1 1.7 1.36 2.66 2.86 2.97V19h2.34v-1.67c1.52-.29 2.72-1.16 2.73-2.77-.01-2.2-1.9-2.96-3.66-3.42z"/>
-                                </svg>
-                                <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">{p.coins}</span>
-                              </div>
-                            )}
-                          </div>
-                          {p.disconnected && <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Déconnecté</span>}
-                          <p className={`mt-1 text-sm ${p.role === "cat" ? "text-[#C45454]" : "text-[#5B7FA5]"}`}>{roleBadgeText(p)}</p>
-                          {ghostRemaining != null && (
-                            <div className="mt-2">
-                              <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                                <span>Ghost encore</span>
-                                <span className="font-semibold">{ghostRemaining}s</span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                                <div
-                                  className="h-full rounded-full bg-slate-500/80 dark:bg-slate-300"
-                                  style={{ width: `${Math.max(6, Math.min(100, ghostProgress * 100))}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <div className="mt-6 h-[1px] w-full bg-slate-200 dark:bg-slate-700" />
-                  <div className="mt-4">
-                    <h2 className="mb-3 text-sm font-semibold text-slate-500 dark:text-slate-400">Chat</h2>
-                    <div className="h-full p-0">
-                      <PartyChatPanel
-                        fillHeight
-                        variant="discussion"
-                        messages={partyChatMessages}
-                        sessionId={sessionId}
-                        onSend={sendPartyChat}
-                        position={position}
-                        disabled={!socket}
-                        onFocusLocation={onFocusChatLocation}
-                      />
-                    </div>
-                  </div>
+                <div className="h-full overflow-auto pt-[7.5rem] md:pt-0">
+                <SocialPanel
+                  roomCode={currentRoomCode}
+                  rosterList={rosterList}
+                  sessionId={sessionId}
+                  partyChatMessages={partyChatMessages}
+                  onShare={() => setShowShareParty(true)}
+                  onSelectPlayer={setSelectedPlayer}
+                  onSendChat={sendPartyChat}
+                  position={position}
+                  socket={socket}
+                  onFocusLocation={onFocusChatLocation}
+                  ghostUiNow={ghostUiNow}
+                  roleBadgeText={roleBadgeText}
+                />
                 </div>
               )}
 
@@ -3507,19 +3385,6 @@ export default function App() {
 
               {gameTab === "map" && !(catLocked && isCat) && (
                 <div className="relative h-full w-full">
-                  {gameState.settings?.shrinkZoneEnabled && (
-                    <div className="pointer-events-none absolute left-3 top-3 z-[1000]">
-                      <ZonePhaseIndicator
-                        currentRadius={gameState.effectiveGlobalRadiusM}
-                        nextRadius={gameState.nextPhaseRadiusM}
-                        phaseEndsAt={gameState.phaseEndsAt}
-                        shrinkStartsAt={gameState.shrinkStartsAt}
-                        phaseState={gameState.zonePhaseState}
-                        totalPhases={gameState.totalPhases || 5}
-                        currentPhase={gameState.currentPhase || 1}
-                      />
-                    </div>
-                  )}
                   <MapControls
                     basemapId={mapBasemap}
                     onBasemapChange={setMapBasemap}
@@ -3528,14 +3393,12 @@ export default function App() {
                     onZoomOut={() => setZoomOutTick((n) => n + 1)}
                   />
                   {baliseLureSelecting && role === "cat" && (
-                    <div className="pointer-events-none absolute inset-x-0 top-3 z-[1200] flex justify-center">
-                      <div className="inline-flex items-center gap-2 rounded-full bg-purple-600/90 px-4 py-1.5 text-xs font-semibold text-white shadow-lg">
-                        <span>Mode balise-leurre actif</span>
-                        <span className="text-purple-100">Touchez la carte pour choisir l'emplacement de la prochaine balise.</span>
+                    <div className="pointer-events-none absolute inset-x-0 top-14 z-[1200] flex justify-center px-4 md:top-3">
+                      <div className="rounded-full bg-gradient-to-r from-[#A78BFA] to-[#EC4899] px-4 py-2 text-xs font-bold text-white shadow-lg">
+                        Touchez la carte pour placer le leurre
                       </div>
                     </div>
                   )}
-
                   <GameMap
                     gameState={gameState}
                     role={role}
@@ -3547,6 +3410,8 @@ export default function App() {
                     geoChatItems={geoChatItems}
                     focusCenter={focusCenter}
                     focusTick={focusTick}
+                    focusZoom={focusZoom}
+                    highlightSessionId={highlightSessionId}
                     onPlayerClick={setSelectedPlayer}
                     baliseLureSelecting={baliseLureSelecting}
                     baliseLureTarget={baliseLureTarget}
@@ -3565,101 +3430,84 @@ export default function App() {
                 </div>
               )}
 
-              {/* Floating info bar above dock (mobile) */}
-              <div className="pointer-events-none absolute bottom-20 left-0 right-0 z-[800] flex flex-col items-center gap-2 px-4 md:hidden">
-                <GameInfoPanel
-                  role={role}
-                  isSpectator={me?.spectator}
-                  phaseEndsAt={gameState.phaseEndsAt}
-                  nextBaliseAt={gameState.nextBaliseAt}
-                  baliseExpiresAt={baliseExpiresAt}
-                  currentRadius={gameState.effectiveGlobalRadiusM}
-                  nextRadius={gameState.nextPhaseRadiusM}
-                  totalPhases={gameState.totalPhases}
-                  currentPhase={gameState.currentPhase}
-                  shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
-                  coins={me?.coins}
-                />
-                <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
-                  <div className="flex flex-col gap-0.5 text-[11px]">
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">Cercle de brouillage</span>
-                    <div className="flex items-center gap-2">
-                      {["small", "normal", "large"].map((lvl) => {
-                        const active = lvl === jamLevel;
-                        const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
-                        return (
-                          <div key={lvl} className="flex flex-col items-center text-[10px]">
-                            <div
-                              className={`h-1.5 w-6 rounded-full transition-all ${
-                                active
-                                  ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
-                                  : "bg-slate-300 dark:bg-slate-700"
-                              }`}
-                            />
-                            <span className={`mt-0.5 ${active ? "font-semibold text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
-                              {label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+              {(gameTab === "map" || gameTab === "social") && (
+                <>
+                  {/* HUD mobile en haut */}
+                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-[800] md:hidden">
+                    <MapHud
+                      variant="mobile"
+                      role={role}
+                      isSpectator={me?.spectator}
+                      jamLevel={jamLevel}
+                      connected={connected}
+                      shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                      currentRadius={gameState.effectiveGlobalRadiusM}
+                      nextRadius={gameState.nextPhaseRadiusM}
+                      phaseEndsAt={gameState.phaseEndsAt}
+                      shrinkStartsAt={gameState.shrinkStartsAt}
+                      phaseState={gameState.zonePhaseState}
+                      totalPhases={gameState.totalPhases}
+                      currentPhase={gameState.currentPhase}
+                      nextBaliseAt={gameState.nextBaliseAt}
+                      baliseExpiresAt={baliseExpiresAt}
+                      timeLimitEndsAt={gameState.timeLimitEndsAt}
+                      catLocked={catLocked}
+                      isCat={isCat}
+                      mapUnlockAt={gameState.mapUnlockAt}
+                      socket={socket}
+                      powerEffect={hudPowerEffect}
+                      powerUiNow={hudPowerUiNow}
+                      onGhostCancel={() => {
+                        socket?.emit("use_power", { kind: "invisibility_cancel" }, (res) => {
+                          if (!res?.ok && res?.error) addNotification(res.error, "error");
+                        });
+                      }}
+                    />
                   </div>
-                </div>
-                <div className="pointer-events-auto flex items-center gap-2 rounded-[8px] bg-white/90 px-3 py-1.5 shadow backdrop-blur dark:bg-slate-900/90">
-                  {catLocked && isCat && gameState.mapUnlockAt && (
-                    <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
-                  )}
-                  {gameState.timeLimitEndsAt && <GameTimer endsAt={gameState.timeLimitEndsAt} />}
-                  {!connected && <span className="animate-pulse text-xs text-[#C45454]">Déconnecté</span>}
-                </div>
-              </div>
+                  {/* Pièces séparées en haut à droite (mobile) */}
+                  <div className="pointer-events-none absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[810] md:hidden">
+                    <CoinsBadge coins={me?.coins} />
+                  </div>
+                  <div className="pointer-events-none absolute left-3 top-14 z-[800] hidden md:block">
+                    <MapHud
+                      variant="desktop"
+                      role={role}
+                      isSpectator={me?.spectator}
+                      jamLevel={jamLevel}
+                      connected={connected}
+                      shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                      currentRadius={gameState.effectiveGlobalRadiusM}
+                      nextRadius={gameState.nextPhaseRadiusM}
+                      phaseEndsAt={gameState.phaseEndsAt}
+                      shrinkStartsAt={gameState.shrinkStartsAt}
+                      phaseState={gameState.zonePhaseState}
+                      totalPhases={gameState.totalPhases}
+                      currentPhase={gameState.currentPhase}
+                      nextBaliseAt={gameState.nextBaliseAt}
+                      baliseExpiresAt={baliseExpiresAt}
+                      timeLimitEndsAt={gameState.timeLimitEndsAt}
+                      catLocked={catLocked}
+                      isCat={isCat}
+                      mapUnlockAt={gameState.mapUnlockAt}
+                      socket={socket}
+                      powerEffect={hudPowerEffect}
+                      powerUiNow={hudPowerUiNow}
+                      onGhostCancel={() => {
+                        socket?.emit("use_power", { kind: "invisibility_cancel" }, (res) => {
+                          if (!res?.ok && res?.error) addNotification(res.error, "error");
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute right-3 top-3 z-[810] hidden md:block">
+                    <CoinsBadge coins={me?.coins} />
+                  </div>
+                </>
+              )}
 
-              {/* Desktop info bar (top) */}
-              <div className="pointer-events-none absolute left-3 top-3 z-[800] hidden md:block">
-                <GameInfoPanel
-                  role={role}
-                  isSpectator={me?.spectator}
-                  phaseEndsAt={gameState.phaseEndsAt}
-                  nextBaliseAt={gameState.nextBaliseAt}
-                  baliseExpiresAt={baliseExpiresAt}
-                  currentRadius={gameState.effectiveGlobalRadiusM}
-                  nextRadius={gameState.nextPhaseRadiusM}
-                  totalPhases={gameState.totalPhases}
-                  currentPhase={gameState.currentPhase}
-                  shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
-                  coins={me?.coins}
-                />
-              </div>
+              <CoinFeed socket={socket} sessionId={sessionIdRef.current} />
               <div className="pointer-events-none absolute right-3 top-3 z-[800] hidden md:flex items-center gap-2">
-                {catLocked && isCat && gameState.mapUnlockAt && (
-                  <CatLockCountdownHeader mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
-                )}
-                {gameState.timeLimitEndsAt && <GameTimer endsAt={gameState.timeLimitEndsAt} />}
-                <div className="pointer-events-auto flex flex-col gap-0.5 rounded-[8px] bg-white/90 px-2 py-1 text-[11px] shadow dark:bg-slate-900/90">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">Cercle de brouillage</span>
-                  <div className="flex items-center gap-2">
-                    {["small", "normal", "large"].map((lvl) => {
-                      const active = lvl === jamLevel;
-                      const label = lvl === "small" ? "Petit" : lvl === "large" ? "Grand" : "Moyen";
-                      return (
-                        <div key={lvl} className="flex flex-col items-center text-[10px]">
-                          <div
-                            className={`h-1.5 w-6 rounded-full transition-all ${
-                              active
-                                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
-                                : "bg-slate-300 dark:bg-slate-700"
-                            }`}
-                          />
-                          <span className={`mt-0.5 ${active ? "font-semibold text-emerald-600 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
-                            {label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
                 <ThemeToggle theme={theme} onToggle={toggleTheme} size="sm" />
-                {!connected && <span className="animate-pulse text-xs text-[#C45454]">Déconnecté</span>}
               </div>
             </div>
 
@@ -3686,108 +3534,9 @@ export default function App() {
               onQuit={!isHost ? leaveGame : undefined}
             />
 
-            {/* Overlay de bruit fantôme : impact visuel fort au-dessus de l'interface */}
-            {activeNoise && (() => {
-              const elapsedMs = Math.max(0, noiseUiNow - activeNoise.startedAt);
-              const totalMs = Math.max(1, activeNoise.durationSec * 1000);
-              const remainingSec = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
-              const progress = Math.min(1, elapsedMs / totalMs);
-
-              if (elapsedMs > totalMs) {
-                // Termine automatiquement l'effet au prochain render
-                if (activeNoise) {
-                  setTimeout(() => setActiveNoise(null), 0);
-                }
-              }
-
-              const volumeLabel = activeNoise.volume === "low" ? "Bas" : activeNoise.volume === "high" ? "Fort" : "Moyen";
-
-              return elapsedMs <= totalMs ? (
-                <div className="pointer-events-none fixed inset-x-0 top-0 z-[1850] flex justify-center">
-                  <div className="pointer-events-auto mt-4 w-[min(420px,90%)] animate-[wiggle_0.6s_ease-in-out_infinite] rounded-2xl bg-amber-500/95 px-4 py-3 text-xs font-semibold text-amber-950 shadow-2xl ring-2 ring-amber-300/80 dark:bg-amber-400/95 dark:text-amber-950">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-700/90 text-lg text-amber-100 shadow-md">
-                          {activeNoise.volume === "high" ? "🔊" : activeNoise.volume === "low" ? "🔈" : "🔉"}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[11px] uppercase tracking-[0.18em]">Bruit fantôme</span>
-                          <span className="text-[12px] font-bold">{activeNoise.by} fait tout vibrer ({volumeLabel})</span>
-                        </div>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-amber-700/90 px-2 py-0.5 text-[11px] font-bold text-amber-100 tabular-nums">
-                        {remainingSec}s
-                      </span>
-                    </div>
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200/80">
-                      <div
-                        className="h-full rounded-full bg-amber-700 transition-[width] duration-200 ease-out"
-                        style={{ width: `${Math.max(8, (1 - progress) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null;
-            })()}
-
-            {/* Panneau compact pour le joueur en mode ghost */}
-            {me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince && (
-              (() => {
-                const total = me.invisUntil - me.invisSince;
-                const rest = me.invisUntil - ghostUiNow;
-                if (total <= 0 || rest <= 0) return null;
-                const progress = 1 - rest / total;
-                const remainingSec = Math.max(1, Math.round(rest / 1000));
-                return (
-                  <div className="pointer-events-none fixed inset-x-0 top-16 z-[1500] flex justify-center px-4">
-                    <div className="pointer-events-auto inline-flex max-w-md flex-1 items-center gap-3 rounded-2xl bg-slate-900/90 px-4 py-3 text-xs text-slate-100 shadow-lg ring-1 ring-slate-700/80">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold uppercase tracking-wide text-[11px] text-slate-300">Mode ghost actif</span>
-                          <span className="text-[11px] font-semibold text-slate-100">{remainingSec}s</span>
-                        </div>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-700">
-                          <div
-                            className="h-full rounded-full bg-slate-300"
-                            style={{ width: `${Math.max(6, Math.min(100, progress * 100))}%` }}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          socket?.emit("use_power", { kind: "invisibility_cancel" }, (res) => {
-                            if (!res?.ok && res?.error) {
-                              addNotification(res.error, "error");
-                            }
-                          });
-                        }}
-                        className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-900 hover:bg-white"
-                      >
-                        Revenir visible
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-
-            {/* Overlay d'immobilisation (malus fort visuel) */}
-            {me?.immobilizedUntil && me.immobilizedUntil > Date.now() && (
-              <div className="pointer-events-auto fixed inset-0 z-[1900] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-                <div className="relative mx-4 max-w-sm rounded-2xl bg-slate-900/90 p-6 text-center text-slate-100 shadow-2xl ring-2 ring-indigo-500/60">
-                  <div className="mb-3 flex items-center justify-center">
-                    <div className="h-12 w-12 animate-pulse rounded-full bg-indigo-500/80 text-2xl">🧊</div>
-                  </div>
-                  <h3 className="mb-2 text-lg font-extrabold tracking-wide">IMMOBILISÉ</h3>
-                  <p className="mb-3 text-sm text-slate-200">
-                    Ta carte est gelée pendant un court instant. Attends la fin du malus pour retrouver la vue de la chasse.
-                  </p>
-                  <p className="text-xs font-semibold uppercase text-indigo-300">
-                    Temps restant : {Math.max(1, Math.round((me.immobilizedUntil - Date.now()) / 1000))} s
-                  </p>
-                </div>
-              </div>
+            {/* Overlay d'immobilisation — fond léger, détail dans le HUD */}
+            {me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow && (
+              <div className="pointer-events-auto fixed inset-0 z-[1900] bg-slate-950/50 backdrop-blur-[2px]" />
             )}
 
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
@@ -3837,13 +3586,15 @@ export default function App() {
         {selectedPlayer && gameTab !== "powers" && (
           <PlayerSheet
             player={selectedPlayer}
-            roomCode={currentRoomCode}
             onClose={() => setSelectedPlayer(null)}
-            onShowLocation={(lat, lng) => {
-              setGameTab("map");
-              setFocusCenter([lat, lng]);
-              setFocusTick((n) => n + 1);
-            }}
+            mapFocus={resolvePlayerMapFocus(selectedPlayer.sessionId, {
+              gameState,
+              position,
+              mySessionId: sessionId,
+            })}
+            onShowOnMap={(mapFocus) =>
+              onShowPlayerOnMap(mapFocus, selectedPlayer.sessionId)
+            }
           />
         )}
       </div>

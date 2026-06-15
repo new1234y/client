@@ -240,6 +240,7 @@ export default function GameMap({
   focusCenter = null,
   focusTick = 0,
   focusZoom = 18,
+  highlightSessionId = null,
   onPlayerClick = null,
   baliseLureSelecting = false,
   baliseLureTarget = null,
@@ -396,6 +397,14 @@ export default function GameMap({
     pickMarkerIcon,
   ]);
 
+  const highlightPos = useMemo(() => {
+    if (!highlightSessionId) return null;
+    const hit = clusterItems.find(
+      (it) => it.playerData?.sessionId === highlightSessionId
+    );
+    return hit ? [hit.lat, hit.lng] : null;
+  }, [highlightSessionId, clusterItems]);
+
   if (!gameState) return null;
 
   const shouldShowBaliseLureMarker = useMemo(() => {
@@ -463,6 +472,20 @@ export default function GameMap({
       />
       <FlyToFocus center={focusCenter} zoom={focusZoom} tick={focusTick} />
       <ZoomOnTicks zoomInTick={zoomInTick} zoomOutTick={zoomOutTick} />
+
+      {highlightPos && (
+        <CircleMarker
+          center={highlightPos}
+          radius={22}
+          pathOptions={{
+            color: "#f59e0b",
+            fillColor: "#fbbf24",
+            fillOpacity: 0.25,
+            weight: 3,
+            className: "animate-pulse",
+          }}
+        />
+      )}
 
       {shouldShowBaliseLureMarker && (
         <CircleMarker
