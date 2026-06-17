@@ -174,40 +174,56 @@ function PodiumPillar({ place, player, accent }) {
     );
   }
   const crown = place === 1;
-  const podiumHeight = place === 1 ? "h-24 sm:h-40" : place === 2 ? "h-20 sm:h-32" : "h-16 sm:h-24";
-  const baseColor =
-    accent === "sun"
-      ? "bg-[#FFD447]"
-      : accent === "sky"
-      ? "bg-[#60A5FA]"
-      : "bg-[#FB7185]";
+  const podiumHeight = place === 1 ? "h-28 sm:h-44" : place === 2 ? "h-24 sm:h-36" : "h-20 sm:h-28";
+  const gradientColor =
+    place === 1
+      ? "bg-gradient-to-b from-amber-400 via-yellow-500 to-amber-600"
+      : place === 2
+      ? "bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500"
+      : "bg-gradient-to-b from-orange-300 via-orange-400 to-orange-500";
+  const shadowColor =
+    place === 1
+      ? "shadow-amber-500/40"
+      : place === 2
+      ? "shadow-slate-500/40"
+      : "shadow-orange-500/40";
+
   return (
-    <div className="flex flex-1 flex-col items-center justify-end gap-2 sm:gap-4 text-center">
-      <div className="space-y-0.5 sm:space-y-1">
-        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">#{place}</p>
-        <div className="flex items-center justify-center gap-1 sm:gap-2 text-sm sm:text-lg font-bold text-slate-800 dark:text-slate-100">
-          {crown && (
-            <span role="img" aria-label="crown" className="text-amber-400 text-sm sm:text-base">
-              👑
-            </span>
-          )}
-          <span className="truncate max-w-[8ch] sm:max-w-[11ch] md:max-w-[16ch]">{player.nickname}</span>
+    <div className="flex flex-1 flex-col items-center justify-end gap-3 sm:gap-5 text-center">
+      <div className="space-y-1 sm:space-y-2">
+        {crown && (
+          <div className="flex justify-center">
+            <span className="text-3xl sm:text-4xl drop-shadow-lg animate-bounce">👑</span>
+          </div>
+        )}
+        <div className="relative">
+          <div className={`absolute inset-0 rounded-full blur-xl opacity-50 ${gradientColor}`}></div>
+          <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-black text-white ${gradientColor} shadow-lg ${shadowColor}`}>
+            {player.nickname?.charAt(0)?.toUpperCase() || '?'}
+          </div>
         </div>
+        <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white max-w-[10ch] sm:max-w-[14ch] truncate">
+          {player.nickname}
+        </p>
         <div className="flex items-center justify-center gap-2">
-          <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
             {player.catTimeLabel}
           </p>
-          <span className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-yellow-600 dark:text-yellow-400">
-            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
+            <span>🪙</span>
             {player.coins}
           </span>
         </div>
+        <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+          {formatDistance(player.distanceMeters)}
+        </p>
       </div>
       <div
-        className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${baseColor} shadow-[0_10px_25px_rgba(0,0,0,0.12)] sm:shadow-[0_20px_35px_rgba(0,0,0,0.15)]`}
+        className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${gradientColor} shadow-2xl ${shadowColor} relative overflow-hidden`}
       >
-        <div className="flex h-full items-end justify-center">
-          <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/90 py-1 sm:py-2 text-[10px] sm:text-sm font-bold text-slate-700 dark:bg-white/70">
+        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+        <div className="relative flex h-full items-end justify-center">
+          <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/95 py-2 sm:py-3 text-xs sm:text-sm font-black text-slate-800 dark:bg-white/90">
             {player.badgeLabel}
           </div>
         </div>
@@ -280,6 +296,7 @@ function SummaryPodiumView({
               : "Résilient",
           stats: analyticsRow,
           coins: analyticsRow.coins ?? data.coins ?? 0,
+          distanceMeters: analyticsRow.distanceMeters ?? 0,
         };
       })
       .filter(Boolean);
@@ -305,51 +322,17 @@ function SummaryPodiumView({
 
   const lastSurvivor = playersById[gameAnalytics.lastSurvivorSessionId];
 
+  const myPlayer = players.find(p => p.sessionId === summary?.mySessionId);
+  const myDistance = analyticsPlayers[summary?.mySessionId]?.distanceMeters || 0;
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
       <ConfettiField seed={summary?.code} />
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 pb-8 pt-8 sm:px-8">
-        <header className="flex flex-col gap-4 rounded-3xl bg-white/80 px-6 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-slate-900/80">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Résumé de partie</p>
-              <h1 className="text-3xl font-black text-slate-900 dark:text-white">{summary?.code || "—"}</h1>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                {gameMode === "infection"
-                  ? "Mode Infection · Dernier survivant en vedette"
-                  : "Mode Tag Swap · Classement par temps passé en chat"}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onShare}
-                disabled={shareBusy || (!publicRecapUrl && !shareBusy)}
-                className="rounded-full bg-[#2563EB] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:bg-[#1d4ed8] disabled:opacity-60"
-              >
-                {shareBusy ? "Partage…" : "Partager"}
-              </button>
-              {publicRecapUrl && (
-                <button
-                  type="button"
-                  onClick={copyRecap}
-                  className="rounded-full border border-[#2563EB]/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] transition hover:bg-[#2563EB]/10 dark:text-indigo-300 dark:border-indigo-500/40 dark:hover:bg-indigo-500/10"
-                >
-                  {copied ? "Lien copié" : "Copier le lien"}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <SummaryHighlight label="Durée" value={formatDurationMs(gameAnalytics.durationMs)} accent="gold" />
-            <SummaryHighlight label="Distance totale" value={formatDistance(gameAnalytics.totalDistanceMeters)} accent="blue" />
-            <SummaryHighlight label="Événements" value={`${gameAnalytics.totalJamEvents || 0} brouillages`} accent="red" />
-          </div>
-        </header>
-
-        <main className="mt-8 flex-1">
+        {/* Main ranking area - 70-80% of screen height */}
+        <main className="flex-1 min-h-[70vh] flex flex-col">
           {gameMode === "infection" ? (
-            <div className="flex h-full flex-col items-center gap-8">
+            <div className="flex h-full flex-col items-center justify-center gap-8">
               <div className="w-full max-w-xl rounded-3xl bg-white/85 p-8 text-center shadow-[0_25px_45px_rgba(15,23,42,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.4em] text-emerald-500">Survivant·e</p>
                 <h2 className="mt-2 text-4xl font-black text-slate-900">
@@ -456,9 +439,8 @@ function SummaryPodiumView({
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
                           <span>Vitesse max&nbsp;: {formatSpeedKmh(player.stats?.maxSpeedKmh)}</span>
-                          <span>Distance&nbsp;: {formatDistance(player.stats?.distanceMeters)}</span>
+                          <span>Distance&nbsp;: {formatDistance(player.distanceMeters)}</span>
                           <span>Temps joueur&nbsp;: {formatDurationMs(player.stats?.timeAsPlayerMs)}</span>
-                          <span>Brouillages : {player.stats?.jamEvents ?? 0}</span>
                         </div>
                       </li>
                     ))}
@@ -468,6 +450,55 @@ function SummaryPodiumView({
             </div>
           )}
         </main>
+
+        {/* Bottom info boxes */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Mode</p>
+            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+              {gameMode === "infection" ? "Infection" : "Tag Swap"}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Temps</p>
+            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+              {formatDurationMs(gameAnalytics.durationMs)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Ma distance</p>
+            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+              {formatDistance(myDistance)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Événements</p>
+            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+              {gameAnalytics.totalCaptures || 0} captures
+            </p>
+          </div>
+        </div>
+
+        {/* Share buttons */}
+        <div className="mt-4 flex flex-wrap gap-2 justify-center">
+          <button
+            type="button"
+            onClick={onShare}
+            disabled={shareBusy || (!publicRecapUrl && !shareBusy)}
+            className="rounded-full bg-[#2563EB] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:bg-[#1d4ed8] disabled:opacity-60"
+          >
+            {shareBusy ? "Partage…" : "Partager"}
+          </button>
+          {publicRecapUrl && (
+            <button
+              type="button"
+              onClick={copyRecap}
+              className="rounded-full border border-[#2563EB]/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] transition hover:bg-[#2563EB]/10 dark:text-indigo-300 dark:border-indigo-500/40 dark:hover:bg-indigo-500/10"
+            >
+              {copied ? "Lien copié" : "Copier le lien"}
+            </button>
+          )}
+        </div>
       </div>
       <footer className="relative z-10 flex flex-wrap items-center justify-center gap-3 bg-white/80 px-6 py-6 shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:bg-slate-900/80">
         <button

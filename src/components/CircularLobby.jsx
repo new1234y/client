@@ -39,7 +39,7 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
   }, [otherPlayers]);
 
   return (
-    <div className="flex min-h-[500px] w-full items-center justify-center bg-white dark:bg-slate-900">
+    <div className="flex min-h-[500px] w-full items-center justify-center bg-white">
       <div className="relative h-[500px] w-[500px]">
         {/* Connection lines */}
         <svg className="absolute inset-0 h-full w-full pointer-events-none" style={{ zIndex: 0 }}>
@@ -53,16 +53,15 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
               stroke="#E0E6ED"
               strokeWidth="2"
               strokeDasharray="5,5"
-              className="dark:stroke-slate-700"
             />
           ))}
         </svg>
 
         {/* Concentric circles around center */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-          <div className="h-[280px] w-[280px] rounded-full border-2 border-slate-200 dark:border-slate-700 opacity-30" />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[220px] w-[220px] rounded-full border-2 border-slate-200 dark:border-slate-700 opacity-40" />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[160px] w-[160px] rounded-full border-2 border-slate-200 dark:border-slate-700 opacity-50" />
+          <div className="h-[280px] w-[280px] rounded-full border-2 border-slate-200 opacity-30" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[220px] w-[220px] rounded-full border-2 border-slate-200 opacity-40" />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[160px] w-[160px] rounded-full border-2 border-slate-200 opacity-50" />
         </div>
 
         {/* Center host player */}
@@ -72,20 +71,20 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
             style={{ zIndex: 10 }}
           >
             <div className="relative animate-float-slow">
-              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 shadow-2xl flex items-center justify-center text-white text-3xl font-bold border-4 border-white dark:border-slate-800">
+              <div className="h-24 w-24 rounded-full bg-gradient-to-br from-vibrant-blue to-vibrant-blue-dark shadow-2xl flex items-center justify-center text-white text-3xl font-bold border-4 border-white">
                 {hostPlayer.nickname?.charAt(0)?.toUpperCase() || "?"}
               </div>
               {/* Host badge */}
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-md">
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-vibrant-gold px-2 py-0.5 text-xs font-bold text-white shadow-md">
                 HÔTE
               </div>
             </div>
             <div className="mt-4 text-center">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              <p className="text-sm font-semibold text-slate-900">
                 {hostPlayer.nickname}
               </p>
               {hostPlayer.sessionId === currentSessionId && (
-                <p className="text-xs text-indigo-600 dark:text-indigo-400">vous</p>
+                <p className="text-xs text-vibrant-blue">vous</p>
               )}
             </div>
           </div>
@@ -106,14 +105,14 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
           >
             <div className="relative animate-float">
               <div
-                className={`h-16 w-16 rounded-full shadow-lg flex items-center justify-center text-white text-xl font-bold border-3 border-white dark:border-slate-800 ${
-                  ['bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500'][player.index % 5]
+                className={`h-16 w-16 rounded-full shadow-lg flex items-center justify-center text-white text-xl font-bold border-3 border-white ${
+                  ['bg-vibrant-pink', 'bg-vibrant-gold', 'bg-vibrant-blue', 'bg-vibrant-green', 'bg-vibrant-purple'][player.index % 5]
                 }`}
               >
                 {player.nickname?.charAt(0)?.toUpperCase() || "?"}
               </div>
               {player.disconnected && (
-                <div className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-amber-500 border-2 border-white dark:border-slate-800 flex items-center justify-center">
+                <div className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-vibrant-orange border-2 border-white flex items-center justify-center">
                   <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                   </svg>
@@ -121,14 +120,14 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
               )}
             </div>
             <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-slate-900 dark:text-white max-w-[80px] truncate">
+              <p className="text-xs font-medium text-slate-900 max-w-[80px] truncate">
                 {player.nickname}
               </p>
               {player.sessionId === currentSessionId && (
-                <p className="text-[10px] text-indigo-600 dark:text-indigo-400">vous</p>
+                <p className="text-[10px] text-vibrant-blue">vous</p>
               )}
               {player.disconnected && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">déconnecté</p>
+                <p className="text-[10px] text-vibrant-orange">déconnecté</p>
               )}
             </div>
           </div>

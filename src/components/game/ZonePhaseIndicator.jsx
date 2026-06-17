@@ -6,8 +6,6 @@ export default function ZonePhaseIndicator({
   phaseEndsAt,
   shrinkStartsAt,
   phaseState,
-  totalPhases = 5,
-  currentPhase = 1,
 }) {
   const [timeLeft, setTimeLeft] = useState(null);
 
@@ -33,72 +31,57 @@ export default function ZonePhaseIndicator({
   const minutes = timeLeft ? Math.floor(timeLeft / 60) : 0;
   const seconds = timeLeft ? timeLeft % 60 : 0;
 
+  // Use whole-game percent when possible (fallback to radius-based percent)
+  const percentRadius = currentRadius && nextRadius ? Math.max(0, Math.min(100, Math.round((nextRadius / currentRadius) * 100))) : 100;
+  const percent = percentRadius; // keep same semantics for now
+  const r = 18;
+  const c = Math.PI * 2 * r;
+  const dash = (percent / 100) * c;
+
   return (
-    <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-slate-900/95 px-3 py-2 shadow-lg ring-1 ring-slate-700 backdrop-blur">
-      {/* Phase indicator dots */}
-      <div className="flex gap-1">
-        {Array.from({ length: totalPhases }).map((_, i) => {
-          const done = i < currentPhase - 1;
-          const active = i === currentPhase - 1;
-          return (
-            <div
-              key={i}
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                done
-                  ? "bg-indigo-500"
-                  : active
-                    ? "animate-pulse bg-indigo-400"
-                    : "bg-slate-600"
-              }`}
-            />
-          );
-        })}
-      </div>
-
-      <div className="h-4 w-px bg-slate-700" />
-
-      {/* Current zone info */}
-      <div className="flex items-center gap-2 text-xs">
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-indigo-500" />
-          <span className="text-slate-400">{Math.round(currentRadius)}m</span>
+    <div className="pointer-events-auto flex items-center gap-4 rounded-2xl bg-white border border-slate-300 px-5 py-3 shadow-md">
+      {/* Left: clock with blue ring + time */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex items-center justify-center h-12 w-12">
+          <svg className="absolute" width="48" height="48" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" fill="#EAF2FF" />
+            <circle cx="24" cy="24" r="18" fill="none" stroke="#DBEAFE" strokeWidth="3" />
+            <circle cx="24" cy="24" r="16" fill="none" stroke="#60A5FA" strokeWidth="4" />
+          </svg>
+          <svg className="relative h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3" />
+            <circle cx="12" cy="12" r="9" stroke="#1E3A8A" strokeWidth={0} fill="none" />
+          </svg>
         </div>
-        
-        {nextRadius && nextRadius !== currentRadius && (
-          <>
-            <svg className="h-3 w-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-            <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full border border-orange-500 bg-transparent" />
-              <span className="text-orange-400">{Math.round(nextRadius)}m</span>
-            </div>
-          </>
-        )}
+
+        <div className="flex flex-col leading-tight">
+          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</div>
+          <div className="text-sm font-semibold text-blue-600">Zone rétréci</div>
+        </div>
       </div>
 
-      {/* Phase status */}
-      <div className="h-4 w-px bg-slate-700" />
-      <div className="text-xs text-slate-300">
-        {phaseState === "waiting" && "Attente"}
-        {phaseState === "shrinking" && "Rétrécissement"}
-        {phaseState === "stopped" && "Arrêté"}
-      </div>
+      <div className="h-12 w-px bg-slate-200" />
 
-      {/* Time until shrink start or end */}
-      {timeLeft != null && timeLeft > 0 && phaseState !== "stopped" && (
-        <>
-          <div className="h-4 w-px bg-slate-700" />
-          <div className="flex items-center gap-1 text-xs">
-            <svg className="h-3 w-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="font-mono text-white">
-              {minutes}:{String(seconds).padStart(2, "0")}
-            </span>
-          </div>
-        </>
-      )}
+      {/* Right: circular percent + label */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex items-center justify-center h-12 w-12">
+          <svg className="-rotate-90" width={48} height={48} viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r={r} stroke="#E6EEF9" strokeWidth="6" fill="#FFFFFF" />
+            <circle
+              cx="24"
+              cy="24"
+              r={r}
+              stroke="#2563EB"
+              strokeWidth="6"
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={`${dash} ${c - dash}`}
+            />
+          </svg>
+          <div className="absolute text-sm text-slate-900 font-semibold">{percent}%</div>
+        </div>
+        <div className="text-xs text-slate-500 uppercase">ZONE</div>
+      </div>
     </div>
   );
 }

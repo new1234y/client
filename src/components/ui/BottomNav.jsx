@@ -7,6 +7,8 @@ export default function BottomNav({
   onCenterAction,
   canShowMap = true,
   showAdmin = false,
+  showPowers = true,
+  disablePowers = false,
   onMore,
   onQuit,
 }) {
@@ -15,15 +17,15 @@ export default function BottomNav({
       disabled
         ? "opacity-30"
         : active
-        ? "bg-gradient-to-r from-[#FDE68A]/60 to-[#FBBF24]/40 text-amber-950 dark:from-amber-900/40 dark:to-amber-800/30 dark:text-amber-100"
-          : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+        ? "bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark text-white shadow-lg"
+          : "text-slate-600 hover:bg-slate-100"
     }`;
 
   const iconCls = "h-6 w-6";
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-6 md:hidden">
-      <nav className="relative rounded-[40px] bg-gradient-to-r from-white/90 via-[#FFF5D7]/80 to-white/90 p-2 shadow-lg ring-1 ring-amber-100/60 backdrop-blur-xl dark:from-slate-900/90 dark:via-slate-900/80 dark:to-slate-800/90 dark:ring-slate-700">
+      <nav className="relative rounded-[40px] bg-white p-2 shadow-lg ring-1 ring-slate-200 backdrop-blur-xl">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -69,8 +71,8 @@ export default function BottomNav({
               disabled={!centerAction}
               className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-white shadow-lg transition active:scale-[0.96] ${
                 centerAction
-                  ? "bg-gradient-to-br from-[#FB7185] to-[#F97316] dark:from-[#FBBF24] dark:to-[#F97316] dark:text-slate-900"
-                  : "bg-slate-200 dark:bg-slate-800"
+                  ? "bg-gradient-to-br from-vibrant-pink to-vibrant-orange"
+                  : "bg-slate-200"
               }`}
               aria-label={
                 centerAction === "scan"
@@ -110,23 +112,26 @@ export default function BottomNav({
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              onTabChange("powers");
-            }}
-            className={tabCls(activeTab === "powers" && !chatOpen, false)}
-            aria-current={activeTab === "powers" ? "page" : undefined}
-          >
-            <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-            Super
-          </button>
+          {showPowers && (
+            <button
+              type="button"
+              disabled={disablePowers}
+              onClick={() => {
+                onTabChange("powers");
+              }}
+              className={tabCls(activeTab === "powers" && !chatOpen, disablePowers)}
+              aria-current={activeTab === "powers" ? "page" : undefined}
+            >
+              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              Super
+            </button>
+          )}
 
           {showAdmin && (
             <button

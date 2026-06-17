@@ -11,6 +11,20 @@ export default function ScannerModal({ onScan, onClose }) {
   const reactId = useId().replace(/:/g, "");
   const regionId = `qr-reader-${reactId}`;
 
+  const stopCamera = useCallback(() => {
+    const s = scannerRef.current;
+    scannerRef.current = null;
+    if (s && started.current) {
+      s.stop().catch(() => {});
+      started.current = false;
+    }
+  }, []);
+
+  const handleClose = useCallback(() => {
+    stopCamera();
+    onClose();
+  }, [stopCamera, onClose]);
+
   useEffect(() => {
     done.current = false;
     started.current = false;
@@ -43,13 +57,15 @@ export default function ScannerModal({ onScan, onClose }) {
 
     return () => {
       cancelled = true;
-      const s = scannerRef.current;
-      scannerRef.current = null;
-      if (s && started.current) {
-        s.stop().catch(() => {});
-      }
+      stopCamera();
     };
-  }, [regionId]);
+  }, [regionId, stopCamera]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   return (
     <div
@@ -57,12 +73,13 @@ export default function ScannerModal({ onScan, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label="Scanner QR Code"
+      onClick={handleClose}
     >
       {/* Close Button */}
       <button
         type="button"
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+        onClick={handleClose}
+        className="absolute top-4 right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60 ring-2 ring-white/20"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -79,19 +96,19 @@ export default function ScannerModal({ onScan, onClose }) {
       {/* QR Code Scanning Area - Transparent */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="relative w-72 h-72">
-          <div className="absolute inset-0 border-2 border-white/40 rounded-lg"></div>
-          {/* Corner markers - Transparent/White */}
-          <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-white/60 rounded-tl-lg"></div>
-          <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-white/60 rounded-tr-lg"></div>
-          <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-white/60 rounded-bl-lg"></div>
-          <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-white/60 rounded-br-lg"></div>
+          <div className="absolute inset-0 border-2 border-vibrant-blue/40 rounded-lg"></div>
+          {/* Corner markers - Vibrant Blue */}
+          <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-vibrant-blue rounded-tl-lg"></div>
+          <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-vibrant-blue rounded-tr-lg"></div>
+          <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-vibrant-blue rounded-bl-lg"></div>
+          <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-vibrant-blue rounded-br-lg"></div>
         </div>
       </div>
 
       {/* Error Message */}
       {err && (
         <div className="absolute top-20 left-4 right-4 z-20">
-          <p className="rounded-[8px] bg-red-950/90 p-3 text-sm text-red-200 backdrop-blur-sm">{err}</p>
+          <p className="rounded-2xl bg-red-950/90 p-3 text-sm text-red-200 backdrop-blur-sm">{err}</p>
         </div>
       )}
 

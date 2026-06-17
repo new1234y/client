@@ -15,8 +15,8 @@ export default function SocialPanel({
   roleBadgeText,
 }) {
   return (
-    <div className="h-full overflow-auto bg-gradient-to-b from-[#FFF5D7]/40 via-white to-[#FDECF4]/40 p-4 pb-28 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="mx-auto max-w-lg space-y-4">
+    <div className="h-full overflow-auto bg-gradient-to-b from-[#FFF5D7]/40 via-white to-[#FDECF4]/40 px-2 pb-28 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="mx-auto max-w-lg space-y-4 py-2">
         <div className="rounded-3xl bg-gradient-to-br from-[#BFDBFE] via-[#93C5FD] to-[#2563EB] p-5 text-center text-white shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/80">Code partie</p>
           <p className="mt-1 font-mono text-3xl font-black tracking-widest">{roomCode}</p>
@@ -44,12 +44,13 @@ export default function SocialPanel({
                 ghostRemaining = Math.max(1, Math.round(rest / 1000));
               }
               const isCat = p.role === "cat";
+              const isGhost = p.invisible;
               return (
                 <li key={p.sessionId}>
                   <button
                     type="button"
                     onClick={() => onSelectPlayer(p)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-white/90 p-3 text-left shadow-sm ring-1 ring-slate-100 transition active:scale-[0.98] dark:bg-slate-800/90 dark:ring-slate-700"
+                    className={`flex w-full items-center gap-3 rounded-2xl bg-white/90 p-3 text-left shadow-sm ring-1 ring-slate-100 transition active:scale-[0.98] dark:bg-slate-800/90 dark:ring-slate-700 ${isGhost ? 'opacity-50 grayscale' : ''}`}
                   >
                     <div
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white ${

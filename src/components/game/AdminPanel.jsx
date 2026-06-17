@@ -80,24 +80,24 @@ export default function AdminPanel({
                   </div>
                   <p className="mt-0.5 text-xs text-white/80">{p.role === "cat" ? "Chat" : "Joueur"}</p>
                 </div>
-                {p.sessionId !== sessionId && (
-                  <div className="space-y-2 p-3">
-                    <div className="flex flex-wrap gap-1">
-                      {[-10, -5, -1, 1, 5, 10].map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          className={`rounded-lg px-2 py-1 text-xs font-bold text-white ${
-                            d > 0 ? "bg-emerald-500" : "bg-rose-500"
-                          }`}
-                          onClick={() =>
-                            onAdjustCoins(p.sessionId, d, p.nickname)
-                          }
-                        >
-                          {d > 0 ? `+${d}` : d}
-                        </button>
-                      ))}
-                    </div>
+                <div className="space-y-2 p-3">
+                  <div className="flex flex-wrap gap-1">
+                    {[-10, -5, -1, 1, 5, 10].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`rounded-lg px-2 py-1 text-xs font-bold text-white ${
+                          d > 0 ? "bg-emerald-500" : "bg-rose-500"
+                        }`}
+                        onClick={() =>
+                          onAdjustCoins(p.sessionId, d, p.nickname)
+                        }
+                      >
+                        {d > 0 ? `+${d}` : d}
+                      </button>
+                    ))}
+                  </div>
+                  {p.sessionId !== sessionId && (
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -121,8 +121,8 @@ export default function AdminPanel({
                         Expulser
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </li>
             );
           })}

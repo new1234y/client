@@ -101,7 +101,7 @@ export default function GameSummary({ summary, onLeave }) {
         ))}
       </div>
 
-      <div className="h-[42vh] min-h-[220px] w-full shrink-0 border-b border-slate-800">
+      <div className="h-[42vh] min-h-[220px] w-full shrink-0 border-b border-slate-200">
         <MapContainer
           center={center}
           zoom={15}
@@ -157,12 +157,12 @@ export default function GameSummary({ summary, onLeave }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-400">Légende</h2>
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">Légende</h2>
         <ul className="mb-6 flex flex-wrap gap-2">
           {legend.map((p) => (
             <li
               key={p.sessionId}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-slate-200 ring-1 ring-slate-700"
+              className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700 ring-1 ring-slate-200"
             >
               <span
                 className="h-3 w-3 shrink-0 rounded-full"
@@ -173,13 +173,13 @@ export default function GameSummary({ summary, onLeave }) {
           ))}
         </ul>
 
-        <h2 className="mb-2 text-sm font-semibold text-slate-400">
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">
           Chronologie
         </h2>
-        <ul className="space-y-2 border-l-2 border-slate-700 pl-4">
+        <ul className="space-y-2 border-l-2 border-slate-300 pl-4">
           {(summary.timeline || []).map((ev, i) => (
-            <li key={i} className="relative text-sm text-slate-300">
-              <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-indigo-500" />
+            <li key={i} className="relative text-sm text-slate-700">
+              <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-vibrant-blue" />
               <span className="text-xs text-slate-500">
                 {formatTime(ev.t)}
               </span>
@@ -189,11 +189,11 @@ export default function GameSummary({ summary, onLeave }) {
         </ul>
       </div>
 
-      <div className="shrink-0 border-t border-slate-800 p-4">
+      <div className="shrink-0 border-t border-slate-200 p-4">
         <button
           type="button"
           onClick={onLeave}
-          className="w-full rounded-xl bg-indigo-600 py-4 text-base font-semibold text-white"
+          className="w-full rounded-xl bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark py-4 text-base font-semibold text-white shadow-lg"
         >
           Retour au menu
         </button>

@@ -25,43 +25,44 @@ export default function SharePartyModal({ code, title, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[12000] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/75 p-4 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Partager la partie"
+      onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-        <h2 className="text-center text-lg font-bold text-slate-900 dark:text-white">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-center text-lg font-bold text-slate-900">
           Scanner le QR code
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-center text-sm text-slate-500">
           Montrez ce code pour inviter des joueurs à rejoindre votre partie.
         </p>
 
         <div className="mt-6 flex justify-center">
-          <div className="rounded-[8px] bg-white p-4 ring-2 ring-[#5B7FA5]/20 dark:bg-slate-800 dark:ring-[#5B7FA5]/30">
+          <div className="rounded-2xl bg-white p-4 ring-2 ring-vibrant-blue/20">
             <QRCodeSVG value={joinUrl} size={180} level="M" />
           </div>
         </div>
 
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <div className="flex-1 border-t border-slate-200"></div>
+          <span className="text-xs font-medium text-slate-500">
             ou entrez le code manuellement
           </span>
-          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+          <div className="flex-1 border-t border-slate-200"></div>
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1 rounded-[8px] border-2 border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-800">
-            <p className="font-mono text-2xl font-bold tracking-[0.2em] text-[#5B7FA5]">
+          <div className="flex-1 rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="font-mono text-2xl font-bold tracking-[0.2em] text-vibrant-blue">
               {code}
             </p>
           </div>
           <button
             type="button"
             onClick={handleShare}
-            className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[#5B7FA5] text-white shadow-lg transition-transform active:scale-95"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-vibrant-blue text-white shadow-lg transition-transform active:scale-95"
             aria-label="Partager"
           >
             <svg
@@ -84,7 +85,7 @@ export default function SharePartyModal({ code, title, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
+          className="mt-6 w-full rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Fermer
         </button>

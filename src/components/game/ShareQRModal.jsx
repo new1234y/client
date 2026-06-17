@@ -41,15 +41,16 @@ export default function ShareQRModal({ sessionId, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-label="Inviter à cette salle"
+      onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">Inviter à cette salle</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Copier le lien ou le code ne vous déconnecte pas : vous restez dans la salle.
         </p>
 
         <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          <div className="rounded-[8px] bg-white p-3 ring-2 ring-[#5B7FA5]/20 dark:bg-slate-800 dark:ring-[#5B7FA5]/30">
+          <div className="rounded-2xl bg-white p-3 ring-2 ring-[#5B7FA5]/20 dark:bg-slate-800 dark:ring-[#5B7FA5]/30">
             <QRCodeSVG value={invitationUrl} size={168} level="M" />
           </div>
 
@@ -63,14 +64,14 @@ export default function ShareQRModal({ sessionId, onClose }) {
               <button
                 type="button"
                 onClick={handleShare}
-                className="w-full rounded-[8px] bg-[#5B7FA5] py-3 text-sm font-semibold text-white sm:w-auto sm:px-6 transition hover:bg-[#4A6A8A]"
+                className="w-full rounded-2xl bg-[#5B7FA5] py-3 text-sm font-semibold text-white sm:w-auto sm:px-6 transition hover:bg-[#4A6A8A]"
               >
                 Partager
               </button>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:text-slate-200 sm:w-auto sm:px-5"
+                className="w-full rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:text-slate-200 sm:w-auto sm:px-5"
               >
                 Copier le code seul
               </button>
@@ -88,7 +89,7 @@ export default function ShareQRModal({ sessionId, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
+          className="mt-6 w-full rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
         >
           Fermer
         </button>
