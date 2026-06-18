@@ -6,6 +6,8 @@ export default function GameStatusModal({
   progress = 11,
   coins = 35,
   playerType = 'player', // 'player' or 'cat'
+  shrinkZoneEnabled = true,
+  timeLimitEnabled = false,
   onCoinsClick = null,
   onTimerClick = null,
   onProgressClick = null,
@@ -31,39 +33,102 @@ export default function GameStatusModal({
       {/* Conteneur principal superposé */}
       <div className="relative z-10 w-full flex items-center justify-between">
         
-        {/* GAUCHE : Icône Joueur + Compteur de Coins */}
-        <div className="flex-1 flex items-center justify-start pl-3 gap-3">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlayerClick?.();
-            }}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
-          >
-            {playerType === 'player' ? (
-              // Icône Joueur (Bonhomme qui court)
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 21a6 6 0 0 0-12 0" />
-                <circle cx="12" cy="10" r="4" />
-              </svg>
-            ) : (
-              // Icône Chat
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5c.67 0 1.35.09 2 .26L18.5 2 17 6.5a7.5 7.5 0 1 1-10 0L5.5 2 10 5.26c.65-.17 1.33-.26 2-.26Z" />
-              </svg>
-            )}
-          </button>
+        {/* GAUCHE : Icône Joueur */}
+        {!shrinkZoneEnabled && !timeLimitEnabled ? (
+          <div className="flex-1 flex items-center justify-start pl-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlayerClick?.();
+              }}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
+            >
+              {playerType === 'player' ? (
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 21a6 6 0 0 0-12 0" />
+                  <circle cx="12" cy="10" r="4" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5c.67 0 1.35.09 2 .26L18.5 2 17 6.5a7.5 7.5 0 1 1-10 0L5.5 2 10 5.26c.65-.17 1.33-.26 2-.26Z" />
+                </svg>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-start pl-3 gap-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlayerClick?.();
+              }}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
+            >
+              {playerType === 'player' ? (
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 21a6 6 0 0 0-12 0" />
+                  <circle cx="12" cy="10" r="4" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5c.67 0 1.35.09 2 .26L18.5 2 17 6.5a7.5 7.5 0 1 1-10 0L5.5 2 10 5.26c.65-.17 1.33-.26 2-.26Z" />
+                </svg>
+              )}
+            </button>
 
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCoinsClick?.();
+              }}
+              className="flex items-center gap-1.5 hover:scale-105 transition-transform cursor-pointer"
+            >
+              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="url(#coinGradient)" stroke="#D97706" strokeWidth="1.5" />
+                <circle cx="9" cy="9" r="3" fill="white" opacity="0.4" />
+                <path d="M12 7v10M9 9l3-2 3 2M9 15l3 2 3-2" stroke="#B45309" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <defs>
+                  <linearGradient id="coinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFED9A" />
+                    <stop offset="100%" stopColor="#F59E0B" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <span className="text-lg font-bold text-[#446b9e] tabular-nums">{coins}</span>
+            </button>
+          </div>
+        )}
+
+        {/* CENTRE : Le Timer */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTimerClick?.();
+          }}
+          className="flex-shrink-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl rounded-[2.25rem] px-8 py-3 shadow-lg ring-1 ring-slate-200 hover:scale-105 transition-transform cursor-pointer mx-2"
+        >
+          <span className="text-[2rem] font-extrabold text-[#2563eb] tabular-nums tracking-tight leading-none mb-0.5">
+            {!shrinkZoneEnabled && !timeLimitEnabled ? '♾️' : timeRemaining}
+          </span>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-[#5c728e] whitespace-nowrap">
+            {!shrinkZoneEnabled && !timeLimitEnabled ? 'Sans Limite' : shrinkZoneEnabled ? (zoneState === 'waiting' ? 'En Attente' : zoneState === 'shrinking' ? 'Rétrécissement' : zoneState === 'stopped' ? 'Arrêté' : 'Temps Restant') : 'Temps Restant'}
+          </span>
+        </button>
+
+        {/* DROITE : Barre de progression ou Coins */}
+        {!shrinkZoneEnabled && !timeLimitEnabled ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onCoinsClick?.();
             }}
-            className="flex items-center gap-1.5 hover:scale-105 transition-transform cursor-pointer"
+            className="flex-1 flex items-center justify-end pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
           >
-            {/* Simple coin icon */}
             <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="10" fill="url(#coinGradient)" stroke="#D97706" strokeWidth="1.5" />
               <circle cx="9" cy="9" r="3" fill="white" opacity="0.4" />
@@ -77,44 +142,26 @@ export default function GameStatusModal({
             </svg>
             <span className="text-lg font-bold text-[#446b9e] tabular-nums">{coins}</span>
           </button>
-        </div>
-
-        {/* CENTRE : Le Timer (Plus imposant en hauteur) */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onTimerClick?.();
-          }}
-          className="flex-shrink-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl rounded-[2.25rem] px-8 py-3 shadow-lg ring-1 ring-slate-200 hover:scale-105 transition-transform cursor-pointer mx-2"
-        >
-          <span className="text-[2rem] font-extrabold text-[#2563eb] tabular-nums tracking-tight leading-none mb-0.5">
-            {timeRemaining}
-          </span>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-[#5c728e] whitespace-nowrap">
-            {zoneState === 'waiting' ? 'En Attente' : zoneState === 'shrinking' ? 'Rétrécissement' : zoneState === 'stopped' ? 'Arrêté' : 'Temps Restant'}
-          </span>
-        </button>
-
-        {/* DROITE : Barre de progression */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onProgressClick?.();
-          }}
-          className="flex-1 flex flex-col items-end justify-center pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
-        >
-          <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">
-            {displayProgress}%
-          </span>
-          <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out"
-              style={{ width: `${displayProgress}%` }}
-            />
-          </div>
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onProgressClick?.();
+            }}
+            className="flex-1 flex flex-col items-end justify-center pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
+          >
+            <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">
+              {displayProgress}%
+            </span>
+            <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out"
+                style={{ width: `${displayProgress}%` }}
+              />
+            </div>
+          </button>
+        )}
 
       </div>
     </div>

@@ -3,6 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 
 export default function ScannerModal({ onScan, onClose }) {
   const [err, setErr] = useState(null);
+  const [isStarting, setIsStarting] = useState(true);
   const started = useRef(false);
   const scannerRef = useRef(null);
   const onScanRef = useRef(onScan);
@@ -28,6 +29,10 @@ export default function ScannerModal({ onScan, onClose }) {
   useEffect(() => {
     done.current = false;
     started.current = false;
+    setIsStarting(true);
+    
+    console.log('[ScannerModal] Initializing camera with regionId:', regionId);
+    
     const html5 = new Html5Qrcode(regionId, { verbose: false });
     scannerRef.current = html5;
 
@@ -41,22 +46,32 @@ export default function ScannerModal({ onScan, onClose }) {
         config,
         (decodedText) => {
           if (cancelled || done.current) return;
+          console.log('[ScannerModal] QR code scanned:', decodedText);
           done.current = true;
           onScanRef.current?.(decodedText);
         },
-        () => {}
+        (errorMessage) => {
+          console.log('[ScannerModal] Scan error (expected during operation):', errorMessage);
+        }
       )
       .then(() => {
-        if (!cancelled) started.current = true;
+        if (!cancelled) {
+          started.current = true;
+          setIsStarting(false);
+          console.log('[ScannerModal] Camera started successfully');
+        }
       })
       .catch((e) => {
         if (!cancelled) {
+          console.error('[ScannerModal] Camera start failed:', e);
+          setIsStarting(false);
           setErr(e?.message || "Impossible d'accéder à la caméra.");
         }
       });
 
     return () => {
       cancelled = true;
+      console.log('[ScannerModal] Cleaning up camera');
       stopCamera();
     };
   }, [regionId, stopCamera]);
@@ -90,7 +105,7 @@ export default function ScannerModal({ onScan, onClose }) {
       {/* Camera View */}
       <div
         id={regionId}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full bg-black"
       />
 
       {/* QR Code Scanning Area - Transparent */}
@@ -105,7 +120,15 @@ export default function ScannerModal({ onScan, onClose }) {
         </div>
       </div>
 
-      {/* Error Message */}
+      {/* Loading State */}
+      {isStarting && !err && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <div className="text-center">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-white mx-auto mb-4" />
+            <p className="text-white/80 text-sm">Activation de la caméra...</p>
+          </div>
+        </div>
+      )}
       {err && (
         <div className="absolute top-20 left-4 right-4 z-20">
           <p className="rounded-2xl bg-red-950/90 p-3 text-sm text-red-200 backdrop-blur-sm">{err}</p>

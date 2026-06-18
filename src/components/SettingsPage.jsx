@@ -1,8 +1,10 @@
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
-export default function SettingsPage({ onClose }) {
+export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
   const [selectedTheme, setSelectedTheme] = useState(theme);
 
   const handleThemeChange = (newTheme) => {
@@ -23,7 +25,7 @@ export default function SettingsPage({ onClose }) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => navigate(-1)}
             className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white shadow-lg transition hover:bg-slate-700"
           >
             Retour

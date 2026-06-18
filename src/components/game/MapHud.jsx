@@ -269,6 +269,7 @@ export default function MapHud({
   jamLevel,
   connected,
   shrinkZoneEnabled,
+  timeLimitEnabled,
   currentRadius,
   nextRadius,
   phaseEndsAt,
@@ -359,13 +360,20 @@ export default function MapHud({
         progress={Math.round(totalProgress * 100)}
         coins={coins}
         playerType={role}
+        shrinkZoneEnabled={shrinkZoneEnabled}
+        timeLimitEnabled={timeLimitEnabled}
         onCoinsClick={() => onCoinsModalOpen?.()}
         onTimerClick={() => shrinkZoneEnabled ? onZoneModalOpen?.() : onGameModalOpen?.()}
         onProgressClick={() => onGameModalOpen?.()}
         onPlayerClick={() => onPlayerModalOpen?.()}
       />
 
-      <AnimatedGameNotification effect={powerEffect} uiNow={powerUiNow} onGhostCancel={onGhostCancel} />
+      <AnimatedGameNotification 
+        key={Array.isArray(powerEffect) ? powerEffect.map(e => e.kind).join('-') : (powerEffect ? powerEffect.kind : 'none')}
+        effect={powerEffect} 
+        uiNow={powerUiNow} 
+        onGhostCancel={onGhostCancel} 
+      />
     </>
   );
 

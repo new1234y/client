@@ -1,3 +1,5 @@
+import Button from "../ui/Button.jsx";
+
 export default function AdminPanel({
   roomCode,
   rosterList,
@@ -17,13 +19,13 @@ export default function AdminPanel({
           <p className="mt-1 font-mono text-3xl font-black tracking-widest text-amber-950">{roomCode}</p>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="danger"
+          className="w-full"
           onClick={onEndGame}
-          className="w-full rounded-2xl bg-gradient-to-r from-[#FB7185] to-[#F43F5E] py-3.5 text-sm font-bold text-white shadow-lg"
         >
           Terminer la partie
-        </button>
+        </Button>
 
         <div className="rounded-3xl bg-white/90 p-4 shadow-sm ring-1 ring-amber-100 dark:bg-slate-800/90 dark:ring-slate-700">
           <p className="mb-2 text-sm font-bold text-slate-800 dark:text-white">Ajouter du temps</p>
@@ -41,16 +43,16 @@ export default function AdminPanel({
                 }
               }}
             />
-            <button
-              type="button"
+            <Button
+              variant="success"
+              size="sm"
               onClick={(e) => {
                 const input = e.currentTarget.parentElement?.querySelector("input");
                 if (input?.value) onAddTime(input.value);
               }}
-              className="rounded-xl bg-gradient-to-r from-[#34D399] to-[#10B981] px-4 py-2 text-xs font-bold text-white"
             >
               + Temps
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -83,43 +85,41 @@ export default function AdminPanel({
                 <div className="space-y-2 p-3">
                   <div className="flex flex-wrap gap-1">
                     {[-10, -5, -1, 1, 5, 10].map((d) => (
-                      <button
+                      <Button
                         key={d}
-                        type="button"
-                        className={`rounded-lg px-2 py-1 text-xs font-bold text-white ${
-                          d > 0 ? "bg-emerald-500" : "bg-rose-500"
-                        }`}
+                        variant={d > 0 ? "success" : "danger"}
+                        size="sm"
                         onClick={() =>
                           onAdjustCoins(p.sessionId, d, p.nickname)
                         }
                       >
                         {d > 0 ? `+${d}` : d}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   {p.sessionId !== sessionId && (
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => onSetRole(p.sessionId, "cat")}
-                        className="rounded-xl bg-gradient-to-r from-[#FB7185] to-[#F97316] px-3 py-2 text-xs font-bold text-white"
                       >
                         Chat
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => onSetRole(p.sessionId, "player")}
-                        className="rounded-xl bg-gradient-to-r from-[#60A5FA] to-[#2563EB] px-3 py-2 text-xs font-bold text-white"
                       >
                         Joueur
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => onKick(p.sessionId)}
-                        className="rounded-xl bg-slate-200 px-3 py-2 text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200"
                       >
                         Expulser
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -128,13 +128,13 @@ export default function AdminPanel({
           })}
         </ul>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          className="w-full"
           onClick={onLeave}
-          className="w-full rounded-2xl border-2 border-slate-200 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-300"
         >
           Quitter (hôte)
-        </button>
+        </Button>
       </div>
     </div>
   );

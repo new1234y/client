@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { useGeolocation } from "./hooks/useGeolocation.js";
@@ -12,10 +13,13 @@ import CityZonePicker from "./components/game/CityZonePicker.jsx";
 import SharePartyModal from "./components/game/SharePartyModal.jsx";
 import PowerCard from "./components/powers/PowerCard.jsx";
 import { NotificationContainer, useNotifications } from "./components/ui/NotificationSystem.jsx";
+import Button from "./components/ui/Button.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
 import DiscreteSlider from "./components/ui/DiscreteSlider.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
 import AnimatedPrice from "./components/ui/AnimatedPrice.jsx";
+import { getGameByCode } from "./supabase.js";
+import RadarBackground from "./components/ui/RadarBackground.jsx";
 import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
@@ -233,7 +237,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
   );
 }
 
-function CatMapLockOverlay({ mapUnlockAt, socket }) {
+function CatMapLockOverlay({ mapUnlockAt, socket, getServerTime }) {
   const [secLeft, setSecLeft] = useState(0);
   const didRefresh = useRef(false);
 
@@ -243,8 +247,9 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
 
   useEffect(() => {
     if (!mapUnlockAt) return;
+    const nowFn = typeof getServerTime === "function" ? getServerTime : () => Date.now();
     const tick = () => {
-      const s = Math.max(0, Math.ceil((mapUnlockAt - Date.now()) / 1000));
+      const s = Math.max(0, Math.ceil((mapUnlockAt - nowFn()) / 1000));
       setSecLeft(s);
       if (s <= 0 && !didRefresh.current) {
         didRefresh.current = true;
@@ -254,7 +259,7 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [mapUnlockAt, socket]);
+  }, [mapUnlockAt, socket, getServerTime]);
 
   const mm = Math.floor(secLeft / 60);
   const ss = secLeft % 60;
@@ -278,7 +283,7 @@ function CatMapLockOverlay({ mapUnlockAt, socket }) {
 }
 
 /** Compte à rebours verrouillage carte chat — visible sur tous les onglets */
-function CatLockCountdownHeader({ mapUnlockAt, socket }) {
+function CatLockCountdownHeader({ mapUnlockAt, socket, getServerTime }) {
   const [secLeft, setSecLeft] = useState(0);
   const didRefresh = useRef(false);
 
@@ -288,8 +293,9 @@ function CatLockCountdownHeader({ mapUnlockAt, socket }) {
 
   useEffect(() => {
     if (!mapUnlockAt) return;
+    const nowFn = typeof getServerTime === "function" ? getServerTime : () => Date.now();
     const tick = () => {
-      const s = Math.max(0, Math.ceil((mapUnlockAt - Date.now()) / 1000));
+      const s = Math.max(0, Math.ceil((mapUnlockAt - nowFn()) / 1000));
       setSecLeft(s);
       if (s <= 0 && !didRefresh.current) {
         didRefresh.current = true;
@@ -299,7 +305,7 @@ function CatLockCountdownHeader({ mapUnlockAt, socket }) {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [mapUnlockAt, socket]);
+  }, [mapUnlockAt, socket, getServerTime]);
 
   const mm = Math.floor(secLeft / 60);
   const ss = secLeft % 60;
@@ -312,14 +318,15 @@ function CatLockCountdownHeader({ mapUnlockAt, socket }) {
 }
 
 // Settings button component
-function SettingsButton({ onClick, size = "md" }) {
+function SettingsButton({ size = "md" }) {
+  const navigate = useNavigate();
   const sizeClasses = size === "sm"
     ? "h-9 w-9 text-sm"
     : "px-3 py-2 text-xs";
 
   const handleClick = (e) => {
     e.stopPropagation();
-    onClick();
+    navigate("/settings");
   };
 
   return (
@@ -341,6 +348,8 @@ function SettingsButton({ onClick, size = "md" }) {
 export default function App() {
   const { theme, toggleTheme } = useTheme();
   const { notifications, addNotification, removeNotification } = useNotifications();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [entryMode, setEntryMode] = useState("create");
   const [entryBusyKind, setEntryBusyKind] = useState(null);
   const [socket, setSocket] = useState(null);
@@ -367,7 +376,6 @@ export default function App() {
   const [mapBasemap, setMapBasemap] = useState("osm");
   const [hasSeenRole, setHasSeenRole] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   const prevMeRef = useRef(null);
   useEffect(() => {
@@ -464,7 +472,13 @@ export default function App() {
   const [baliseLureSelecting, setBaliseLureSelecting] = useState(false);
   const [baliseLureTarget, setBaliseLureTarget] = useState(null);
   const [ghostUiNow, setGhostUiNow] = useState(() => Date.now());
+  const [joinRequestEffect, setJoinRequestEffect] = useState(null);
   const lastPingRef = useRef(Date.now());
+  const serverTimeOffsetRef = useRef(0); // Offset between server time and local time
+  
+  // Helper function to get synchronized server time
+  const getServerTime = () => Date.now() + serverTimeOffsetRef.current;
+  
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
   stageRef.current = stage;
@@ -475,8 +489,8 @@ export default function App() {
   useEffect(() => {
     if (!activeNoise) return;
     const id = setInterval(() => {
-      setNoiseUiNow(Date.now());
-      const elapsed = Date.now() - activeNoise.startedAt;
+      setNoiseUiNow(getServerTime());
+      const elapsed = getServerTime() - activeNoise.startedAt;
       if (elapsed > activeNoise.durationSec * 1000) {
         setActiveNoise(null);
       }
@@ -502,13 +516,13 @@ export default function App() {
 
   useEffect(() => {
     if (!isReconnecting) return;
-    const id = setInterval(() => setReconnectUiNow(Date.now()), 250);
+    const id = setInterval(() => setReconnectUiNow(getServerTime()), 250);
     return () => clearInterval(id);
   }, [isReconnecting]);
 
   // Tick pour les barres de temps (ghost)
   useEffect(() => {
-    const id = setInterval(() => setGhostUiNow(Date.now()), 500);
+    const id = setInterval(() => setGhostUiNow(getServerTime()), 500);
     return () => clearInterval(id);
   }, []);
 
@@ -628,7 +642,7 @@ export default function App() {
               setRolesReveal(res.rolesReveal);
               if (res.rolesReveal.partyChat) setPartyChatMessages(res.rolesReveal.partyChat);
               setHasSeenRole(false);
-              setIsFlipped(false);
+              // Don't reset isFlipped - let user control when to flip
               setStage("role_reveal");
             } else if (res.phase === "playing" && res.gameState) {
               setGameState(res.gameState);
@@ -723,7 +737,7 @@ export default function App() {
 
     s.on("connect", () => {
       setConnected(true);
-      lastPingRef.current = Date.now();
+      lastPingRef.current = getServerTime();
       const saved = loadSession();
       if (saved) {
         setIsReconnecting(true);
@@ -735,7 +749,17 @@ export default function App() {
 
     s.on("disconnect", () => {
       setConnected(false);
-      if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
+      if (stageRef.current === "entry") {
+        // On home screen, clear session and don't auto-reconnect
+        clearSession();
+        setRejoinCandidate(null);
+        try {
+          localStorage.removeItem(LS_LAST_ROOM_KEY);
+          localStorage.removeItem(LS_LAST_SESSION_KEY);
+        } catch (e) {
+          console.warn("localStorage non disponible:", e);
+        }
+      } else if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
         setReconnectError(null);
@@ -744,7 +768,10 @@ export default function App() {
     });
 
     s.on("server_ping", ({ t }) => {
-      lastPingRef.current = Date.now();
+      lastPingRef.current = getServerTime();
+      // Calculate time offset: server time - client time
+      // This allows us to synchronize timers across all devices
+      serverTimeOffsetRef.current = t - Date.now();
       s.emit("client_pong", { t });
     });
 
@@ -764,7 +791,7 @@ export default function App() {
       setRolesReveal(payload);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       setHasSeenRole(false);
-      setIsFlipped(false);
+      // Don't reset isFlipped - let user control when to flip
       setStage("role_reveal");
     });
 
@@ -781,8 +808,16 @@ export default function App() {
     s.on("game_finished", (data) => {
       clearSession();
       setSummary(data);
-      setStage("summary");
       setGameState(null);
+      
+      // Redirect to recap page with game code
+      const recapUrl = `/recap/${data.code}`;
+      window.history.pushState({}, "", recapUrl);
+      setRecapSlug(data.code);
+      setRecapData(data);
+      setRecapLoading(false);
+      setRecapErr(false);
+      setStage("recap");
     });
 
     s.on("capture_ok", (data) => {
@@ -881,7 +916,7 @@ export default function App() {
       });
 
       setActiveNoise({
-        startedAt: Date.now(),
+        startedAt: getServerTime(),
         durationSec: Math.max(1, durationSec || 1),
         volume,
         by: by || "un adversaire",
@@ -940,7 +975,14 @@ export default function App() {
           code: data.code,
         },
       ]);
-      addNotification(`${data.nickname} demande à rejoindre la partie`, "info", 12000);
+      // Use new game notification modal instead of old notification
+      setJoinRequestEffect({
+        kind: "join_request",
+        requestId: data.requestId,
+        nickname: data.nickname,
+        onAccept: () => respondJoinRequest(data.requestId, true),
+        onDeny: () => respondJoinRequest(data.requestId, false),
+      });
     });
 
     s.on("join_request_denied", (data) => {
@@ -965,7 +1007,7 @@ export default function App() {
       else if (payload.lobby?.partyChat) setPartyChatMessages(payload.lobby.partyChat);
       if (payload.phase === "role_reveal") {
         setHasSeenRole(false);
-        setIsFlipped(false);
+        // Don't reset isFlipped - let user control when to flip
         setStage("role_reveal");
       } else if (payload.phase === "playing") {
         setStage("game");
@@ -1008,7 +1050,7 @@ export default function App() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const heartbeatCheck = setInterval(() => {
-      if (s.connected && Date.now() - lastPingRef.current > 180000) {
+      if (s.connected && getServerTime() - lastPingRef.current > 180000) {
         s.emit("refresh_state");
       }
     }, 60000);
@@ -1043,7 +1085,7 @@ export default function App() {
 
   useEffect(() => {
     if (!socket || !position) return;
-    const now = Date.now();
+    const now = getServerTime();
     if (now - lastEmit.current < 800) return;
     lastEmit.current = now;
     socket.emit("position", { lat: position.lat, lng: position.lng });
@@ -1146,6 +1188,7 @@ export default function App() {
         console.log('[respondJoinRequest] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Action impossible.");
         setJoinRequestQueue((q) => q.filter((x) => x.requestId !== requestId));
+        setJoinRequestEffect(null);
       });
     },
     [socket]
@@ -1591,20 +1634,64 @@ export default function App() {
   useEffect(() => {
     if (!recapSlug) return;
     let alive = true;
-    fetch(`/api/recap/${recapSlug}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => {
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryDelay = 2000; // 2 seconds
+    
+    const fetchRecap = async () => {
+      try {
+        const data = await getGameByCode(recapSlug);
         if (alive) {
-          setRecapData(d);
-          setRecapLoading(false);
+          if (data) {
+            // Transform Supabase data to match expected format
+            const summary = {
+              code: data.code,
+              huntStartedAt: data.hunt_started_at ? new Date(data.hunt_started_at).getTime() : null,
+              endedAt: data.ended_at ? new Date(data.ended_at).getTime() : null,
+              gameCenter: data.game_center,
+              globalRadiusM: data.global_radius_m,
+              jamRadiusM: data.jam_radius_m,
+              settingsSnapshot: data.settings_snapshot,
+              players: data.players,
+              colors: data.colors,
+              partyChat: data.party_chat,
+              shrinkPhasesList: data.shrink_phases_list,
+              balises: data.balises,
+              analytics: data.analytics,
+              timeline: data.analytics?.timeline || [],
+              paths: data.analytics?.paths || {},
+              jamHistory: data.analytics?.jamHistory || [],
+            };
+            setRecapData(summary);
+            setRecapErr(false);
+            setRecapLoading(false);
+            
+            // Update page title for sharing
+            document.title = `Chase GPS - Partie ${data.code}`;
+          } else {
+            // Data not yet saved to Supabase, retry
+            retryCount++;
+            if (retryCount < maxRetries) {
+              console.log(`[recap] Game data not found, retrying (${retryCount}/${maxRetries})...`);
+              setTimeout(fetchRecap, retryDelay);
+            } else {
+              console.log('[recap] Max retries reached, showing error');
+              setRecapErr(true);
+              setRecapLoading(false);
+            }
+          }
         }
-      })
-      .catch(() => {
+      } catch (e) {
+        console.error('Failed to fetch recap from Supabase:', e);
         if (alive) {
           setRecapErr(true);
           setRecapLoading(false);
         }
-      });
+      }
+    };
+    
+    fetchRecap();
+    
     return () => {
       alive = false;
     };
@@ -1681,28 +1768,32 @@ export default function App() {
   // Entry screen
   if (stage === "entry") {
     return (
-      <div className="flex min-h-full flex-col bg-white p-4 pb-8">
+      <div className="flex min-h-full flex-col bg-white p-4 pb-8 relative">
+        <RadarBackground />
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
         
-        <header className="mb-8 flex items-start justify-between gap-3 pt-4">
+        <header className="mb-8 flex items-start justify-between gap-3 pt-4 relative z-10">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
               Chase GPS
             </h1>
+            <p className="mt-3 text-xl font-semibold text-slate-700">
+              Le jeu de chat et de souris en temps réel
+            </p>
             <p className="mt-2 flex items-center gap-2 text-sm text-slate-600">
               <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
               {connected ? "Connecté" : "Connexion..."}
             </p>
-            <p className="mt-1 max-w-md text-sm text-slate-500">
-              Les chats traquent les joueurs en temps réel
+            <p className="mt-3 max-w-md text-base text-slate-600 leading-relaxed">
+              Créez une partie avec vos amis, rejoignez une salle existante, et vivez une expérience de traque GPS unique. Les chats traquent les joueurs en temps réel !
             </p>
           </div>
-          <SettingsButton onClick={() => setShowSettings(true)} size="sm" />
+          <SettingsButton size="sm" />
         </header>
 
         {errorBanner && (
-          <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-900 ring-1 ring-red-200">
+          <div className="mb-4 rounded-xl bg-red-50/90 backdrop-blur-sm p-3 text-sm text-red-900 ring-1 ring-red-200 relative z-10">
             {errorBanner}
           </div>
         )}
@@ -1757,7 +1848,7 @@ export default function App() {
                           } else if (res.phase === "role_reveal" && res.rolesReveal) {
                             setRolesReveal(res.rolesReveal);
                             setHasSeenRole(false);
-                            setIsFlipped(false);
+                            // Don't reset isFlipped - let user control when to flip
                             setStage("role_reveal");
                           } else if (res.phase === "playing" && res.gameState) {
                             setGameState(res.gameState);
@@ -1802,7 +1893,7 @@ export default function App() {
         )}
 
         <div
-          className="mx-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200"
+          className="mx-auto w-full max-w-md rounded-3xl bg-white/80 backdrop-blur-xl p-8 shadow-2xl ring-1 ring-white/50 relative z-10"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !entryBusyKind) {
               e.preventDefault();
@@ -1811,48 +1902,40 @@ export default function App() {
             }
           }}
         >
-        <div className="mb-4 flex gap-3">
-          <button
-            type="button"
+        <div className="mb-6 flex gap-3">
+          <Button
+            variant={entryMode === "create" ? "primaryGradient" : "secondary"}
+            className="flex-1"
             onClick={() => {
               setEntryMode("create");
               setErrorBanner(null);
               setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
-            className={`flex-1 rounded-xl py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
-              entryMode === "create"
-                ? "bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark text-white shadow-lg"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Créer une partie
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={entryMode === "join" ? "primaryGradient" : "secondary"}
+            className="flex-1"
             onClick={() => {
               setEntryMode("join");
               setErrorBanner(null);
               setNicknameError(null);
             }}
             disabled={Boolean(entryBusyKind)}
-            className={`flex-1 rounded-xl py-3 text-sm font-bold transition-colors flex items-center justify-center gap-2 ${
-              entryMode === "join"
-                ? "bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark text-white shadow-lg"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             Rejoindre
-          </button>
+          </Button>
         </div>
 
-        <label className="mb-2 text-sm font-medium text-slate-700">
+        <label className="mb-2 text-sm font-semibold text-slate-700">
           Pseudo
         </label>
         <div className="relative mb-4">
@@ -1862,10 +1945,10 @@ export default function App() {
             </svg>
           </div>
           <input
-            className={`w-full rounded-xl border bg-white pl-12 pr-4 py-3.5 text-base text-slate-900 outline-none focus:ring-2 ${
+            className={`w-full rounded-2xl border bg-white/90 backdrop-blur-sm pl-12 pr-4 py-4 text-base text-slate-900 outline-none focus:ring-2 transition-all ${
               nicknameError
                 ? "border-orange-300 ring-orange-500"
-                : "border-slate-300 ring-vibrant-blue"
+                : "border-slate-200 ring-blue-500/50"
             }`}
             placeholder="Votre nom"
             value={nickname}
@@ -1886,11 +1969,11 @@ export default function App() {
 
         {entryMode === "join" && (
           <>
-            <label className="mb-2 text-sm font-medium text-slate-700">
+            <label className="mb-2 text-sm font-semibold text-slate-700">
               Code de la salle
             </label>
             <input
-              className="mb-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base uppercase tracking-widest text-slate-900 outline-none focus:ring-2 focus:ring-vibrant-blue"
+              className="mb-4 w-full rounded-2xl border border-slate-200 bg-white/90 backdrop-blur-sm px-4 py-4 text-base uppercase tracking-widest text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
               placeholder="ex: AZERT"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
@@ -1902,44 +1985,46 @@ export default function App() {
         )}
 
         {entryMode === "create" ? (
-          <button
-            type="button"
+          <Button
+            variant="primaryGradient"
+            size="lg"
+            className="w-full"
             onClick={onCreate}
             disabled={Boolean(entryBusyKind)}
-            className="w-full rounded-2xl bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark py-4 text-base font-bold text-white shadow-lg flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
             {entryBusyKind === "create" ? "Réveil du serveur…" : "Créer ma partie"}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="primaryGradient"
+            size="lg"
+            className="w-full"
             onClick={onJoin}
             disabled={Boolean(entryBusyKind)}
-            className="w-full rounded-2xl bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark py-4 text-base font-bold text-white shadow-lg flex items-center justify-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
             {entryBusyKind === "join" ? "Réveil du serveur…" : "Rejoindre la partie"}
-          </button>
+          </Button>
         )}
 
         {entryBusyKind && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            className="w-full"
             onClick={() => {
               entryReqRef.current += 1;
               setEntryBusyKind(null);
             }}
-            className="w-full rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200"
           >
             Annuler
-          </button>
+          </Button>
         )}
         </div>
 
@@ -1955,13 +2040,13 @@ export default function App() {
             <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
               L’hôte doit accepter votre demande.
             </p>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              className="mt-4 w-full"
               onClick={() => setMidJoinWait(null)}
-              className="mt-4 w-full rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
             >
               Annuler
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -1975,10 +2060,10 @@ if (stage === "lobby" && lobby) {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row relative">
-        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-32 md:max-w-none">
+        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-48 md:max-w-none">
           <header className="flex shrink-0 items-start justify-between gap-3">
             <div>
-              <p className="font-mono text-3xl font-bold tracking-widest text-indigo-600 dark:text-indigo-400">
+              <p className="font-mono text-5xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
                 {lobby.code}
               </p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
@@ -1986,14 +2071,13 @@ if (stage === "lobby" && lobby) {
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
+              <Button
+                variant="primaryGradient"
                 onClick={() => setShowShareParty(true)}
-                className="rounded-xl bg-vibrant-blue px-4 py-2.5 text-sm font-bold text-white shadow-lg"
               >
                 Partager
-              </button>
-              <SettingsButton onClick={() => setShowSettings(true)} size="sm" />
+              </Button>
+              <SettingsButton size="sm" />
             </div>
           </header>
 
@@ -2260,28 +2344,46 @@ if (stage === "lobby" && lobby) {
       </div>
 
       {/* Fixed bottom button container */}
-      {isHost && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200 p-4 shadow-2xl">
-          <button
-            type="button"
-            onClick={onRevealRoles}
-            disabled={!lobby.canStartGps || !lobby.canRevealRoles}
-            className="w-full rounded-xl bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark py-4 text-base font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 shadow-lg"
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200 p-4 shadow-2xl">
+        {isHost ? (
+          <>
+            <Button
+              variant="primaryGradient"
+              size="lg"
+              className="w-full"
+              onClick={onRevealRoles}
+              disabled={!lobby.canStartGps || !lobby.canRevealRoles}
+            >
+              Révéler les rôles
+            </Button>
+            {!lobby.canRevealRoles && (
+              <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+                Il faut au moins 2 joueurs dans la salle pour lancer la partie.
+              </p>
+            )}
+            {lobby.canRevealRoles && !lobby.canStartGps && (
+              <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+                Au moins une position GPS est nécessaire pour le centre de la zone.
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              className="mt-3 w-full"
+              onClick={leaveGame}
+            >
+              Quitter la partie
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={leaveGame}
           >
-            Révéler les rôles
-          </button>
-          {!lobby.canRevealRoles && (
-            <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
-              Il faut au moins 2 joueurs dans la salle pour lancer la partie.
-            </p>
-          )}
-          {lobby.canRevealRoles && !lobby.canStartGps && (
-            <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
-              Au moins une position GPS est nécessaire pour le centre de la zone.
-            </p>
-          )}
-        </div>
-      )}
+            Quitter la partie
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -2292,7 +2394,8 @@ if (stage === "role_reveal" && rolesReveal) {
   const myRole = myPlayer?.role;
 
   const handleCardClick = () => {
-    setIsFlipped(true);
+    console.log('[handleCardClick] Card clicked, isFlipped:', isFlipped);
+    setIsFlipped(prev => !prev);
     if (!hasSeenRole) {
       setHasSeenRole(true);
       socket?.emit("player_saw_role", {}, (res) => {
@@ -2386,16 +2489,23 @@ if (stage === "role_reveal" && rolesReveal) {
           {myPlayer && (
             <div className="flex justify-center py-8">
               <div 
-                className="relative h-64 w-80 cursor-pointer perspective-1000"
-                onClick={handleCardClick}
+                className="relative h-64 w-80 cursor-pointer"
+                style={{ perspective: '1000px' }}
+                onClick={() => {
+                  console.log('[Card] Clicked directly, current isFlipped:', isFlipped);
+                  handleCardClick();
+                }}
               >
                 <div 
-                  className={`relative h-full w-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}
-                  style={{ transformStyle: 'preserve-3d' }}
+                  className="relative h-full w-full transition-transform duration-700"
+                  style={{
+                    transformStyle: 'preserve-3d',
+                    transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
+                  }}
                 >
                   {/* Front of card */}
                   <div 
-                    className="absolute inset-0 flex items-center justify-center rounded-3xl bg-gradient-to-br from-slate-100 to-slate-200 shadow-2xl backface-hidden"
+                    className="absolute inset-0 flex items-center justify-center rounded-3xl bg-gradient-to-br from-slate-100 to-slate-200 shadow-2xl"
                     style={{ backfaceVisibility: 'hidden' }}
                   >
                     <div className="text-center">
@@ -2407,7 +2517,7 @@ if (stage === "role_reveal" && rolesReveal) {
 
                   {/* Back of card */}
                   <div 
-                    className={`absolute inset-0 flex items-center justify-center rounded-3xl shadow-2xl backface-hidden rotate-y-180 ${
+                    className={`absolute inset-0 flex items-center justify-center rounded-3xl shadow-2xl ${
                       myRole === 'cat' 
                         ? 'bg-gradient-to-br from-red-500 to-red-700' 
                         : 'bg-gradient-to-br from-emerald-500 to-blue-600'
@@ -2504,16 +2614,17 @@ if (stage === "role_reveal" && rolesReveal) {
                   <div className="absolute h-1 w-1 rounded-full bg-[#E2C96D]" style={{ transform: 'translateX(44px)' }} />
                 </div>
               </div>
-              <button
-                type="button"
+              <Button
+                variant="primaryGradient"
+                size="lg"
+                className="relative z-10 w-full"
                 onClick={onBeginHunt}
                 disabled={!allPlayersSeenRole || (rolesReveal?.players?.length ?? 0) < 2}
-                className="relative z-10 w-full rounded-[8px] bg-gradient-to-r from-blue-500 to-pink-500 py-4 text-base font-semibold text-white shadow-md transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {!allPlayersSeenRole 
                   ? "En attente que tous voient leur rôle" 
                   : "Lancer la chasse"}
-              </button>
+              </Button>
               {!allPlayersSeenRole && (
                 <p className="mt-2 text-center text-xs text-amber-600">
                   {rolesReveal.players?.filter(p => !p.hasSeenRole).length ?? 0} joueur(s) n'ont pas encore vu leur rôle
@@ -2525,15 +2636,13 @@ if (stage === "role_reveal" && rolesReveal) {
               En attente du démarrage par l&apos;hôte…
             </p>
           )}
-          {!isHost && (
-            <button
-              type="button"
-              onClick={leaveGame}
-              className="mt-4 w-full rounded-[8px] border border-slate-300 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
-            >
-              Quitter la partie
-            </button>
-          )}
+          <Button
+            variant="secondary"
+            className="mt-4 w-full"
+            onClick={leaveGame}
+          >
+            Quitter la partie
+          </Button>
         </main>
       </div>
     </div>
@@ -2612,38 +2721,47 @@ if (stage === "role_reveal" && rolesReveal) {
     const jamIsMin = jamScale <= 0.51; // proche du palier min côté serveur (0.5)
     const jamIsMax = jamScale >= 1.49; // proche du palier max côté serveur (1.5)
 
-    // Effet de pouvoir actif pour l'extension du HUD
-    let hudPowerEffect = null;
-    let hudPowerUiNow = Date.now();
+    // Effet de pouvoir actif pour l'extension du HUD - collect all active effects
+    const hudPowerEffects = [];
+    let hudPowerUiNow = getServerTime();
+    
+    if (joinRequestEffect) {
+      hudPowerEffects.push(joinRequestEffect);
+      hudPowerUiNow = Date.now();
+    }
     if (baliseLureSelecting) {
-      hudPowerEffect = { kind: "balise_lure" };
-    } else if (activeNoise) {
-      const elapsed = Date.now() - activeNoise.startedAt;
+      hudPowerEffects.push({ kind: "balise_lure" });
+    }
+    if (activeNoise) {
+      const elapsed = getServerTime() - activeNoise.startedAt;
       if (elapsed <= activeNoise.durationSec * 1000) {
-        hudPowerEffect = { kind: "noise", ...activeNoise };
+        hudPowerEffects.push({ kind: "noise", ...activeNoise });
         hudPowerUiNow = noiseUiNow;
       }
-    } else if (me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince) {
-      hudPowerEffect = {
+    }
+    if (me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince) {
+      hudPowerEffects.push({
         kind: "ghost",
         invisUntil: me.invisUntil,
         invisSince: me.invisSince,
-      };
+      });
       hudPowerUiNow = ghostUiNow;
-    } else if (me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow) {
-      hudPowerEffect = { kind: "immobilized", until: me.immobilizedUntil };
+    }
+    if (me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow) {
+      hudPowerEffects.push({ kind: "immobilized", until: me.immobilizedUntil });
       hudPowerUiNow = ghostUiNow;
-    } else if (jamLevel !== "normal") {
-      hudPowerEffect = {
+    }
+    if (jamLevel !== "normal") {
+      hudPowerEffects.push({
         kind: "jam",
-        label: jamLabel,
+        label: jamLevel,
         radiusM: jamRadius,
-      };
+      });
     }
 
-    const isCooldown = (key) => (localCooldowns?.[key] || 0) > Date.now();
+    const isCooldown = (key) => (localCooldowns?.[key] || 0) > getServerTime();
     const cooldownUntil = (key) => localCooldowns?.[key] || 0;
-    const setCd = (key, secs) => setLocalCooldowns((m) => ({ ...m, [key]: Date.now() + secs * 1000 }));
+    const setCd = (key, secs) => setLocalCooldowns((m) => ({ ...m, [key]: getServerTime() + secs * 1000 }));
 
     const sameRoleAliveCount = (gameState.roster || []).filter((p) => p.role === role && !p.spectator && !p.captured).length;
     const catAliveCount = (gameState.roster || []).filter((p) => p.role === "cat" && !p.spectator && !p.captured).length;
@@ -3159,7 +3277,7 @@ if (stage === "role_reveal" && rolesReveal) {
                             if (jamIsMax) return; // évite d'envoyer une requête inutile
                             socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
                               if (res?.ok) {
-                                addNotification("Cercle de brouillage ajusté", "success");
+                                // Game notification handles jam level display
                               } else if (res?.error) {
                                 // On supprime le cas "Déjà au maximum" côté UX : on se contente de bloquer le bouton
                                 if (!/Déjà au maximum/i.test(res.error)) {
@@ -3453,7 +3571,7 @@ if (stage === "role_reveal" && rolesReveal) {
               {gameTab === "admin" && isHost && renderAdminPanel()}
 
               {gameTab === "map" && catLocked && isCat && (
-                <CatMapLockOverlay mapUnlockAt={gameState.mapUnlockAt} socket={socket} />
+                <CatMapLockOverlay mapUnlockAt={gameState.mapUnlockAt} socket={socket} getServerTime={getServerTime} />
               )}
 
               {gameTab === "map" && !(catLocked && isCat) && (
@@ -3507,6 +3625,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       jamLevel={jamLevel}
                       connected={connected}
                       shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                      timeLimitEnabled={gameState.settings?.timeLimitEnabled}
                       currentRadius={gameState.effectiveGlobalRadiusM}
                       nextRadius={gameState.nextPhaseRadiusM}
                       phaseEndsAt={gameState.phaseEndsAt}
@@ -3521,7 +3640,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       isCat={isCat}
                       mapUnlockAt={gameState.mapUnlockAt}
                       socket={socket}
-                      powerEffect={hudPowerEffect}
+                      powerEffect={hudPowerEffects.length > 0 ? hudPowerEffects : null}
                       powerUiNow={hudPowerUiNow}
                       gameStartedAt={gameState.huntStartedAt}
                       onGhostCancel={() => {
@@ -3545,6 +3664,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       jamLevel={jamLevel}
                       connected={connected}
                       shrinkZoneEnabled={gameState.settings?.shrinkZoneEnabled}
+                      timeLimitEnabled={gameState.settings?.timeLimitEnabled}
                       currentRadius={gameState.effectiveGlobalRadiusM}
                       nextRadius={gameState.nextPhaseRadiusM}
                       phaseEndsAt={gameState.phaseEndsAt}
@@ -3559,7 +3679,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       isCat={isCat}
                       mapUnlockAt={gameState.mapUnlockAt}
                       socket={socket}
-                      powerEffect={hudPowerEffect}
+                      powerEffect={hudPowerEffects.length > 0 ? hudPowerEffects : null}
                       powerUiNow={hudPowerUiNow}
                       gameStartedAt={gameState.huntStartedAt}
                       onGhostCancel={() => {
@@ -3580,7 +3700,7 @@ if (stage === "role_reveal" && rolesReveal) {
 
               <CoinFeed socket={socket} sessionId={sessionIdRef.current} />
               <div className="pointer-events-none absolute right-3 top-3 z-[800] hidden md:flex items-center gap-2">
-                <SettingsButton onClick={() => setShowSettings(true)} size="sm" />
+                <SettingsButton size="sm" />
               </div>
             </div>
 
@@ -3667,6 +3787,8 @@ if (stage === "role_reveal" && rolesReveal) {
           nextRadius={gameState?.nextPhaseRadiusM}
           gameStartedAt={gameState?.huntStartedAt}
           timeLimitEndsAt={gameState?.timeLimitEndsAt}
+          shrinkZoneEnabled={gameState?.settings?.shrinkZoneEnabled}
+          timeLimitEnabled={gameState?.settings?.timeLimitEnabled}
           onClose={() => setShowZoneModal(false)}
         />}
         {showGameModal && <GameModal
@@ -3705,9 +3827,9 @@ if (stage === "role_reveal" && rolesReveal) {
     );
   }
 
-  // Settings page
-  if (showSettings) {
-    return <SettingsPage onClose={() => setShowSettings(false)} />;
+  // Settings page route
+  if (location.pathname === "/settings") {
+    return <SettingsPage />;
   }
 
   return (

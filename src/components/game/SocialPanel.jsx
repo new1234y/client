@@ -1,4 +1,5 @@
 import PartyChatPanel from "./PartyChatPanel.jsx";
+import Button from "../ui/Button.jsx";
 
 export default function SocialPanel({
   roomCode,
@@ -20,13 +21,13 @@ export default function SocialPanel({
         <div className="rounded-3xl bg-gradient-to-br from-[#BFDBFE] via-[#93C5FD] to-[#2563EB] p-5 text-center text-white shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/80">Code partie</p>
           <p className="mt-1 font-mono text-3xl font-black tracking-widest">{roomCode}</p>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            className="mt-4 w-full"
             onClick={onShare}
-            className="mt-4 w-full rounded-full bg-white/90 py-2.5 text-sm font-bold text-[#2563EB] shadow transition hover:bg-white"
           >
             Partager
-          </button>
+          </Button>
         </div>
 
         <div>

@@ -1,48 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
-  const [animationPhase, setAnimationPhase] = useState('circle-expand');
-  const [isVisible, setIsVisible] = useState(false);
+function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
+  // Gestion de l'état de l'animation : 'hidden' | 'entering' | 'exiting'
+  const [animationState, setAnimationState] = useState('hidden');
+  const effectRef = useRef(null);
+  const prevJamLabelRef = useRef(null);
+
+  const buildEffectKey = (ef) => {
+    if (!ef) return 'none';
+    const makeKey = (e) => {
+      if (!e) return 'empty';
+      switch (e.kind) {
+        case 'noise':
+          return `noise:${e.volume || ''}:${e.startedAt || ''}:${e.durationSec || ''}:${e.by || ''}`;
+        case 'ghost':
+          return `ghost:${e.invisSince || ''}:${e.invisUntil || ''}:${e.by || ''}`;
+        case 'immobilized':
+          return `immobilized:${e.until || ''}`;
+        case 'jam':
+          return `jam:${e.label || ''}`;
+        case 'balise_lure':
+          return `balise_lure:${e.id || e.lat || e.lng || ''}`;
+        case 'join_request':
+          return `join_request:${e.nickname || ''}:${e.requestId || ''}`;
+        default:
+          try {
+            const clone = {};
+            Object.keys(e).forEach(k => {
+              const v = e[k];
+              if (typeof v !== 'function' && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) {
+                clone[k] = v;
+              }
+            });
+            return `${e.kind}:${JSON.stringify(clone)}`;
+          } catch (err) {
+            return String(e.kind);
+          }
+      }
+    };
+
+    if (Array.isArray(ef)) {
+      return ef.map(makeKey).join('|');
+    }
+    return makeKey(ef);
+  };
+
+  const effectKey = buildEffectKey(effect);
 
   useEffect(() => {
-    setIsVisible(true);
-    // Animation sequence
-    const phase1 = setTimeout(() => setAnimationPhase('circle-expand'), 0);
-    const phase2 = setTimeout(() => setAnimationPhase('circle-open'), 300);
-    const phase3 = setTimeout(() => setAnimationPhase('descend'), 600);
-    const phase4 = setTimeout(() => setAnimationPhase('content-expand'), 900);
+    if (effectKey === 'none' || effectKey === 'empty') {
+      setAnimationState('exiting'); // On lance la sortie si l'effet disparaît
+      effectRef.current = null;
+      return;
+    }
 
-    return () => {
-      clearTimeout(phase1);
-      clearTimeout(phase2);
-      clearTimeout(phase3);
-      clearTimeout(phase4);
-    };
-  }, []);
+    const prevKey = effectRef.current;
+    let prevJam = null;
+    if (prevKey) {
+      const m = String(prevKey).match(/jam:([^|]+)/);
+      if (m) prevJam = m[1];
+    }
+
+    let currentJam = null;
+    const currentMatch = String(effectKey).match(/jam:([^|]+)/);
+    if (currentMatch) currentJam = currentMatch[1];
+
+    if (currentJam && prevJam && prevJam !== currentJam) {
+      prevJamLabelRef.current = prevJam;
+    } else {
+      prevJamLabelRef.current = null;
+    }
+
+    effectRef.current = effectKey;
+    setAnimationState('entering'); // On déclenche l'animation d'entrée
+
+    // Au bout de 2 secondes, on passe en mode "exiting"
+    const timer = setTimeout(() => {
+      setAnimationState('exiting');
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [effectKey]);
 
   if (!effect) return null;
 
-  const getContent = () => {
-    if (effect.kind === "noise") {
-      const elapsedMs = Math.max(0, uiNow - effect.startedAt);
-      const totalMs = Math.max(1, effect.durationSec * 1000);
+  const effects = Array.isArray(effect) ? effect : [effect];
+
+  const getContent = (currentEffect) => {
+    if (currentEffect.kind === "noise") {
+      const elapsedMs = Math.max(0, uiNow - currentEffect.startedAt);
+      const totalMs = Math.max(1, currentEffect.durationSec * 1000);
       const remainingSec = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
       const progress = Math.min(1, elapsedMs / totalMs);
       if (elapsedMs > totalMs) return null;
 
       const volumeLabel =
-        effect.volume === "low" ? "Bas" : effect.volume === "high" ? "Fort" : "Moyen";
+        currentEffect.volume === "low" ? "Bas" : currentEffect.volume === "high" ? "Fort" : "Moyen";
 
       return (
         <>
           <div className="flex items-center gap-2">
             <span className="text-2xl">
-              {effect.volume === "high" ? "🔊" : effect.volume === "low" ? "🔈" : "🔉"}
+              {currentEffect.volume === "high" ? "🔊" : currentEffect.volume === "low" ? "🔈" : "🔉"}
             </span>
             <div>
               <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Bruit fantôme</p>
               <p className="text-xs font-semibold text-blue-700">
-                {effect.by} fait vibrer ({volumeLabel})
+                {currentEffect.by} fait vibrer ({volumeLabel})
               </p>
             </div>
           </div>
@@ -59,9 +123,9 @@ export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel 
       );
     }
 
-    if (effect.kind === "ghost") {
-      const total = effect.invisUntil - effect.invisSince;
-      const rest = effect.invisUntil - uiNow;
+    if (currentEffect.kind === "ghost") {
+      const total = currentEffect.invisUntil - currentEffect.invisSince;
+      const rest = currentEffect.invisUntil - uiNow;
       if (total <= 0 || rest <= 0) return null;
       const progress = 1 - rest / total;
       const remainingSec = Math.max(1, Math.round(rest / 1000));
@@ -84,7 +148,7 @@ export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel 
               <button
                 type="button"
                 onClick={onGhostCancel}
-                className="px-3 py-1 text-xs font-semibold text-blue-600 bg-white rounded-full border border-blue-300 hover:bg-blue-50"
+                className="pointer-events-auto px-3 py-1 text-xs font-semibold text-blue-600 bg-white rounded-full border border-blue-300 hover:bg-blue-50"
               >
                 Visible
               </button>
@@ -94,10 +158,12 @@ export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel 
       );
     }
 
-    if (effect.kind === "immobilized") {
-      const rest = effect.until - uiNow;
+    if (currentEffect.kind === "immobilized") {
+      const rest = currentEffect.until - uiNow;
       if (rest <= 0) return null;
       const remainingSec = Math.max(1, Math.round(rest / 1000));
+      const totalDuration = 10000;
+      const progress = Math.max(0, Math.min(1, rest / totalDuration));
 
       return (
         <>
@@ -105,30 +171,81 @@ export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel 
             <span className="text-2xl">🧊</span>
             <div>
               <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Immobilisé</p>
-              <p className="text-xs font-semibold text-blue-700">Carte gelée — {remainingSec}s restantes</p>
+              <p className="text-xs font-semibold text-blue-700">Carte gelée</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3 mt-2">
+            <div className="flex-1 h-2 overflow-hidden rounded-full bg-blue-200">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-200"
+                style={{ width: `${Math.max(8, progress * 100)}%` }}
+              />
+            </div>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
           </div>
         </>
       );
     }
 
-    if (effect.kind === "jam") {
+    if (currentEffect.kind === "jam") {
+      const jamLevel = currentEffect.label;
+      const isSmall = jamLevel === 'small';
+      const isNormal = jamLevel === 'normal' || jamLevel === 'medium';
+      const isLarge = jamLevel === 'large';
+
+      const labelToText = (lbl) => {
+        if (lbl === 'small') return 'Petit';
+        if (lbl === 'normal' || lbl === 'medium') return 'Moyen';
+        if (lbl === 'large') return 'Grand';
+        return '';
+      };
+      
+      const prevLabel = prevJamLabelRef.current;
+      const showTransition = prevLabel && prevLabel !== jamLevel;
+
       return (
         <>
           <div className="flex items-center gap-2">
             <span className="text-2xl">📡</span>
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Cercle de brouillage</p>
-              <p className="text-xs font-semibold text-blue-700">
-                Zone {effect.label} — rayon ~{Math.round(effect.radiusM)}m
-              </p>
+            <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Cercle de brouillage</p>
+          </div>
+          <div className="flex flex-col gap-2 mt-3">
+            {showTransition && (
+              <div className="text-xs font-semibold text-blue-700 mb-1 text-center">
+                {labelToText(prevLabel)} → {labelToText(jamLevel)}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div 
+                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isSmall ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
+                style={{
+                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
+                }}
+              />
+              <div 
+                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isNormal ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
+                style={{
+                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
+                }}
+              />
+              <div 
+                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isLarge ? 'bg-green-500 shadow-lg shadow-green-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
+                style={{
+                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isSmall ? 'text-red-500' : 'text-gray-400'}`}>Petit</span>
+              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isNormal ? 'text-yellow-500' : 'text-gray-400'}`}>Moyen</span>
+              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isLarge ? 'text-green-500' : 'text-gray-400'}`}>Grand</span>
             </div>
           </div>
         </>
       );
     }
 
-    if (effect.kind === "balise_lure") {
+    if (currentEffect.kind === "balise_lure") {
       return (
         <>
           <div className="flex items-center gap-2">
@@ -141,45 +258,146 @@ export default function AnimatedGameNotification({ effect, uiNow, onGhostCancel 
       );
     }
 
+    if (currentEffect.kind === "join_request") {
+      return (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">👤</span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Demande de rejoindre</p>
+              <p className="text-xs font-semibold text-blue-700">
+                {currentEffect.nickname} veut rejoindre la partie
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              type="button"
+              onClick={() => currentEffect.onAccept?.()}
+              className="flex-1 px-3 py-2 text-xs font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 pointer-events-auto"
+            >
+              Accepter
+            </button>
+            <button
+              type="button"
+              onClick={() => currentEffect.onDeny?.()}
+              className="flex-1 px-3 py-2 text-xs font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 pointer-events-auto"
+            >
+              Refuser
+            </button>
+          </div>
+        </>
+      );
+    }
+
     return null;
   };
 
-  const content = getContent();
-  if (!content) return null;
+  // Ne filtre que si l'état est complètement 'hidden'
+  const validEffects = effects.filter(e => {
+    if (!e) return false;
+    if (animationState === 'hidden') return false;
+    const content = getContent(e);
+    return content !== null;
+  });
+
+  if (validEffects.length === 0) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] pointer-events-none flex items-start justify-center pt-32">
-      {/* Circle animation */}
-      <div
-        className={`relative transition-all duration-300 ease-out ${
-          animationPhase === 'circle-expand' ? 'scale-0 opacity-0' :
-          animationPhase === 'circle-open' ? 'scale-100 opacity-100' :
-          animationPhase === 'descend' ? 'scale-100 opacity-100 translate-y-20' :
-          'scale-100 opacity-100 translate-y-24'
-        }`}
-      >
-        {/* Expanding circle */}
-        <div
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-2xl transition-all duration-500 ease-out ${
-            animationPhase === 'circle-expand' ? 'w-0 h-0' :
-            animationPhase === 'circle-open' ? 'w-16 h-16' :
-            animationPhase === 'descend' ? 'w-16 h-16' :
-            'w-0 h-0'
-          }`}
-        />
+    <>
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateY(-20px) scale(0.1);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(60px) scale(1);
+            opacity: 1;
+          }
+        }
+        /* L'animation de sortie : Exactement l'inverse de slideIn */
+        @keyframes slideOut {
+          from {
+            transform: translateY(60px) scale(1);
+            opacity: 1;
+          }
+          to {
+            transform: translateY(-20px) scale(0.1);
+            opacity: 0;
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            width: 0;
+            height: 0;
+            opacity: 0;
+          }
+          to {
+            width: 48px;
+            height: 48px;
+            opacity: 0.3;
+          }
+        }
+        /* Inverse du petit cercle de fond */
+        @keyframes fadeOut {
+          from {
+            width: 48px;
+            height: 48px;
+            opacity: 0.3;
+          }
+          to {
+            width: 0;
+            height: 0;
+            opacity: 0;
+          }
+        }
+      `}</style>
+      <div className="fixed inset-0 z-40 pointer-events-none flex items-start justify-center pt-16 gap-3">
+        {validEffects.map((e, index) => {
+          const content = getContent(e);
+          if (!content) return null;
+          return (
+            <div
+              key={`${e.kind}-${index}`}
+              className="relative"
+              style={{
+                // Application dynamique de slideIn ou slideOut
+                animation: animationState === 'entering'
+                  ? 'slideIn 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards'
+                  : 'slideOut 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                animationIterationCount: '1'
+              }}
+              // Quand le slideOut se termine, on masque définitivement l'élément du DOM
+              onAnimationEnd={() => {
+                if (animationState === 'exiting') {
+                  setAnimationState('hidden');
+                }
+              }}
+            >
+              {/* Cercle d'effet avec fadeIn / fadeOut */}
+              <div
+                className="notification-circle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-2xl"
+                style={{
+                  animation: animationState === 'entering'
+                    ? 'fadeIn 400ms ease-out forwards'
+                    : 'fadeOut 400ms ease-out forwards',
+                  animationIterationCount: '1'
+                }}
+              />
 
-        {/* Content container */}
-        <div
-          className={`relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-4 border border-blue-200 transition-all duration-500 ease-out overflow-hidden ${
-            animationPhase === 'circle-expand' ? 'max-h-0 opacity-0 scale-75' :
-            animationPhase === 'circle-open' ? 'max-h-0 opacity-0 scale-75' :
-            animationPhase === 'descend' ? 'max-h-0 opacity-0 scale-75' :
-            'max-h-40 opacity-100 scale-100'
-          }`}
-        >
-          {content}
-        </div>
+              {/* Conteneur principal */}
+              <div
+                className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-4 border border-blue-200 overflow-hidden pointer-events-auto"
+              >
+                {content}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </>
   );
 }
+
+export default AnimatedGameNotification;

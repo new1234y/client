@@ -59,6 +59,18 @@ export default {
         'particle-burst': 'particle-burst 0.5s ease-out forwards',
         'particle-orbit': 'particle-orbit 3s linear infinite',
       },
+      transformStyle: {
+        'preserve-3d': 'preserve-3d',
+      },
+      backfaceVisibility: {
+        'hidden': 'hidden',
+      },
+      perspective: {
+        '1000': '1000px',
+      },
+      rotateY: {
+        '180': '180deg',
+      },
     },
   },
   plugins: [],

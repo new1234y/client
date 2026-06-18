@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Button from "../ui/Button.jsx";
 
 export function RoleModal({ role, onClose }) {
   const roleInfo = {
@@ -98,26 +99,27 @@ export function RoleModal({ role, onClose }) {
           </ul>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          className="mt-6 w-full"
           onClick={(e) => {
             e.preventDefault();
             onClose();
           }}
-          className="mt-6 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none"
         >
           Fermer
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius, nextRadius, gameStartedAt, timeLimitEndsAt, onClose }) {
+export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius, nextRadius, gameStartedAt, timeLimitEndsAt, shrinkZoneEnabled, timeLimitEnabled, onClose }) {
   const [phases, setPhases] = useState([]);
+  const [gameTimeLeft, setGameTimeLeft] = useState(null);
 
   useEffect(() => {
-    if (!gameStartedAt || !timeLimitEndsAt || !totalPhases) {
+    if (!gameStartedAt || !timeLimitEndsAt || !totalPhases || !shrinkZoneEnabled) {
       setPhases([]);
       return;
     }
@@ -141,7 +143,36 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
       };
     });
     setPhases(phaseData);
-  }, [gameStartedAt, timeLimitEndsAt, totalPhases, currentPhase]);
+  }, [gameStartedAt, timeLimitEndsAt, totalPhases, currentPhase, shrinkZoneEnabled]);
+
+  useEffect(() => {
+    if (!timeLimitEndsAt || !timeLimitEnabled || shrinkZoneEnabled) {
+      setGameTimeLeft(null);
+      return;
+    }
+    const tick = () => setGameTimeLeft(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [timeLimitEndsAt, timeLimitEnabled, shrinkZoneEnabled]);
+
+  const fmt = (s) => {
+    if (s == null) return "--:--";
+    const m = Math.floor(s / 60);
+    return `${m}:${String(s % 60).padStart(2, "0")}`;
+  };
+
+  const calculateProgress = () => {
+    if (!shrinkZoneEnabled && timeLimitEnabled && timeLimitEndsAt && gameStartedAt) {
+      const total = timeLimitEndsAt - gameStartedAt;
+      const elapsed = Date.now() - gameStartedAt;
+      return Math.min(1, Math.max(0, elapsed / total));
+    }
+    if (shrinkZoneEnabled && totalPhases && currentPhase) {
+      return currentPhase / totalPhases;
+    }
+    return 0;
+  };
 
   return (
     <div
@@ -174,7 +205,9 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
         onPointerUp={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Étapes de zone</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            {shrinkZoneEnabled ? "Étapes de zone" : "Temps de partie"}
+          </h2>
           <button
             type="button"
             onClick={(e) => {
@@ -189,60 +222,109 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
           </button>
         </div>
 
-        <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-          <p>État actuel : <span className="font-semibold text-blue-600">
-            {phaseState === "waiting" ? "En attente" : phaseState === "shrinking" ? "Rétrécissement" : "Arrêté"}
-          </span></p>
-          <p>Rayon actuel : <span className="font-semibold">{Math.round(currentRadius)}m</span>
-          {nextRadius && nextRadius !== currentRadius && (
-            <span className="text-orange-500"> → {Math.round(nextRadius)}m</span>
-          )}
-          </p>
-        </div>
+        {shrinkZoneEnabled ? (
+          <>
+            <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+              <p>État actuel : <span className="font-semibold text-blue-600">
+                {phaseState === "waiting" ? "En attente" : phaseState === "shrinking" ? "Rétrécissement" : "Arrêté"}
+              </span></p>
+              <p>Rayon actuel : <span className="font-semibold">{Math.round(currentRadius)}m</span>
+              {nextRadius && nextRadius !== currentRadius && (
+                <span className="text-orange-500"> → {Math.round(nextRadius)}m</span>
+              )}
+              </p>
+            </div>
 
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {phases.map((phase) => (
-            <div
-              key={phase.index}
-              className={`flex items-center gap-3 rounded-lg p-3 ${
-                phase.isCurrent
-                  ? "bg-blue-100 border-2 border-blue-600"
-                  : phase.isPast
-                    ? "bg-slate-100 opacity-60"
-                    : "bg-slate-50"
-              }`}
-            >
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                phase.isCurrent
-                  ? "bg-blue-600 text-white"
-                  : phase.isPast
-                    ? "bg-slate-400 text-white"
-                    : "bg-slate-200 text-slate-600"
-              }`}>
-                {phase.index}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {phases.map((phase) => (
+                <div
+                  key={phase.index}
+                  className={`flex items-center gap-3 rounded-lg p-3 ${
+                    phase.isCurrent
+                      ? "bg-blue-100 border-2 border-blue-600"
+                      : phase.isPast
+                        ? "bg-slate-100 opacity-60"
+                        : "bg-slate-50"
+                  }`}
+                >
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                    phase.isCurrent
+                      ? "bg-blue-600 text-white"
+                      : phase.isPast
+                        ? "bg-slate-400 text-white"
+                        : "bg-slate-200 text-slate-600"
+                  }`}>
+                    {phase.index}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {phase.isCurrent ? "En cours" : phase.isPast ? "Terminé" : `Dans ${phase.label}`}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {phase.isPast ? "Phase terminée" : phase.isCurrent ? "Phase active" : "Phase à venir"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : timeLimitEnabled ? (
+          <>
+            <div className="mb-4 text-center">
+              <div className="text-5xl font-black tabular-nums text-blue-600 mb-2">
+                {fmt(gameTimeLeft)}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {phase.isCurrent ? "En cours" : phase.isPast ? "Terminé" : `Dans ${phase.label}`}
+              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Temps restant</p>
+            </div>
+
+            <div className="bg-slate-100 rounded-xl p-4 dark:bg-slate-800">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Progression</span>
+                <span className="text-sm font-bold text-blue-600">{Math.round(calculateProgress() * 100)}%</span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                  style={{ width: `${calculateProgress() * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm mt-4">
+              <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Début</p>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {gameStartedAt ? new Date(gameStartedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                 </p>
-                <p className="text-xs text-slate-500">
-                  {phase.isPast ? "Phase terminée" : phase.isCurrent ? "Phase active" : "Phase à venir"}
+              </div>
+              <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Fin</p>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {timeLimitEndsAt ? new Date(timeLimitEndsAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                 </p>
               </div>
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4">♾️</div>
+            <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">Partie sans limite</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Cette partie n'a pas de limite de temps ni de rétrécissement de zone.
+            </p>
+          </div>
+        )}
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          className="mt-4 w-full"
           onClick={(e) => {
             e.preventDefault();
             onClose();
           }}
-          className="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none"
         >
           Fermer
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -354,16 +436,16 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
           </div>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="primary"
+          className="mt-6 w-full"
           onClick={(e) => {
             e.preventDefault();
             onClose();
           }}
-          className="mt-6 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none"
         >
           Fermer
-        </button>
+        </Button>
       </div>
     </div>
   );

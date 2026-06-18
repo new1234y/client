@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Button from "../ui/Button.jsx";
 
 export default function PowerCard({
   title,
@@ -57,27 +58,23 @@ export default function PowerCard({
       <div className="mt-4 relative">
         {children}
         <div className="mt-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
+          <Button
+            variant="power"
             disabled={isButtonDisabled}
             onClick={onUse}
-            className={`flex-1 rounded-xl px-5 py-3 text-sm font-bold text-white transition active:scale-[0.96] ${
-              isButtonDisabled
-                ? "bg-slate-400 dark:bg-slate-700 cursor-not-allowed"
-                : "bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/30"
-            }`}
+            className="flex-1"
           >
             {isButtonDisabled ? (insufficientCoins ? `Pas assez de pièces (${estimatedCost})` : remaining ? `Attente (${Math.floor(remaining/60)}:${(remaining%60).toString().padStart(2, '0')})` : lockReason || "Indisponible") : "Utiliser"}
-          </button>
+          </Button>
 
           {details && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setOpen((v) => !v)}
-              className="rounded-xl px-4 py-3 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               {open ? "Moins" : "Plus"}
-            </button>
+            </Button>
           )}
         </div>
 
