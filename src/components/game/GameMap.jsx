@@ -23,6 +23,7 @@ import {
   iconDisconnected,
   iconChatLocation,
   iconGhost,
+  iconFakePosition,
 } from "../../lib/map/icons.js";
 import { BASEMAPS } from "../../lib/map/basemaps.js";
 import { offsetMeters } from "../../lib/map/geoOffset.js";
@@ -278,6 +279,9 @@ export default function GameMap({
 
   const myJam = gameState?.myJamCircle;
   const balises = gameState?.balises || [];
+  const myFakePosition = gameState?.me?.fakePosition;
+  const now = Date.now();
+  const hasActiveFakePosition = myFakePosition && myFakePosition.until > now;
 
   const chatGeoMarkers = useMemo(() => {
     const photos = [];
@@ -409,24 +413,9 @@ export default function GameMap({
 
   const shouldShowBaliseLureMarker = useMemo(() => {
     if (!baliseLureTarget || role !== "cat") return false;
-    if (!balises || !balises.length) return true;
-    const toRad = (v) => (v * Math.PI) / 180;
-    const R = 6371000;
-    for (const b of balises) {
-      const dLat = toRad(b.lat - baliseLureTarget.lat);
-      const dLon = toRad(b.lng - baliseLureTarget.lng);
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(baliseLureTarget.lat)) *
-          Math.cos(toRad(b.lat)) *
-          Math.sin(dLon / 2) ** 2;
-      const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      if (d < 25) {
-        // La balise réelle est apparue très proche de la cible : on masque le marqueur de sélection
-        return false;
-      }
-    }
+    // Always show the lure marker, even after the balise appears
     return true;
-  }, [baliseLureTarget, role, balises]);
+  }, [baliseLureTarget, role]);
 
   const handleTileError = () => {
     setMapError("Impossible de charger la carte. Vérifiez votre connexion internet.");
@@ -565,6 +554,48 @@ export default function GameMap({
         />
       )}
 
+      {/* Afficher la fausse position et son cercle de brouillage pour le joueur lui-même */}
+      {hasActiveFakePosition && myFakePosition?.lat != null && myFakePosition?.lng != null && (
+        <>
+          {/* Marqueur de fausse position */}
+          <Marker
+            key="fake-position-marker"
+            position={[myFakePosition.lat, myFakePosition.lng]}
+            icon={iconFakePosition}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+              },
+            }}
+          >
+            <Popup className="fake-position-popup" maxWidth={200}>
+              <div className="min-w-0">
+                <p className="mb-1 text-xs font-semibold text-purple-700">Fausse position</p>
+                <p className="text-[10px] text-slate-600">Les autres joueurs voient cette position</p>
+                <p className="mt-1 text-[10px] text-slate-500">Expire dans {Math.max(0, Math.ceil((myFakePosition.until - now) / 1000))}s</p>
+              </div>
+            </Popup>
+          </Marker>
+
+          {/* Cercle de brouillage de la fausse position (visible uniquement par le joueur lui-même) */}
+          {role === "player" && myJam?.radiusM != null && (
+            <PlayerCircle
+              key="fake-jam"
+              center={myFakePosition.jamCircleCenter || { lat: myFakePosition.lat, lng: myFakePosition.lng }}
+              radius={myJam.radiusM}
+              color="#8b5cf6"
+              fillColor="#a78bfa"
+              fillOpacity={0.2}
+              eventHandlers={{
+                click: (e) => {
+                  L.DomEvent.stopPropagation(e);
+                },
+              }}
+            />
+          )}
+        </>
+      )}
+
       {balises.map((balise) => {
         const isBeingCaptured = balise.beingCapturedBy !== null;
         const isMyCapture = balise.beingCapturedBy === mySessionId;
@@ -588,6 +619,30 @@ export default function GameMap({
         setExpandKey={setExpandKey}
         onPlayerClick={baliseLureSelecting ? null : onPlayerClick}
       />
+
+      {/* Afficher les cercles de brouillage des alliés quand ils ont une fausse position */}
+      {(gameState?.allies || []).map((ally) => {
+        if (ally.sessionId === mySessionId) return null;
+        if (!ally.jamCircleCenter || !ally.jamCircleRadiusM) return null;
+        return (
+          <PlayerCircle
+            key={`ally-jam-${ally.sessionId}`}
+            center={ally.jamCircleCenter}
+            radius={ally.jamCircleRadiusM}
+            color="#d97706"
+            fillColor="#fbbf24"
+            fillOpacity={0.16}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                if (onPlayerClick) {
+                  onPlayerClick({ ...ally, role: "player" });
+                }
+              },
+            }}
+          />
+        );
+      })}
 
       {role === "cat" &&
         renderPreyDiscs(

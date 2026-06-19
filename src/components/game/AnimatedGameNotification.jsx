@@ -21,6 +21,10 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
           return `jam:${e.label || ''}`;
         case 'balise_lure':
           return `balise_lure:${e.id || e.lat || e.lng || ''}`;
+        case 'balise_capture':
+          return `balise_capture:${e.baliseId || ''}:${e.nickname || ''}:${e.isMyCapture || ''}`;
+        case 'fake_position':
+          return `fake_position:${e.until || ''}`;
         case 'join_request':
           return `join_request:${e.nickname || ''}:${e.requestId || ''}`;
         default:
@@ -47,6 +51,91 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
 
   const effectKey = buildEffectKey(effect);
 
+  // Helper function to determine notification duration based on type
+  const getNotificationDuration = (ef) => {
+    if (!ef) return 2000;
+
+    const effects = Array.isArray(ef) ? ef : [ef];
+    
+    // Check if any effect is a timer/progress notification (should stay until completion)
+    const hasTimerEffect = effects.some(e => {
+      if (e.kind === 'noise') {
+        const elapsedMs = Math.max(0, uiNow - e.startedAt);
+        const totalMs = Math.max(1, e.durationSec * 1000);
+        return (totalMs - elapsedMs) > 0;
+      }
+      if (e.kind === 'ghost') {
+        const rest = e.invisUntil - uiNow;
+        return rest > 0;
+      }
+      if (e.kind === 'immobilized') {
+        const rest = e.until - uiNow;
+        return rest > 0;
+      }
+      if (e.kind === 'balise_capture') {
+        const captureTime = 30 * 1000;
+        const elapsedMs = e.captureProgress || 0;
+        return (captureTime - elapsedMs) > 0;
+      }
+      return false;
+    });
+
+    if (hasTimerEffect) {
+      // For timer notifications, calculate the maximum remaining time
+      let maxRemaining = 0;
+      effects.forEach(e => {
+        if (e.kind === 'noise') {
+          const elapsedMs = Math.max(0, uiNow - e.startedAt);
+          const totalMs = Math.max(1, e.durationSec * 1000);
+          const remaining = totalMs - elapsedMs;
+          maxRemaining = Math.max(maxRemaining, remaining);
+        }
+        if (e.kind === 'ghost') {
+          const rest = e.invisUntil - uiNow;
+          maxRemaining = Math.max(maxRemaining, rest);
+        }
+        if (e.kind === 'immobilized') {
+          const rest = e.until - uiNow;
+          maxRemaining = Math.max(maxRemaining, rest);
+        }
+        if (e.kind === 'balise_capture') {
+          const captureTime = 30 * 1000;
+          const elapsedMs = e.captureProgress || 0;
+          const remaining = captureTime - elapsedMs;
+          maxRemaining = Math.max(maxRemaining, remaining);
+        }
+      });
+      return maxRemaining;
+    }
+
+    // Check if any effect is a one-time action (jam - should stay 2 seconds)
+    const hasJamEffect = effects.some(e => e.kind === 'jam');
+    if (hasJamEffect) {
+      return 2000;
+    }
+
+    // Check if any effect has a defined duration (fake_position)
+    const hasDurationEffect = effects.some(e => e.kind === 'fake_position' && e.until);
+    if (hasDurationEffect) {
+      const fakePosEffect = effects.find(e => e.kind === 'fake_position');
+      if (fakePosEffect && fakePosEffect.until) {
+        return Math.max(0, fakePosEffect.until - Date.now());
+      }
+    }
+
+    // For other notifications (join_request, balise_lure), use a longer duration
+    // These have clickable buttons and should stay longer
+    const hasButtonEffect = effects.some(e => 
+      e.kind === 'join_request' || e.kind === 'balise_lure'
+    );
+    if (hasButtonEffect) {
+      return 10000; // 10 seconds for button notifications
+    }
+
+    // Default fallback
+    return 2000;
+  };
+
   useEffect(() => {
     if (effectKey === 'none' || effectKey === 'empty') {
       setAnimationState('exiting'); // On lance la sortie si l'effet disparaît
@@ -65,6 +154,28 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     const currentMatch = String(effectKey).match(/jam:([^|]+)/);
     if (currentMatch) currentJam = currentMatch[1];
 
+    // Pour les notifications jam, on relance toujours l'animation et le timer à chaque changement
+    const isJamEffect = currentJam !== null;
+    
+    if (isJamEffect) {
+      if (currentJam && prevJam && prevJam !== currentJam) {
+        prevJamLabelRef.current = prevJam;
+      } else {
+        prevJamLabelRef.current = null;
+      }
+      
+      effectRef.current = effectKey;
+      setAnimationState('entering'); // On déclenche l'animation d'entrée
+
+      // Pour les jam, durée fixe de 2 secondes
+      const timer = setTimeout(() => {
+        setAnimationState('exiting');
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+
+    // Pour les autres effets, comportement normal
     if (currentJam && prevJam && prevJam !== currentJam) {
       prevJamLabelRef.current = prevJam;
     } else {
@@ -74,13 +185,16 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     effectRef.current = effectKey;
     setAnimationState('entering'); // On déclenche l'animation d'entrée
 
-    // Au bout de 2 secondes, on passe en mode "exiting"
+    // Calculate dynamic duration based on notification type
+    const duration = getNotificationDuration(effect);
+
+    // Use the calculated duration instead of hardcoded 2 seconds
     const timer = setTimeout(() => {
       setAnimationState('exiting');
-    }, 2000);
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, [effectKey]);
+  }, [effectKey, effect, uiNow]);
 
   if (!effect) return null;
 
@@ -253,6 +367,68 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
             <p className="text-sm font-semibold text-blue-900">
               Touchez la carte pour placer le leurre
             </p>
+          </div>
+        </>
+      );
+    }
+
+    if (currentEffect.kind === "balise_capture") {
+      const captureTime = 30 * 1000; // 30 seconds
+      const elapsedMs = currentEffect.captureProgress || 0;
+      const remainingMs = Math.max(0, captureTime - elapsedMs);
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      const progress = Math.min(1, elapsedMs / captureTime);
+      const isMyCapture = currentEffect.isMyCapture;
+
+      return (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🎯</span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Capture de balise</p>
+              <p className="text-xs font-semibold text-blue-700">
+                {isMyCapture ? "Vous capturez" : `${currentEffect.nickname} capture`} la balise
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-2">
+            <div className="flex-1 h-2 overflow-hidden rounded-full bg-blue-200">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-200"
+                style={{ width: `${Math.max(8, progress * 100)}%` }}
+              />
+            </div>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
+          </div>
+        </>
+      );
+    }
+
+    if (currentEffect.kind === "fake_position") {
+      const until = currentEffect.until || 0;
+      const remainingMs = Math.max(0, until - Date.now());
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+
+      return (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🎭</span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider text-purple-900">Leurre de position</p>
+              <p className="text-xs font-semibold text-purple-700">
+                Votre position est masquée aux autres joueurs
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-sm font-bold text-purple-600 tabular-nums">{remainingSec}s</span>
+            <button
+              type="button"
+              onClick={() => currentEffect.onCancel?.()}
+              className="flex-1 px-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 pointer-events-auto"
+            >
+              Rétablir ma position
+            </button>
           </div>
         </>
       );

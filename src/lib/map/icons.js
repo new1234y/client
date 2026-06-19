@@ -83,3 +83,10 @@ export const iconCaptured = div(
   "pin-captured",
   38
 );
+
+/** Fausse position (leurre) - visible uniquement par le joueur lui-même */
+export const iconFakePosition = div(
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#8b5cf6;border:3px solid #fff;box-shadow:0 2px 8px rgba(139, 92, 246, 0.6);font-size:12px;font-weight:800;color:#fff">Faux</span>`,
+  "pin-fake",
+  36
+);

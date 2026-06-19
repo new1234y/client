@@ -788,6 +788,8 @@ export default function App() {
       if (stageRef.current === "entry") return;
       setIsReconnecting(false);
       setReconnectReason(null);
+      console.log('[Client] roles_reveal payload received:', payload);
+      console.log('[Client] Players with location:', payload.players?.filter(p => p.lat != null && p.lng != null).length, '/', payload.players?.length);
       setRolesReveal(payload);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       setHasSeenRole(false);
@@ -1084,12 +1086,47 @@ export default function App() {
   }, [gameTab]);
 
   useEffect(() => {
-    if (!socket || !position) return;
+    if (!socket || !position) {
+      console.log('[Position emit] Skipped:', { hasSocket: !!socket, hasPosition: !!position });
+      return;
+    }
     const now = getServerTime();
-    if (now - lastEmit.current < 800) return;
+    if (now - lastEmit.current < 800) {
+      console.log('[Position emit] Rate limited');
+      return;
+    }
     lastEmit.current = now;
+    console.log('[Position emit] Sending position:', { lat: position.lat, lng: position.lng });
     socket.emit("position", { lat: position.lat, lng: position.lng });
   }, [socket, position]);
+
+  // Check periodically for players without location and remind them
+  useEffect(() => {
+    if (stage !== "role_reveal" || !rolesReveal?.players) return;
+
+    const checkLocation = () => {
+      const playersWithoutLocation = rolesReveal.players.filter(p =>
+        p.sessionId !== sessionId && (p.lat == null || p.lng == null)
+      );
+
+      if (playersWithoutLocation.length > 0) {
+        console.log('[Location check] Players without location:', playersWithoutLocation.map(p => p.nickname));
+        // Show notification to remind players to enable location
+        addNotification(
+          `${playersWithoutLocation.length} joueur(s) doivent activer leur localisation`,
+          "warning"
+        );
+      }
+    };
+
+    // Check immediately
+    checkLocation();
+
+    // Check every 10 seconds
+    const interval = setInterval(checkLocation, 10000);
+
+    return () => clearInterval(interval);
+  }, [stage, rolesReveal?.players, sessionId, addNotification]);
 
   const settings = lobby?.settings ||
     rolesReveal?.settings || {
@@ -1335,18 +1372,119 @@ export default function App() {
     return min;
   }, [gameState?.balises]);
 
+  // Roster list derived from game state / rolesReveal and merged with location data.
+  // Moved above callbacks that reference it to avoid temporal-dead-zone errors
+  // when those callbacks include `rosterList` in their dependency arrays.
+  const rosterList = useMemo(() => {
+    let baseRoster = [];
+    if (gameState?.roster?.length) {
+      baseRoster = gameState.roster;
+    } else if (rolesReveal?.players?.length) {
+      baseRoster = rolesReveal.players.map((p) => ({
+        sessionId: p.sessionId,
+        nickname: p.nickname,
+        role: p.role,
+        originalRole: p.originalRole,
+        captured: false,
+        spectator: false,
+      }));
+    }
+
+    // Merge with location data from gameState
+    const locationMap = new Map();
+    // Add allies location data
+    for (const a of gameState?.allies || []) {
+      if (a.sessionId && a.lat != null && a.lng != null) {
+        locationMap.set(a.sessionId, { lat: a.lat, lng: a.lng });
+      }
+    }
+    // Add cats exact location data
+    for (const c of gameState?.catsExact || []) {
+      if (c.sessionId && c.lat != null && c.lng != null) {
+        locationMap.set(c.sessionId, { lat: c.lat, lng: c.lng });
+      }
+    }
+    // Add prey for cat location data (if viewing as cat)
+    if (role === "cat") {
+      for (const p of gameState?.preyForCat || []) {
+        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
+          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        } else if (p.sessionId && p.kind === "circle" && p.center) {
+          locationMap.set(p.sessionId, {
+            lat: p.center.lat,
+            lng: p.center.lng,
+            mapKind: "circle",
+            radiusM: p.radiusM,
+          });
+        }
+      }
+    }
+    // Add admin prey preview location data (if host with preview enabled)
+    if (isHost) {
+      for (const p of gameState?.adminPreyPreview || []) {
+        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
+          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
+        } else if (p.sessionId && p.kind === "circle" && p.center) {
+          locationMap.set(p.sessionId, {
+            lat: p.center.lat,
+            lng: p.center.lng,
+            mapKind: "circle",
+            radiusM: p.radiusM,
+          });
+        }
+      }
+    }
+    // Spectateurs avec position
+    for (const s of gameState?.spectators || []) {
+      if (s.sessionId && s.lat != null && s.lng != null) {
+        locationMap.set(s.sessionId, { lat: s.lat, lng: s.lng });
+      }
+    }
+    // Position du joueur courant (gameState.me)
+    if (sessionId && gameState?.me?.lat != null && gameState?.me?.lng != null) {
+      locationMap.set(sessionId, { lat: gameState.me.lat, lng: gameState.me.lng });
+    }
+
+    // Merge location data into roster
+    return baseRoster.map((player) => {
+      const loc = locationMap.get(player.sessionId);
+      // Get coins from gameState.me if it's the current player, otherwise try to get from allies/cats
+      let coins = player.coins;
+      if (player.sessionId === sessionId && gameState?.me?.coins !== undefined) {
+        coins = gameState.me.coins;
+      }
+      return {
+        ...player,
+        lat: loc?.lat ?? null,
+        lng: loc?.lng ?? null,
+        coins,
+      };
+    });
+  }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, gameState?.spectators, gameState?.me, rolesReveal?.players, role, isHost, sessionId]);
+
   const onBeginHunt = useCallback(() => {
     console.log('[onBeginHunt] Called');
     if (!socket) {
       console.log('[onBeginHunt] No socket');
       return;
     }
+    if (geoError) {
+      console.log('[onBeginHunt] Geolocation error:', geoError);
+      // Don't show notification - button should be disabled with message
+      return;
+    }
+    if (!position) {
+      console.log('[onBeginHunt] No position available');
+      // Don't show notification - button should be disabled with message
+      return;
+    }
+
     socket.emit("begin_hunt", {}, (res) => {
       console.log('[onBeginHunt] Response:', res);
       // Error is prevented by button being disabled, so no need to show error banner
       if (!res?.ok) console.error('[onBeginHunt] Error:', res?.error);
     });
-  }, [socket]);
+  }, [socket, geoError, position]);
 
   const onScanResult = useCallback(
     (text) => {
@@ -1469,99 +1607,6 @@ export default function App() {
     if (role === "player") return "Joueur";
     return "";
   }, [role]);
-
-  const rosterList = useMemo(() => {
-    let baseRoster = [];
-    if (gameState?.roster?.length) {
-      baseRoster = gameState.roster;
-    } else if (rolesReveal?.players?.length) {
-      baseRoster = rolesReveal.players.map((p) => ({
-        sessionId: p.sessionId,
-        nickname: p.nickname,
-        role: p.role,
-        originalRole: p.originalRole,
-        captured: false,
-        spectator: false,
-      }));
-    }
-
-    // Merge with location data from gameState
-    const locationMap = new Map();
-    
-    // Add allies location data
-    for (const a of gameState?.allies || []) {
-      if (a.sessionId && a.lat != null && a.lng != null) {
-        locationMap.set(a.sessionId, { lat: a.lat, lng: a.lng });
-      }
-    }
-    
-    // Add cats exact location data
-    for (const c of gameState?.catsExact || []) {
-      if (c.sessionId && c.lat != null && c.lng != null) {
-        locationMap.set(c.sessionId, { lat: c.lat, lng: c.lng });
-      }
-    }
-    
-    // Add prey for cat location data (if viewing as cat)
-    if (role === "cat") {
-      for (const p of gameState?.preyForCat || []) {
-        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
-          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
-        } else if (p.sessionId && p.kind === "circle" && p.center) {
-          locationMap.set(p.sessionId, {
-            lat: p.center.lat,
-            lng: p.center.lng,
-            mapKind: "circle",
-            radiusM: p.radiusM,
-          });
-        }
-      }
-    }
-    
-    // Add admin prey preview location data (if host with preview enabled)
-    if (isHost) {
-      for (const p of gameState?.adminPreyPreview || []) {
-        if (p.sessionId && p.kind === "exact" && p.lat != null && p.lng != null) {
-          locationMap.set(p.sessionId, { lat: p.lat, lng: p.lng });
-        } else if (p.sessionId && p.kind === "circle" && p.center) {
-          locationMap.set(p.sessionId, {
-            lat: p.center.lat,
-            lng: p.center.lng,
-            mapKind: "circle",
-            radiusM: p.radiusM,
-          });
-        }
-      }
-    }
-
-    // Spectateurs avec position
-    for (const s of gameState?.spectators || []) {
-      if (s.sessionId && s.lat != null && s.lng != null) {
-        locationMap.set(s.sessionId, { lat: s.lat, lng: s.lng });
-      }
-    }
-
-    // Position du joueur courant (gameState.me)
-    if (sessionId && gameState?.me?.lat != null && gameState?.me?.lng != null) {
-      locationMap.set(sessionId, { lat: gameState.me.lat, lng: gameState.me.lng });
-    }
-
-    // Merge location data into roster
-    return baseRoster.map((player) => {
-      const loc = locationMap.get(player.sessionId);
-      // Get coins from gameState.me if it's the current player, otherwise try to get from allies/cats
-      let coins = player.coins;
-      if (player.sessionId === sessionId && gameState?.me?.coins !== undefined) {
-        coins = gameState.me.coins;
-      }
-      return {
-        ...player,
-        lat: loc?.lat ?? null,
-        lng: loc?.lng ?? null,
-        coins,
-      };
-    });
-  }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, gameState?.spectators, gameState?.me, rolesReveal?.players, role, isHost, sessionId]);
 
   // Suivi des changements d'invisibilité pour notifications
   const prevInvisStateRef = useRef(new Map());
@@ -2555,49 +2600,62 @@ if (stage === "role_reveal" && rolesReveal) {
               Joueurs ({rolesReveal.players?.filter(p => p.hasSeenRole).length ?? 0}/{rolesReveal.players?.length ?? 0} ont vu leur rôle)
             </h2>
             <ul className="space-y-2">
-              {rolesReveal.players?.map((p) => (
-                <li
-                  key={p.sessionId}
-                  className={`flex items-center justify-between rounded-xl p-3 ${
-                    p.sessionId === sessionId
-                      ? "bg-indigo-50 ring-1 ring-indigo-200"
-                      : "bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white ${
-                      p.role === 'cat' ? 'bg-red-500' : 'bg-emerald-500'
-                    }`}>
-                      {p.nickname?.charAt(0)?.toUpperCase() || '?'}
+              {rolesReveal.players?.map((p) => {
+                const hasLocation = p.lat != null && p.lng != null;
+                const isGrayedOut = !hasLocation;
+                return (
+                  <li
+                    key={p.sessionId}
+                    className={`flex items-center justify-between rounded-xl p-3 ${
+                      p.sessionId === sessionId
+                        ? "bg-indigo-50 ring-1 ring-indigo-200"
+                        : isGrayedOut
+                          ? "bg-slate-100 opacity-50"
+                          : "bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white ${
+                        isGrayedOut ? 'bg-slate-400' : p.role === 'cat' ? 'bg-red-500' : 'bg-emerald-500'
+                      }`}>
+                        {p.nickname?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div>
+                        <p className={`font-medium ${isGrayedOut ? 'text-slate-400' : 'text-slate-900'}`}>
+                          {p.nickname}
+                          {p.sessionId === sessionId && (
+                            <span className="ml-2 text-xs font-normal text-indigo-600">vous</span>
+                          )}
+                          {p.hasSeenRole && (
+                            <span className={`ml-2 text-xs font-bold ${
+                              isGrayedOut ? 'text-slate-400' : p.role === 'cat' ? 'text-red-600' : 'text-emerald-600'
+                            }`}>
+                              {p.role === 'cat' ? '🐱 Chat' : '🏃 Joueur'}
+                            </span>
+                          )}
+                        </p>
+                        <p className={`text-xs ${isGrayedOut ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {isGrayedOut ? 'Localisation désactivée' : (p.hasSeenRole ? 'Rôle vu' : 'En attente...')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-slate-900">
-                        {p.nickname}
-                        {p.sessionId === sessionId && (
-                          <span className="ml-2 text-xs font-normal text-indigo-600">vous</span>
-                        )}
-                        {p.hasSeenRole && (
-                          <span className={`ml-2 text-xs font-bold ${
-                            p.role === 'cat' ? 'text-red-600' : 'text-emerald-600'
-                          }`}>
-                            {p.role === 'cat' ? '🐱 Chat' : '🏃 Joueur'}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {p.hasSeenRole ? 'Rôle vu' : 'En attente...'}
-                      </p>
-                    </div>
-                  </div>
-                  {p.hasSeenRole && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
-                      <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                </li>
-              ))}
+                    {p.hasSeenRole && !isGrayedOut && (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">
+                        <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    {isGrayedOut && (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100">
+                        <svg className="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -2614,22 +2672,42 @@ if (stage === "role_reveal" && rolesReveal) {
                   <div className="absolute h-1 w-1 rounded-full bg-[#E2C96D]" style={{ transform: 'translateX(44px)' }} />
                 </div>
               </div>
-              <Button
-                variant="primaryGradient"
-                size="lg"
-                className="relative z-10 w-full"
-                onClick={onBeginHunt}
-                disabled={!allPlayersSeenRole || (rolesReveal?.players?.length ?? 0) < 2}
-              >
-                {!allPlayersSeenRole 
-                  ? "En attente que tous voient leur rôle" 
-                  : "Lancer la chasse"}
-              </Button>
-              {!allPlayersSeenRole && (
-                <p className="mt-2 text-center text-xs text-amber-600">
-                  {rolesReveal.players?.filter(p => !p.hasSeenRole).length ?? 0} joueur(s) n'ont pas encore vu leur rôle
-                </p>
-              )}
+              
+              {/* Check if all players have location enabled */}
+              {(() => {
+                const canStart = allPlayersSeenRole &&
+                                 (rolesReveal?.players?.length ?? 0) >= 2 &&
+                                 !geoError &&
+                                 position;
+
+                return (
+                  <>
+                    <Button
+                      variant="primaryGradient"
+                      size="lg"
+                      className="relative z-10 w-full"
+                      onClick={onBeginHunt}
+                      disabled={!canStart}
+                    >
+                      {!allPlayersSeenRole
+                        ? "En attente que tous voient leur rôle"
+                        : geoError || !position
+                          ? "Activez votre localisation"
+                          : "Lancer la chasse"}
+                    </Button>
+                    {!allPlayersSeenRole && (
+                      <p className="mt-2 text-center text-xs text-amber-600">
+                        {rolesReveal.players?.filter(p => !p.hasSeenRole).length ?? 0} joueur(s) n'ont pas encore vu leur rôle
+                      </p>
+                    )}
+                    {allPlayersSeenRole && (geoError || !position) && (
+                      <p className="mt-2 text-center text-xs text-amber-600">
+                        Vous devez activer votre localisation pour commencer
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <p className="text-center text-sm text-slate-500 dark:text-slate-400">
@@ -2691,6 +2769,7 @@ if (stage === "role_reveal" && rolesReveal) {
       freeze_cats_single: 45,
       freeze_cats_multi: 80,
       freeze_cats_all: 140,
+      fake_position: 60,
     };
 
     const powerLimits = gameState.powerLimits || {};
@@ -2757,6 +2836,36 @@ if (stage === "role_reveal" && rolesReveal) {
         label: jamLevel,
         radiusM: jamRadius,
       });
+    }
+
+    // Check for balise capture in progress - only show for the player capturing
+    const balises = gameState?.balises || [];
+    for (const balise of balises) {
+      if (balise.beingCapturedBy === sessionId && !balise.capturedBy) {
+        hudPowerEffects.push({
+          kind: "balise_capture",
+          baliseId: balise.id,
+          nickname: "Vous",
+          isMyCapture: true,
+          captureProgress: balise.captureProgress || 0,
+        });
+        hudPowerUiNow = getServerTime();
+        break; // Only show one balise capture notification at a time
+      }
+    }
+
+    // Check for fake position active - only show for the player with fake position
+    if (me?.fakePosition && me.fakePosition.until > Date.now()) {
+      hudPowerEffects.push({
+        kind: "fake_position",
+        until: me.fakePosition.until,
+        onCancel: () => {
+          socket?.emit("use_power", { kind: "fake_position_cancel" }, (res) => {
+            if (!res?.ok) console.error('[fake_position_cancel] Error:', res?.error);
+          });
+        },
+      });
+      hudPowerUiNow = Date.now();
     }
 
     const isCooldown = (key) => (localCooldowns?.[key] || 0) > getServerTime();
@@ -3261,6 +3370,29 @@ if (stage === "role_reveal" && rolesReveal) {
 
                     {role === "player" ? (
                       <>
+                        <PowerCard
+                          title="Leurre de position"
+                          emoji="🎭"
+                          gradient={["#8B5CF6", "#EC4899"]}
+                          stars={3}
+                          costText={`${powerCosts.fake_position}`}
+                          usageLabel={formatUsage("fake_position")}
+                          estimatedCost={Number(powerCosts.fake_position)}
+                          insufficientCoins={(me?.coins ?? 0) < Number(powerCosts.fake_position)}
+                          details={<>
+                            Affiche une fausse position aux autres joueurs pendant un certain temps. Les déplacements aléatoires restent crédibles et dans la zone de jeu.
+                          </>}
+                          onUse={() => {
+                            socket?.emit("use_power", { kind: "fake_position", durationSec: 60 }, (res) => {
+                              if (res?.ok) {
+                                addNotification("Leurre de position activé", "success");
+                              } else if (res?.error) {
+                                addNotification(res.error || "Erreur", "error");
+                              }
+                            });
+                          }}
+                        />
+
                         <PowerCard
                           title="Agrandir le cercle de brouillage"
                           emoji="📡"

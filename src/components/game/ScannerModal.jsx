@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 
 export default function ScannerModal({ onScan, onClose }) {

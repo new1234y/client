@@ -26,6 +26,7 @@ export function useGeolocation(enabled) {
   const [error, setError] = useState(null);
   const watchId = useRef(null);
   const lastReported = useRef(null);
+  const retryTimeoutRef = useRef(null);
 
   const clearWatch = useCallback(() => {
     console.log('[clearWatch] Called');
@@ -34,15 +35,14 @@ export function useGeolocation(enabled) {
       watchId.current = null;
       console.log('[clearWatch] Watch cleared');
     }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
   }, []);
 
-  useEffect(() => {
-    console.log('[useGeolocation] useEffect triggered, enabled:', enabled);
-    if (!enabled) {
-      console.log('[useGeolocation] Not enabled, clearing watch');
-      clearWatch();
-      return;
-    }
+  const requestLocation = useCallback(() => {
+    console.log('[useGeolocation] Requesting location');
     if (!navigator.geolocation) {
       console.log('[useGeolocation] Geolocation not available');
       setError({
@@ -59,18 +59,29 @@ export function useGeolocation(enabled) {
       const newLng = pos.coords.longitude;
       const acc = pos.coords.accuracy;
 
+      // Always update position on first receive (no lastReported yet)
+      if (!lastReported.current) {
+        lastReported.current = { lat: newLat, lng: newLng };
+        const newPosition = {
+          lat: newLat,
+          lng: newLng,
+          accuracy: acc,
+        };
+        console.log('[useGeolocation] First position set:', newPosition);
+        setPosition(newPosition);
+        return;
+      }
+
       // Buffer zone: don't update if still within buffer of last reported
-      if (lastReported.current) {
-        const d = distanceM(
-          lastReported.current.lat,
-          lastReported.current.lng,
-          newLat,
-          newLng
-        );
-        if (d < BUFFER_M) {
-          console.log('[useGeolocation] Position within buffer, not updating');
-          return; // stay at last reported position
-        }
+      const d = distanceM(
+        lastReported.current.lat,
+        lastReported.current.lng,
+        newLat,
+        newLng
+      );
+      if (d < BUFFER_M) {
+        console.log('[useGeolocation] Position within buffer, not updating');
+        return; // stay at last reported position
       }
 
       lastReported.current = { lat: newLat, lng: newLng };
@@ -94,6 +105,13 @@ export function useGeolocation(enabled) {
         code: err.code,
         message: messages[err.code] || err.message || "Erreur de géolocalisation.",
       });
+
+      // Auto-retry on permission denied (code 1) - but with exponential backoff
+      if (err.code === 1 && enabled) {
+        console.log('[useGeolocation] Permission denied, will retry on next check');
+        // Don't auto-retry immediately - let the user enable permission first
+        // The useEffect will re-trigger when enabled changes
+      }
     };
 
     console.log('[useGeolocation] Starting watchPosition');
@@ -102,9 +120,29 @@ export function useGeolocation(enabled) {
       maximumAge: 2000,
       timeout: 20000,
     });
+  }, [enabled]);
 
-    return clearWatch;
-  }, [enabled, clearWatch]);
+  useEffect(() => {
+    console.log('[useGeolocation] useEffect triggered, enabled:', enabled);
+    if (!enabled) {
+      console.log('[useGeolocation] Not enabled, clearing watch');
+      clearWatch();
+      return;
+    }
+
+    // Clear any existing watch before starting a new one
+    clearWatch();
+    
+    // Small delay to ensure clean state
+    const timeoutId = setTimeout(() => {
+      requestLocation();
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearWatch();
+    };
+  }, [enabled, clearWatch, requestLocation]);
 
   return { position, error, clearWatch };
 }
