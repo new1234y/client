@@ -468,25 +468,52 @@ export default function GameMap({
         attributionControl
       >
         {/* If the device requires a user gesture to grant orientation permission (iOS),
-            show a small unobtrusive button that the user can tap to enable orientation. */}
+            show a clear overlay with explanation and a button the user can tap to enable orientation. */}
         {needsPermission && (
-          <div className="absolute left-3 top-3 z-[2100]">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const res = await requestPermission();
-                  if (!res.granted) {
-                    setMapError('Autorisation d\'accès à l\'orientation refusée.');
-                  }
-                } catch (err) {
-                  setMapError('Erreur lors de la demande d\'autorisation.');
-                }
-              }}
-              className="rounded bg-white/90 px-3 py-1 text-xs font-medium shadow-md"
-            >
-              Activer l'orientation
-            </button>
+          <div className="absolute left-1/2 top-4 z-[2100] -translate-x-1/2 w-[min(92%,420px)]">
+            <div className="rounded-lg bg-white/95 px-4 py-3 text-sm shadow-lg dark:bg-slate-900/95 dark:text-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <div className="font-semibold">Activer l'orientation (iPhone)</div>
+                  <div className="mt-1 text-[13px] text-slate-600 dark:text-slate-300">
+                    Pour afficher le halo d'orientation, iOS demande la permission d'accès aux capteurs de mouvement.
+                    Appuyez sur « Activer » ci-dessous, puis autorisez "Mouvement et orientation" dans la boîte de dialogue Safari.
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await requestPermission();
+                          if (!res.granted) {
+                            // Provide a helpful message explaining how to enable in settings
+                            setMapError(
+                              "Autorisation d'accès à l'orientation refusée. Si vous utilisez Safari, ouvrez Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
+                            );
+                          }
+                        } catch (err) {
+                          setMapError("Erreur lors de la demande d'autorisation. Vérifiez que vous êtes sur Safari et que la page est servie en HTTPS.");
+                        }
+                      }}
+                      className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow"
+                    >
+                      Activer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMapError(
+                          "Pour activer l'orientation : ouvrez Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
+                        );
+                      }}
+                      className="rounded bg-gray-100 px-3 py-1 text-xs font-medium dark:bg-gray-800"
+                    >
+                      Plus d'infos
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         <TileLayer
