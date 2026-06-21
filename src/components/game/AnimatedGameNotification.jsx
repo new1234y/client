@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatDurationMs, formatCoins } from '../../lib/format';
 
 function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
   // Gestion de l'état de l'animation : 'hidden' | 'entering' | 'exiting'
-  const [animationState, setAnimationState] = useState('hidden');
-  const effectRef = useRef(null);
+  // Track per-item animation states so each notification can exit independently
+  const [items, setItems] = useState([]); // { key, effect, anim: 'entering'|'exiting' }
   const prevJamLabelRef = useRef(null);
 
   const buildEffectKey = (ef) => {
@@ -50,6 +51,49 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
   };
 
   const effectKey = buildEffectKey(effect);
+
+  // Helper to normalize incoming effects into array
+  const incoming = (() => {
+    if (!effect) return [];
+    return Array.isArray(effect) ? effect : [effect];
+  })();
+
+  // Keep items in sync with incoming effects, animating removals
+  useEffect(() => {
+    const next = [];
+    const nowKeys = incoming.map(e => buildEffectKey(e));
+
+    // Preserve existing items that still exist, update effect
+    for (const it of items) {
+      if (nowKeys.includes(it.key)) {
+        const idx = nowKeys.indexOf(it.key);
+        next.push({ key: it.key, effect: incoming[idx], anim: it.anim === 'exiting' ? 'exiting' : 'entering' });
+      }
+    }
+
+    // Add new items
+    for (let i = 0; i < incoming.length; i++) {
+      const e = incoming[i];
+      const k = buildEffectKey(e);
+      if (!next.some(x => x.key === k)) {
+        next.push({ key: k, effect: e, anim: 'entering' });
+      }
+    }
+
+    // Detect removals: items present before but not in nowKeys -> mark exiting
+    const removed = items.filter(it => !nowKeys.includes(it.key));
+    if (removed.length > 0) {
+      // Merge removed items as exiting so we can animate them out
+      for (const r of removed) {
+        if (!next.some(x => x.key === r.key)) {
+          next.push({ key: r.key, effect: r.effect, anim: 'exiting' });
+        }
+      }
+    }
+
+    setItems(next);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectKey, uiNow]);
 
   // Helper function to determine notification duration based on type
   const getNotificationDuration = (ef) => {
@@ -136,75 +180,19 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     return 2000;
   };
 
-  useEffect(() => {
-    if (effectKey === 'none' || effectKey === 'empty') {
-      setAnimationState('exiting'); // On lance la sortie si l'effet disparaît
-      effectRef.current = null;
-      return;
-    }
+  // Notifications are managed per-item in `items` state; individual enter/exit
+  // animations are handled in the rendering loop. The old global animation
+  // state logic was removed to avoid conflicts with per-item behavior.
 
-    const prevKey = effectRef.current;
-    let prevJam = null;
-    if (prevKey) {
-      const m = String(prevKey).match(/jam:([^|]+)/);
-      if (m) prevJam = m[1];
-    }
-
-    let currentJam = null;
-    const currentMatch = String(effectKey).match(/jam:([^|]+)/);
-    if (currentMatch) currentJam = currentMatch[1];
-
-    // Pour les notifications jam, on relance toujours l'animation et le timer à chaque changement
-    const isJamEffect = currentJam !== null;
-    
-    if (isJamEffect) {
-      if (currentJam && prevJam && prevJam !== currentJam) {
-        prevJamLabelRef.current = prevJam;
-      } else {
-        prevJamLabelRef.current = null;
-      }
-      
-      effectRef.current = effectKey;
-      setAnimationState('entering'); // On déclenche l'animation d'entrée
-
-      // Pour les jam, durée fixe de 2 secondes
-      const timer = setTimeout(() => {
-        setAnimationState('exiting');
-      }, 2000);
-
-      return () => clearTimeout(timer);
-    }
-
-    // Pour les autres effets, comportement normal
-    if (currentJam && prevJam && prevJam !== currentJam) {
-      prevJamLabelRef.current = prevJam;
-    } else {
-      prevJamLabelRef.current = null;
-    }
-
-    effectRef.current = effectKey;
-    setAnimationState('entering'); // On déclenche l'animation d'entrée
-
-    // Calculate dynamic duration based on notification type
-    const duration = getNotificationDuration(effect);
-
-    // Use the calculated duration instead of hardcoded 2 seconds
-    const timer = setTimeout(() => {
-      setAnimationState('exiting');
-    }, duration);
-
-    return () => clearTimeout(timer);
-  }, [effectKey, effect, uiNow]);
-
-  if (!effect) return null;
-
-  const effects = Array.isArray(effect) ? effect : [effect];
+  // keep effects ref for duration calculation if needed elsewhere
+  const effects = Array.isArray(effect) ? effect : (effect ? [effect] : []);
 
   const getContent = (currentEffect) => {
     if (currentEffect.kind === "noise") {
       const elapsedMs = Math.max(0, uiNow - currentEffect.startedAt);
       const totalMs = Math.max(1, currentEffect.durationSec * 1000);
-      const remainingSec = Math.max(0, Math.ceil((totalMs - elapsedMs) / 1000));
+  const remainingMs = Math.max(0, totalMs - elapsedMs);
+  const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
       const progress = Math.min(1, elapsedMs / totalMs);
       if (elapsedMs > totalMs) return null;
 
@@ -231,7 +219,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 style={{ width: `${Math.max(8, (1 - progress) * 100)}%` }}
               />
             </div>
-            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{formatDurationMs(remainingMs)}</span>
           </div>
         </>
       );
@@ -242,7 +230,8 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       const rest = currentEffect.invisUntil - uiNow;
       if (total <= 0 || rest <= 0) return null;
       const progress = 1 - rest / total;
-      const remainingSec = Math.max(1, Math.round(rest / 1000));
+  const remainingMs = Math.max(0, rest);
+  const remainingSec = Math.max(1, Math.round(remainingMs / 1000));
 
       return (
         <>
@@ -257,7 +246,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 style={{ width: `${Math.max(6, Math.min(100, progress * 100))}%` }}
               />
             </div>
-            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{formatDurationMs(remainingMs)}</span>
             {onGhostCancel && (
               <button
                 type="button"
@@ -275,7 +264,8 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     if (currentEffect.kind === "immobilized") {
       const rest = currentEffect.until - uiNow;
       if (rest <= 0) return null;
-      const remainingSec = Math.max(1, Math.round(rest / 1000));
+  const remainingMs = Math.max(0, rest);
+  const remainingSec = Math.max(1, Math.round(remainingMs / 1000));
       const totalDuration = 10000;
       const progress = Math.max(0, Math.min(1, rest / totalDuration));
 
@@ -295,7 +285,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 style={{ width: `${Math.max(8, progress * 100)}%` }}
               />
             </div>
-            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{formatDurationMs(remainingMs)}</span>
           </div>
         </>
       );
@@ -349,6 +339,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 }}
               />
             </div>
+            {/* Progress UI intentionally hidden — transient notification still exists and will be removed after 2s by App */}
             <div className="flex items-center gap-2">
               <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isSmall ? 'text-red-500' : 'text-gray-400'}`}>Petit</span>
               <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isNormal ? 'text-yellow-500' : 'text-gray-400'}`}>Moyen</span>
@@ -376,9 +367,12 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       const captureTime = 30 * 1000; // 30 seconds
       const elapsedMs = currentEffect.captureProgress || 0;
       const remainingMs = Math.max(0, captureTime - elapsedMs);
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const remainingMsSafe = Math.max(0, remainingMs);
+  const remainingSec = Math.max(0, Math.ceil(remainingMsSafe / 1000));
       const progress = Math.min(1, elapsedMs / captureTime);
       const isMyCapture = currentEffect.isMyCapture;
+  const awarded = Number.isFinite(currentEffect.awardedCoins) ? currentEffect.awardedCoins : null;
+  const formattedAward = awarded != null ? formatCoins(awarded) : null;
 
       return (
         <>
@@ -398,7 +392,10 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 style={{ width: `${Math.max(8, progress * 100)}%` }}
               />
             </div>
-            <span className="text-sm font-bold text-blue-600 tabular-nums">{remainingSec}s</span>
+            <span className="text-sm font-bold text-blue-600 tabular-nums">{formatDurationMs(remainingMsSafe)}</span>
+            {awarded != null && (
+              <span className="text-sm font-bold text-emerald-600 tabular-nums ml-3">+{formattedAward}</span>
+            )}
           </div>
         </>
       );
@@ -407,7 +404,8 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     if (currentEffect.kind === "fake_position") {
       const until = currentEffect.until || 0;
       const remainingMs = Math.max(0, until - Date.now());
-      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+  const remainingMsSafe2 = Math.max(0, remainingMs);
+  const remainingSec = Math.max(0, Math.ceil(remainingMsSafe2 / 1000));
 
       return (
         <>
@@ -421,7 +419,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-sm font-bold text-purple-600 tabular-nums">{remainingSec}s</span>
+            <span className="text-sm font-bold text-purple-600 tabular-nums">{formatDurationMs(remainingMsSafe2)}</span>
             <button
               type="button"
               onClick={() => currentEffect.onCancel?.()}
@@ -469,38 +467,35 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     return null;
   };
 
-  // Ne filtre que si l'état est complètement 'hidden'
-  const validEffects = effects.filter(e => {
-    if (!e) return false;
-    if (animationState === 'hidden') return false;
-    const content = getContent(e);
-    return content !== null;
-  });
-
-  if (validEffects.length === 0) return null;
+  // Render only when we have items (items include exiting ones so exit animations play)
+  if (items.length === 0) return null;
 
   return (
     <>
       <style>{`
         @keyframes slideIn {
           from {
-            transform: translateY(-20px) scale(0.1);
+            transform: translateY(-20px) scale(0.12);
             opacity: 0;
+            transform-origin: center top;
           }
           to {
             transform: translateY(60px) scale(1);
             opacity: 1;
+            transform-origin: center top;
           }
         }
-        /* L'animation de sortie : Exactement l'inverse de slideIn */
+        /* Exit animation: shrink and translate back up while fading out to simulate "retracting" */
         @keyframes slideOut {
           from {
             transform: translateY(60px) scale(1);
             opacity: 1;
+            transform-origin: center top;
           }
           to {
-            transform: translateY(-20px) scale(0.1);
+            transform: translateY(0px) scale(0.18);
             opacity: 0;
+            transform-origin: center top;
           }
         }
         @keyframes fadeIn {
@@ -508,64 +503,63 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
             width: 0;
             height: 0;
             opacity: 0;
+            transform: scale(0.2);
           }
           to {
             width: 48px;
             height: 48px;
             opacity: 0.3;
+            transform: scale(1);
           }
         }
-        /* Inverse du petit cercle de fond */
+        /* Shrink the small background circle on exit to make the notification feel like it "goes behind" the timer */
         @keyframes fadeOut {
           from {
             width: 48px;
             height: 48px;
             opacity: 0.3;
+            transform: scale(1);
           }
           to {
             width: 0;
             height: 0;
             opacity: 0;
+            transform: scale(0.1);
           }
         }
       `}</style>
       <div className="fixed inset-0 z-40 pointer-events-none flex items-start justify-center pt-16 gap-3">
-        {validEffects.map((e, index) => {
+        {items.map((it, index) => {
+          const e = it.effect;
           const content = getContent(e);
           if (!content) return null;
+          const entering = it.anim === 'entering';
           return (
             <div
-              key={`${e.kind}-${index}`}
+              key={it.key}
               className="relative"
               style={{
-                // Application dynamique de slideIn ou slideOut
-                animation: animationState === 'entering'
+                animation: entering
                   ? 'slideIn 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards'
                   : 'slideOut 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
                 animationIterationCount: '1'
               }}
-              // Quand le slideOut se termine, on masque définitivement l'élément du DOM
               onAnimationEnd={() => {
-                if (animationState === 'exiting') {
-                  setAnimationState('hidden');
+                if (!entering) {
+                  // remove item after exit animation
+                  setItems(prev => prev.filter(x => x.key !== it.key));
                 }
               }}
             >
-              {/* Cercle d'effet avec fadeIn / fadeOut */}
               <div
                 className="notification-circle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-2xl"
                 style={{
-                  animation: animationState === 'entering'
-                    ? 'fadeIn 400ms ease-out forwards'
-                    : 'fadeOut 400ms ease-out forwards',
+                  animation: entering ? 'fadeIn 400ms ease-out forwards' : 'fadeOut 400ms ease-out forwards',
                   animationIterationCount: '1'
                 }}
               />
 
-              {/* Conteneur principal */}
-              <div
-                className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-4 border border-blue-200 overflow-hidden pointer-events-auto"
-              >
+              <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-4 border border-blue-200 overflow-hidden pointer-events-auto">
                 {content}
               </div>
             </div>

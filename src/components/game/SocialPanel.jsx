@@ -1,5 +1,6 @@
 import PartyChatPanel from "./PartyChatPanel.jsx";
 import Button from "../ui/Button.jsx";
+import { formatCoins } from "../../lib/format";
 
 export default function SocialPanel({
   roomCode,
@@ -72,7 +73,7 @@ export default function SocialPanel({
                         </span>
                         {(p.coins || 0) > 0 && (
                           <span className="shrink-0 rounded-full bg-[#FDE68A] px-2 py-0.5 text-xs font-bold text-amber-900">
-                            🪙 {p.coins}
+                            🪙 {formatCoins(p.coins)}
                           </span>
                         )}
                       </div>

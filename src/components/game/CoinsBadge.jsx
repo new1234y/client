@@ -1,3 +1,5 @@
+import { formatCoins } from '../../lib/format';
+
 export default function CoinsBadge({ coins, coinHistory = [], className = "", onOpen = null }) {
   if (coins == null) return null;
   return (
@@ -19,7 +21,7 @@ export default function CoinsBadge({ coins, coinHistory = [], className = "", on
           </defs>
         </svg>
       </div>
-      <div className="tabular-nums">{coins}</div>
+      <div className="tabular-nums">{formatCoins(coins)}</div>
     </button>
   );
 }
@@ -60,7 +62,7 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
             <span className="text-4xl">🪙</span>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Historique des pièces</h2>
-              <p className="text-sm text-slate-500">Total : {coins} pièces</p>
+              <p className="text-sm text-slate-500">Total : {formatCoins(coins)} pièces</p>
             </div>
           </div>
           <button

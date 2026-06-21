@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { formatCoins } from '../../lib/format';
 
 export default function AnimatedPrice({ value, label = "Coût estimé :" }) {
   const [displayValue, setDisplayValue] = useState(value);
@@ -55,7 +56,7 @@ export default function AnimatedPrice({ value, label = "Coût estimé :" }) {
       >
         <span className="text-xl">🪙</span>
         <span className="text-[16px] font-black text-slate-900 dark:text-white">
-          {displayValue}
+          {formatCoins(displayValue)}
         </span>
       </div>
     </div>

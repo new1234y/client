@@ -11,7 +11,7 @@ function baliseIcon(sizePx, color) {
   });
 }
 
-export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, isMyCapture, captureProgress }) {
+export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, isMyCapture, captureProgress, onClick }) {
   const [rotation, setRotation] = useState(0);
   const [pulse, setPulse] = useState(0);
   const animationRef = useRef(null);
@@ -66,6 +66,12 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
           transform: `rotate(${rotation}deg)`,
           transformOrigin: "center",
         }}
+        eventHandlers={{
+          click: (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (onClick) onClick();
+          },
+        }}
       />
 
       {/* Main circle */}
@@ -78,6 +84,12 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
           fillOpacity: isBeingCaptured ? 0.35 : pulseOpacity,
           weight: isBeingCaptured ? 3 : 2,
           className: "balise-main-circle",
+        }}
+        eventHandlers={{
+          click: (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (onClick) onClick();
+          },
         }}
       />
 
@@ -97,10 +109,21 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
           transform: `rotate(${-rotation * 1.5}deg)`,
           transformOrigin: "center",
         }}
+        eventHandlers={{
+          click: (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (onClick) onClick();
+          },
+        }}
       />
 
       {/* Center blinking dot */}
-      <Marker center={center} position={center} icon={baliseIcon(markerSize, color)}>
+      <Marker center={center} position={center} icon={baliseIcon(markerSize, color)} eventHandlers={{
+          click: (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (onClick) onClick();
+          },
+        }}>
         <Popup>
           <div className="text-xs">
             <strong>Balise</strong>

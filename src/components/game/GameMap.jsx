@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -32,6 +32,9 @@ import { Polyline } from "react-leaflet";
 import GlobalCircle from "./GlobalCircle.jsx";
 import PlayerCircle from "./PlayerCircle.jsx";
 import BaliseCircle from "./BaliseCircle.jsx";
+import BaliseSheet from "./BaliseSheet.jsx";
+import DirectionIndicator from "./DirectionIndicator.jsx";
+import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
 
 function RecenterOnDemand({ center, zoom, tick }) {
   const map = useMap();
@@ -249,6 +252,9 @@ export default function GameMap({
 }) {
   const [expandKey, setExpandKey] = useState(null);
   const [mapError, setMapError] = useState(null);
+  const [selectedBalise, setSelectedBalise] = useState(null);
+  const mapRef = useRef(null);
+  const { heading } = useDeviceOrientation();
   const defaultCenter = [46.8, 2.5];
   const me = gameState?.me;
   const initialCenter = useMemo(() => {
@@ -421,6 +427,17 @@ export default function GameMap({
     setMapError("Impossible de charger la carte. Vérifiez votre connexion internet.");
   };
 
+  const handleBaliseClick = (balise) => {
+    if (baliseLureSelecting) return;
+    setSelectedBalise(balise);
+  };
+
+  const handleShowBaliseOnMap = (center) => {
+    if (mapRef.current) {
+      mapRef.current.setView([center.lat, center.lng], 17, { animate: true });
+    }
+  };
+
   return (
     <>
       {mapError && (
@@ -437,6 +454,7 @@ export default function GameMap({
       )}
 
       <MapContainer
+        ref={mapRef}
         center={initialCenter}
         zoom={initialZoom}
         className="h-full w-full"
@@ -554,6 +572,14 @@ export default function GameMap({
         />
       )}
 
+      {/* Direction indicator for player orientation */}
+      {me?.lat != null && me?.lng != null && heading != null && (
+        <DirectionIndicator
+          center={{ lat: me.lat, lng: me.lng }}
+          heading={heading}
+        />
+      )}
+
       {/* Afficher la fausse position et son cercle de brouillage pour le joueur lui-même */}
       {hasActiveFakePosition && myFakePosition?.lat != null && myFakePosition?.lng != null && (
         <>
@@ -565,6 +591,8 @@ export default function GameMap({
             eventHandlers={{
               click: (e) => {
                 L.DomEvent.stopPropagation(e);
+                // En mode balise-leurre, le clic doit servir uniquement à placer la balise
+                if (baliseLureSelecting) return;
               },
             }}
           >
@@ -589,6 +617,8 @@ export default function GameMap({
               eventHandlers={{
                 click: (e) => {
                   L.DomEvent.stopPropagation(e);
+                  // En mode balise-leurre, le clic doit servir uniquement à placer la balise
+                  if (baliseLureSelecting) return;
                 },
               }}
             />
@@ -609,6 +639,7 @@ export default function GameMap({
             beingCapturedBy={balise.beingCapturedBy}
             isMyCapture={isMyCapture}
             captureProgress={balise.captureProgress || 0}
+            onClick={() => handleBaliseClick(balise)}
           />
         );
       })}
@@ -635,6 +666,8 @@ export default function GameMap({
             eventHandlers={{
               click: (e) => {
                 L.DomEvent.stopPropagation(e);
+                // En mode balise-leurre, le clic doit servir uniquement à placer la balise, pas à ouvrir la fiche joueur
+                if (baliseLureSelecting) return;
                 if (onPlayerClick) {
                   onPlayerClick({ ...ally, role: "player" });
                 }
@@ -667,6 +700,8 @@ export default function GameMap({
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
+              // En mode balise-leurre, le clic doit servir uniquement à placer la balise
+              if (baliseLureSelecting) return;
             },
           }}
         >
@@ -692,6 +727,8 @@ export default function GameMap({
           eventHandlers={{
             click: (e) => {
               L.DomEvent.stopPropagation(e);
+              // En mode balise-leurre, le clic doit servir uniquement à placer la balise
+              if (baliseLureSelecting) return;
             },
           }}
         >
@@ -711,6 +748,15 @@ export default function GameMap({
         </Marker>
       ))}
     </MapContainer>
+
+    {selectedBalise && (
+      <BaliseSheet
+        balise={selectedBalise}
+        mySessionId={mySessionId}
+        onClose={() => setSelectedBalise(null)}
+        onShowOnMap={handleShowBaliseOnMap}
+      />
+    )}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Button from "../ui/Button.jsx";
+import { formatDurationMs, formatCoins } from '../../lib/format';
 
 export default function PowerCard({
   title,
@@ -39,10 +40,10 @@ export default function PowerCard({
               <div className="text-lg font-extrabold text-slate-900 dark:text-white">{title}</div>
             </div>
           </div>
-          {costText && (
+      {costText && (
             <div className="mt-3 flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 text-sm font-bold text-amber-700 ring-1 ring-amber-200 dark:from-amber-900/30 dark:to-yellow-900/30 dark:text-amber-300 dark:ring-amber-700">
               <span className="text-base">🪙</span>
-              <span>{costText}</span>
+        <span>{typeof costText === 'number' ? formatCoins(costText) : costText}</span>
             </div>
           )}
           {stars > 0 && (
@@ -64,7 +65,9 @@ export default function PowerCard({
             onClick={onUse}
             className="flex-1"
           >
-            {isButtonDisabled ? (insufficientCoins ? `Pas assez de pièces (${estimatedCost})` : remaining ? `Attente (${Math.floor(remaining/60)}:${(remaining%60).toString().padStart(2, '0')})` : lockReason || "Indisponible") : "Utiliser"}
+            {isButtonDisabled ? (
+              insufficientCoins ? `Pas assez de pièces (${typeof estimatedCost === 'number' ? formatCoins(estimatedCost) : estimatedCost})` : remaining ? `Attente (${formatDurationMs(remaining*1000)})` : lockReason || "Indisponible"
+            ) : "Utiliser"}
           </Button>
 
           {details && (
@@ -89,11 +92,11 @@ export default function PowerCard({
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-slate-900/60 rounded-2xl">
           <div className="relative z-10 flex flex-col items-center gap-3">
             <div className="select-none text-5xl drop-shadow-lg">🔒</div>
-            <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-lg dark:bg-slate-800 dark:text-slate-100">
+              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-lg dark:bg-slate-800 dark:text-slate-100">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 17a3 3 0 100-6 3 3 0 000 6zm6-7h-1V7a5 5 0 10-10 0v3H6a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2zm-7 0H9V7a3 3 0 016 0v3h-2z"/>
               </svg>
-              <span>{remaining ? `${Math.floor(remaining/60)}m ${(remaining%60)}s` : lockReason || "Recharge"}</span>
+              <span>{remaining ? formatDurationMs(remaining*1000) : lockReason || "Recharge"}</span>
             </div>
           </div>
         </div>

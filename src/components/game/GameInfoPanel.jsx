@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatCoins } from '../../lib/format';
 
 export default function GameInfoPanel({
   role,
@@ -69,21 +70,19 @@ export default function GameInfoPanel({
         </span>
       </div>
 
-      {/* Coins */}
-      {coins != null && (
-        <div className="flex items-center gap-2 text-xs">
-          <div className="flex items-center gap-1">
-            <svg className="h-3.5 w-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.636 5.236a.75.75 0 00-1.061 0 3.5 3.5 0 000 4.95l.707.707a2 2 0 010 2.828l-.707.707a.75.75 0 101.06 1.061l.707-.707a3.5 3.5 0 000-4.95l-.707-.707a2 2 0 010-2.828l.707-.707a.75.75 0 00-1.06-1.061z" />
-              <path d="M12 8a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span className="text-slate-600 dark:text-slate-400">Pièces:</span>
-          </div>
-          <span className="font-mono font-semibold text-slate-900 dark:text-white">
-            {coins}
-          </span>
-        </div>
-      )}
+          {/* Coins */}
+          {coins != null && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-1">
+                <svg className="h-3.5 w-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.636 5.236a.75.75 0 00-1.061 0 3.5 3.5 0 000 4.95l.707.707a2 2 0 010 2.828l-.707.707a.75.75 0 101.06 1.061l.707-.707a3.5 3.5 0 000-4.95l-.707-.707a2 2 0 010-2.828l.707-.707a.75.75 0 00-1.06-1.061z" />
+                  <path d="M12 8a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="text-slate-600 dark:text-slate-400">Pièces:</span>
+              </div>
+              <span className="font-mono font-semibold text-slate-900 dark:text-white">{formatCoins(coins)}</span>
+            </div>
+          )}
 
       {/* Zone timer */}
       {shrinkZoneEnabled && phaseEndsAt && zoneTimeLeft != null && (

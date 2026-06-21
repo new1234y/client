@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { formatCoins } from "../../lib/format";
 
 function roleBadgeText(p) {
   if (p.spectator) return "Spectateur";
@@ -13,6 +14,8 @@ export default function PlayerSheet({
   onClose,
   onShowOnMap = null,
   mapFocus = null,
+  onPowerShortcut = null,
+  role = null,
 }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -69,7 +72,7 @@ export default function PlayerSheet({
                 <div className="mt-1 flex items-center gap-1.5">
                   <span className="text-yellow-500">🪙</span>
                   <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                    {player.coins}
+                    {formatCoins(player.coins)}
                   </span>
                 </div>
               )}
@@ -119,6 +122,84 @@ export default function PlayerSheet({
           {!canShowOnMap && !isGhostHidden && (
             <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-center text-sm text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
               Position GPS non reçue — impossible d&apos;afficher sur la carte
+            </div>
+          )}
+
+          {/* Super power shortcuts */}
+          {onPowerShortcut && role === "cat" && player.role === "player" && !player.spectator && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Super pouvoirs rapides
+              </p>
+              
+              {/* Ring power */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'noise', target: player.sessionId, defaultSettings: true })}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-orange-600 hover:to-amber-600 active:scale-[0.98]"
+                >
+                  <span className="text-lg">🔊</span>
+                  Faire sonner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'noise', target: player.sessionId, defaultSettings: false })}
+                  className="flex items-center justify-center rounded-xl bg-slate-200 px-3 text-slate-600 shadow-sm transition-all hover:bg-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  title="Paramètres"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Invisible power */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'invis', target: player.sessionId, defaultSettings: true })}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-violet-600 hover:to-purple-600 active:scale-[0.98]"
+                >
+                  <span className="text-lg">👻</span>
+                  Rendre invisible
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'invis', target: player.sessionId, defaultSettings: false })}
+                  className="flex items-center justify-center rounded-xl bg-slate-200 px-3 text-slate-600 shadow-sm transition-all hover:bg-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  title="Paramètres"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Freeze power */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'freeze', target: player.sessionId, defaultSettings: true })}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-cyan-600 hover:to-blue-600 active:scale-[0.98]"
+                >
+                  <span className="text-lg">🧊</span>
+                  Immobiliser
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPowerShortcut({ type: 'freeze', target: player.sessionId, defaultSettings: false })}
+                  className="flex items-center justify-center rounded-xl bg-slate-200 px-3 text-slate-600 shadow-sm transition-all hover:bg-slate-300 active:scale-[0.98] dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                  title="Paramètres"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatDurationMs } from "../../lib/format";
 import Button from "../ui/Button.jsx";
 
 export function RoleModal({ role, onClose }) {
@@ -129,14 +130,12 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
       const startTs = gameStartedAt + i * phaseDuration;
       const endTs = startTs + phaseDuration;
       const remaining = Math.max(0, Math.ceil((startTs - Date.now()) / 1000));
-      const m = Math.floor(remaining / 60);
-      const s = remaining % 60;
       return {
         index: i + 1,
         startTs,
         endTs,
         remaining,
-        label: remaining <= 0 ? "Terminé" : `${m}:${String(s).padStart(2, "0")}`,
+        label: remaining <= 0 ? "Terminé" : formatDurationMs(remaining * 1000),
         isCurrent: i === currentPhase - 1,
         isFuture: i >= currentPhase,
         isPast: i < currentPhase - 1
@@ -158,8 +157,7 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
 
   const fmt = (s) => {
     if (s == null) return "--:--";
-    const m = Math.floor(s / 60);
-    return `${m}:${String(s % 60).padStart(2, "0")}`;
+    return formatDurationMs(s * 1000);
   };
 
   const calculateProgress = () => {
@@ -330,8 +328,9 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
   );
 }
 
-export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameType, onClose }) {
+export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameType, onClose, gameMode = null, nextBaliseAt = null, jamLevel = null }) {
   const [timeLeft, setTimeLeft] = useState(null);
+  const [nextBaliseTimeLeft, setNextBaliseTimeLeft] = useState(null);
 
   useEffect(() => {
     if (!timeLimitEndsAt) {
@@ -344,11 +343,54 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
     return () => clearInterval(id);
   }, [timeLimitEndsAt]);
 
+  useEffect(() => {
+    if (!nextBaliseAt) {
+      setNextBaliseTimeLeft(null);
+      return;
+    }
+    const tick = () => setNextBaliseTimeLeft(Math.max(0, nextBaliseAt - Date.now()));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [nextBaliseAt]);
+
   const fmt = (s) => {
     if (s == null) return "--:--";
     const m = Math.floor(s / 60);
     return `${m}:${String(s % 60).padStart(2, "0")}`;
   };
+
+  const formatBaliseTime = (ms) => {
+    if (ms == null) return "--:--";
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes} min ${seconds} s`;
+  };
+
+  const getModeDisplayName = (mode) => {
+    if (!mode) return 'Standard';
+    const modeMap = {
+      'tag swap': 'Chatounant',
+      'zombie': 'Chat zombie',
+      'standard': 'Standard',
+      'hardcore': 'Hardcore',
+      'stealth': 'Furtif',
+    };
+    return modeMap[mode.toLowerCase()] || mode;
+  };
+
+  const getJamLevelConfig = (level) => {
+    if (!level) return null;
+    const configs = {
+      'small': { label: 'Petit', color: 'bg-green-500', progress: 33 },
+      'medium': { label: 'Moyen', color: 'bg-orange-500', progress: 66 },
+      'large': { label: 'Grand', color: 'bg-red-500', progress: 100 },
+    };
+    return configs[level] || configs['medium'];
+  };
+
+  const jamConfig = getJamLevelConfig(jamLevel);
 
   return (
     <div
@@ -432,6 +474,63 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
               <p className="font-semibold text-slate-900 dark:text-white">
                 {timeLimitEndsAt ? new Date(timeLimitEndsAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
               </p>
+            </div>
+          </div>
+
+          {/* Cercle de brouillage - full line with notification-style visual */}
+          {jamConfig && (
+            <div className="bg-slate-100 rounded-xl p-4 dark:bg-slate-800">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">📡</span>
+                <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Cercle de brouillage</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {/* Progress bars with visual effects */}
+                <div className="flex items-center gap-2">
+                  <div 
+                    className={`h-2 flex-1 rounded-full ${jamLevel === 'small' ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
+                    style={{
+                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
+                    }}
+                  />
+                  <div 
+                    className={`h-2 flex-1 rounded-full ${jamLevel === 'medium' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
+                    style={{
+                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
+                    }}
+                  />
+                  <div 
+                    className={`h-2 flex-1 rounded-full ${jamLevel === 'large' ? 'bg-green-500 shadow-lg shadow-green-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
+                    style={{
+                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
+                    }}
+                  />
+                </div>
+                {/* Labels */}
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'small' ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}>Petit</span>
+                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'medium' ? 'text-yellow-500' : 'text-slate-400 dark:text-slate-500'}`}>Moyen</span>
+                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'large' ? 'text-green-500' : 'text-slate-400 dark:text-slate-500'}`}>Grand</span>
+                </div>
+                {/* Current level indicator */}
+                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Actuel : <span className={`font-bold ${jamLevel === 'small' ? 'text-red-600' : jamLevel === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>{jamConfig.label}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mode and Prochaine balise - side by side */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Mode</p>
+              <p className="font-semibold text-slate-900 dark:text-white">{getModeDisplayName(gameMode)}</p>
+            </div>
+            <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Prochaine balise</p>
+              <p className="font-semibold text-slate-900 dark:text-white">{nextBaliseAt ? formatBaliseTime(nextBaliseTimeLeft) : '--:--'}</p>
             </div>
           </div>
         </div>

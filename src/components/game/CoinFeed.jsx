@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatCoins } from "../../lib/format";
 
 export default function CoinFeed({ socket, sessionId }) {
   const [currentEvent, setCurrentEvent] = useState(null);
@@ -19,9 +20,10 @@ export default function CoinFeed({ socket, sessionId }) {
 
     const handleBaliseCaptured = (data) => {
       const isMe = data.sessionId === sessionId;
+      const amount = Number.isFinite(data.awardedCoins) ? data.awardedCoins : 10;
       setCurrentEvent({
         type: "gained",
-        amount: 10,
+        amount,
         nickname: data.nickname,
         isMe,
         timestamp: Date.now(),
@@ -58,7 +60,7 @@ export default function CoinFeed({ socket, sessionId }) {
       }`}
     >
       <span className="text-lg">
-        {currentEvent.type === "gained" ? "+" : "-"}{currentEvent.amount}
+        {currentEvent.type === "gained" ? "+" : "-"}{formatCoins(currentEvent.amount)}
       </span>
       <span className="opacity-90">
         {currentEvent.isMe ? "Vous" : currentEvent.nickname}

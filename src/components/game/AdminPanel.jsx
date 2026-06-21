@@ -1,4 +1,5 @@
 import Button from "../ui/Button.jsx";
+import { formatCoins } from "../../lib/format";
 
 export default function AdminPanel({
   roomCode,
@@ -77,7 +78,7 @@ export default function AdminPanel({
                       {p.sessionId === sessionId && " (vous)"}
                     </span>
                     <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold">
-                      🪙 {p.coins || 0}
+                      🪙 {formatCoins(p.coins || 0)}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-white/80">{p.role === "cat" ? "Chat" : "Joueur"}</p>

@@ -160,6 +160,8 @@ function ConfettiField({ seed }) {
   );
 }
 
+import { formatCoins } from '../../lib/format';
+
 function PodiumPillar({ place, player, accent }) {
   if (!player) {
     return (
@@ -211,7 +213,7 @@ function PodiumPillar({ place, player, accent }) {
           </p>
           <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
             <span>🪙</span>
-            {player.coins}
+            {formatCoins(player.coins)}
           </span>
         </div>
         <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
@@ -434,7 +436,7 @@ function SummaryPodiumView({
                           </span>
                           <span className="flex items-center gap-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                             <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
-                            {player.coins}
+                            {formatCoins(player.coins)}
                           </span>
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
@@ -1008,7 +1010,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                     <span>Dist. {formatDistance(st.distanceMeters)}</span>
                     <span>Vmax {formatSpeedKmh(st.maxSpeedKmh)}</span>
                     <span>Chat {formatDurationMs(st.catTimeMs ?? p.totalCatTimeMs)}</span>
-                    <span>🪙 {st.coins ?? p.coins ?? 0}</span>
+                            <span>🪙 {formatCoins(st.coins ?? p.coins ?? 0)}</span>
                   </span>
                 </label>
               );})}

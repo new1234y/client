@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatDurationMs } from "../../lib/format";
 import GameTimer from "./GameTimer.jsx";
 import GameStatusModal from "./GameStatusModal.jsx";
 import AnimatedGameNotification from "./AnimatedGameNotification.jsx";
@@ -95,10 +96,8 @@ function ZonePhaseRow({
         {perPhaseStarts && (
           <div className="flex gap-2 mt-1">
             {perPhaseStarts.map((startTs, i) => {
-              const remaining = Math.max(0, Math.ceil((startTs - Date.now()) / 1000));
-              const m = Math.floor(remaining / 60);
-              const s = remaining % 60;
-              const label = remaining <= 0 ? "--:--" : `${m}:${String(s).padStart(2, "0")}`;
+                      const remaining = Math.max(0, Math.ceil((startTs - Date.now()) / 1000));
+                      const label = remaining <= 0 ? "--:--" : formatDurationMs(remaining * 1000);
               return (
                 <div key={i} className="text-[10px] text-slate-500 tabular-nums">
                   {label}
@@ -168,8 +167,8 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
               </p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full bg-blue-800 px-2 py-0.5 text-[10px] font-bold text-white tabular-nums">
-            {remainingSec}s
+            <span className="shrink-0 rounded-full bg-blue-800 px-2 py-0.5 text-[10px] font-bold text-white tabular-nums">
+            {formatDurationMs(remainingSec * 1000)}
           </span>
         </div>
         <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-blue-400">
@@ -203,7 +202,7 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
               />
             </div>
           </div>
-          <span className="shrink-0 text-[11px] font-semibold tabular-nums">{remainingSec}s</span>
+          <span className="shrink-0 text-[11px] font-semibold tabular-nums">{formatDurationMs(remainingSec * 1000)}</span>
           {onGhostCancel && (
             <button
               type="button"
@@ -229,7 +228,7 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
           <span className="text-lg">🧊</span>
           <div className="flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider">Immobilisé</p>
-            <p className="text-[11px]">Carte gelée — {remainingSec}s restantes</p>
+            <p className="text-[11px]">Carte gelée — {formatDurationMs(remainingSec * 1000)} restantes</p>
           </div>
         </div>
       </div>

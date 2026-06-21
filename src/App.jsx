@@ -237,6 +237,8 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
   );
 }
 
+import { formatDurationMs } from "./lib/format";
+
 function CatMapLockOverlay({ mapUnlockAt, socket, getServerTime }) {
   const [secLeft, setSecLeft] = useState(0);
   const didRefresh = useRef(false);
@@ -261,8 +263,7 @@ function CatMapLockOverlay({ mapUnlockAt, socket, getServerTime }) {
     return () => clearInterval(id);
   }, [mapUnlockAt, socket, getServerTime]);
 
-  const mm = Math.floor(secLeft / 60);
-  const ss = secLeft % 60;
+  const formatted = formatDurationMs(secLeft * 1000);
 
   return (
     <div className="flex h-full flex-col justify-center bg-slate-50 p-6 dark:bg-slate-950">
@@ -271,7 +272,7 @@ function CatMapLockOverlay({ mapUnlockAt, socket, getServerTime }) {
           Chat · carte verrouillée
         </p>
         <p className="mt-3 text-center text-5xl font-black tabular-nums text-slate-900 dark:text-white">
-          {mm}:{String(ss).padStart(2, "0")}
+          {formatted}
         </p>
         <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
           La carte s’ouvre automatiquement à la fin du délai. Vous pouvez consulter
@@ -307,12 +308,9 @@ function CatLockCountdownHeader({ mapUnlockAt, socket, getServerTime }) {
     return () => clearInterval(id);
   }, [mapUnlockAt, socket, getServerTime]);
 
-  const mm = Math.floor(secLeft / 60);
-  const ss = secLeft % 60;
-
   return (
     <span className="inline-flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-1 text-xs font-bold tabular-nums text-orange-800 ring-1 ring-orange-200 dark:bg-orange-950/80 dark:text-orange-100 dark:ring-orange-800">
-      Carte · {mm}:{String(ss).padStart(2, "0")}
+  Carte · {formatDurationMs(secLeft * 1000)}
     </span>
   );
 }
@@ -398,6 +396,56 @@ export default function App() {
   const [zoomOutTick, setZoomOutTick] = useState(0);
   const [summary, setSummary] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  // Derived jam state (computed from gameState) and transient notification hooks
+  const jamBase = gameState ? Number(gameState.jamRadiusBaseM || gameState.settings?.jamRadiusM || 80) : 80;
+  const jamScale = gameState ? Number(gameState.jamRadiusScale || 1) : 1;
+  const jamRadius = jamBase * jamScale;
+  let jamLabel = "Normal";
+  let jamLevel = "normal";
+  if (jamScale < 0.99) {
+    jamLabel = "Rétréci";
+    jamLevel = "small";
+  } else if (jamScale > 1.01) {
+    jamLabel = "Agrandit";
+    jamLevel = "large";
+  }
+
+  const [recentJamNotification, setRecentJamNotification] = useState(null);
+  const prevJamLevelRef = useRef('normal');
+  const recentJamTimeoutRef = useRef(null);
+
+  // Side-effect: when jamLevel transitions from normal -> non-normal create a 2s transient notification
+  useEffect(() => {
+    // Trigger a transient (2s) notification on any jamLevel change
+    if (jamLevel !== prevJamLevelRef.current) {
+      const now = getServerTime();
+      const notif = {
+        kind: 'jam',
+        label: jamLevel,
+        radiusM: jamRadius,
+        startedAt: now,
+        durationMs: 2000,
+      };
+      setRecentJamNotification(notif);
+      if (recentJamTimeoutRef.current) clearTimeout(recentJamTimeoutRef.current);
+      recentJamTimeoutRef.current = setTimeout(() => {
+        setRecentJamNotification(null);
+        recentJamTimeoutRef.current = null;
+      }, 2000);
+    }
+    prevJamLevelRef.current = jamLevel;
+    return undefined;
+  }, [jamLevel, jamRadius]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recentJamTimeoutRef.current) {
+        clearTimeout(recentJamTimeoutRef.current);
+        recentJamTimeoutRef.current = null;
+      }
+    };
+  }, []);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showZoneModal, setShowZoneModal] = useState(false);
   const [showGameModal, setShowGameModal] = useState(false);
@@ -478,6 +526,83 @@ export default function App() {
   
   // Helper function to get synchronized server time
   const getServerTime = () => Date.now() + serverTimeOffsetRef.current;
+
+  // Handle power shortcuts from PlayerSheet
+  const handlePowerShortcut = ({ type, target, defaultSettings }) => {
+    if (defaultSettings) {
+      // Use power with default medium settings
+      switch (type) {
+        case 'invis':
+          socket?.emit(
+            "use_power",
+            { kind: "invisibility", scope: "multi", targetSessionIds: [target], durationSec: 300 },
+            (res) => {
+              if (res?.ok) {
+                setCd("invisibility", 120);
+                addNotification("Invisibilité activée (5 min)", "success");
+                setSelectedPlayer(null);
+              } else {
+                addNotification(res?.error || "Erreur", "error");
+              }
+            }
+          );
+          break;
+        case 'noise':
+          socket?.emit(
+            "use_power",
+            { kind: "noise", targetSessionIds: [target], durationSec: 30, volume: "medium" },
+            (res) => {
+              if (res?.ok) {
+                setCd("noise", 60);
+                addNotification("Bruit fantôme activé (30s)", "success");
+                setSelectedPlayer(null);
+              } else {
+                addNotification(res?.error || "Erreur", "error");
+              }
+            }
+          );
+          break;
+        case 'freeze':
+          socket?.emit(
+            "use_power",
+            { kind: "freeze_cats", scope: "single", targetSessionId: target, durationSec: 20 },
+            (res) => {
+              if (res?.ok) {
+                setCd("freeze_cats", 90);
+                addNotification("Joueur immobilisé (20s)", "success");
+                setSelectedPlayer(null);
+              } else {
+                addNotification(res?.error || "Erreur", "error");
+              }
+            }
+          );
+          break;
+      }
+    } else {
+      // Navigate to powers page with pre-selected target
+      setSelectedPlayer(null);
+      setGameTab("powers");
+      
+      // Pre-select the target based on power type
+      switch (type) {
+        case 'invis':
+          setSelectedInvisTargets([target]);
+          setInvisDurationSec(300); // 5 min default
+          break;
+        case 'noise':
+          setSelectedNoiseTargets([target]);
+          setNoiseTargetMode("single");
+          setNoiseDuration(30); // 30s default
+          setNoiseVolume("medium");
+          break;
+        case 'freeze':
+          setSelectedFreezeTargets([target]);
+          setFreezeTargetMode("single");
+          setFreezeDuration(20); // 20s default
+          break;
+      }
+    }
+  };
   
   const socketRef = useRef(null);
   const stageRef = useRef(stage);
@@ -805,6 +930,22 @@ export default function App() {
       setRole(payload.me?.role ?? null);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       if (payload.phase === "playing") setStage("game");
+      
+      // Restore activeNoise from backend if noise effect is still valid
+      if (payload.me?.noiseEffect) {
+        const noiseEffect = payload.me.noiseEffect;
+        const now = getServerTime();
+        const elapsed = now - noiseEffect.startedAt;
+        if (elapsed <= noiseEffect.durationSec * 1000) {
+          setActiveNoise({
+            startedAt: noiseEffect.startedAt,
+            durationSec: noiseEffect.durationSec,
+            volume: noiseEffect.volume,
+            by: noiseEffect.by
+          });
+          setNoiseUiNow(now);
+        }
+      }
     });
 
     s.on("game_finished", (data) => {
@@ -2783,22 +2924,11 @@ if (stage === "role_reveal" && rolesReveal) {
       return null;
     };
 
-    // État du cercle de brouillage (zone jam des joueurs)
-    const jamBase = Number(gameState.jamRadiusBaseM || gameState.settings?.jamRadiusM || 80);
-    const jamScale = Number(gameState.jamRadiusScale || 1);
-    const jamRadius = jamBase * jamScale;
-    let jamLabel = "Normal";
-    let jamLevel = "normal"; // small | normal | large
-    if (jamScale < 0.99) {
-      jamLabel = "Rétréci";
-      jamLevel = "small";
-    } else if (jamScale > 1.01) {
-      jamLabel = "Agrandit";
-      jamLevel = "large";
-    }
-
-    const jamIsMin = jamScale <= 0.51; // proche du palier min côté serveur (0.5)
-    const jamIsMax = jamScale >= 1.49; // proche du palier max côté serveur (1.5)
+  // État du cercle de brouillage (zone jam des joueurs)
+  // jam values are computed at top-level so they keep hook order stable
+  // jamBase, jamScale, jamRadius, jamLevel are available here
+  const jamIsMin = jamScale <= 0.51; // proche du palier min côté serveur (0.5)
+  const jamIsMax = jamScale >= 1.49; // proche du palier max côté serveur (1.5)
 
     // Effet de pouvoir actif pour l'extension du HUD - collect all active effects
     const hudPowerEffects = [];
@@ -2830,13 +2960,12 @@ if (stage === "role_reveal" && rolesReveal) {
       hudPowerEffects.push({ kind: "immobilized", until: me.immobilizedUntil });
       hudPowerUiNow = ghostUiNow;
     }
-    if (jamLevel !== "normal") {
-      hudPowerEffects.push({
-        kind: "jam",
-        label: jamLevel,
-        radiusM: jamRadius,
-      });
-    }
+    // If we have a recent transient jam notification (2s), show it with progress
+    // and skip the older/persistent jam notification to avoid duplicates.
+    if (recentJamNotification) {
+      hudPowerEffects.push(recentJamNotification);
+      hudPowerUiNow = getServerTime();
+  }
 
     // Check for balise capture in progress - only show for the player capturing
     const balises = gameState?.balises || [];
@@ -2848,6 +2977,7 @@ if (stage === "role_reveal" && rolesReveal) {
           nickname: "Vous",
           isMyCapture: true,
           captureProgress: balise.captureProgress || 0,
+          awardedCoins: balise.awardedCoins || null,
         });
         hudPowerUiNow = getServerTime();
         break; // Only show one balise capture notification at a time
@@ -3115,7 +3245,9 @@ if (stage === "role_reveal" && rolesReveal) {
                         socket?.emit("use_power", body, (res) => {
                           if (res?.ok) {
                             setCd("invisibility", 120);
-                            addNotification("Invisibilité activée", "success");
+                            // Show HUD notification via game state (server will update me.invisUntil)
+                            // Avoid system notification for power usage
+                            setGameTab('map');
                           } else {
                             addNotification(res?.error || "Erreur", "error");
                           }
@@ -3252,7 +3384,9 @@ if (stage === "role_reveal" && rolesReveal) {
                           (res) => {
                             if (res?.ok) {
                               setCd("noise", 60);
-                              addNotification("Bruit déclenché", "success");
+                                      // Immediately show HUD noise effect and switch to game tab
+                                      setActiveNoise({ startedAt: getServerTime(), durationSec, volume, by: me?.nickname });
+                                      setGameTab('map');
                             } else {
                               addNotification(res?.error || "Erreur", "error");
                             }
@@ -3385,7 +3519,8 @@ if (stage === "role_reveal" && rolesReveal) {
                           onUse={() => {
                             socket?.emit("use_power", { kind: "fake_position", durationSec: 60 }, (res) => {
                               if (res?.ok) {
-                                addNotification("Leurre de position activé", "success");
+                                // Rely on HUD/game state for fake position; avoid system notification
+                                setGameTab('map');
                               } else if (res?.error) {
                                 addNotification(res.error || "Erreur", "error");
                               }
@@ -3410,6 +3545,7 @@ if (stage === "role_reveal" && rolesReveal) {
                             socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
                               if (res?.ok) {
                                 // Game notification handles jam level display
+                                setGameTab('map');
                               } else if (res?.error) {
                                 // On supprime le cas "Déjà au maximum" côté UX : on se contente de bloquer le bouton
                                 if (!/Déjà au maximum/i.test(res.error)) {
@@ -3489,7 +3625,8 @@ if (stage === "role_reveal" && rolesReveal) {
                             socket?.emit("use_power", payload, (res) => {
                               if (res?.ok) {
                                 setCd("freeze_cats", 90);
-                                addNotification("Joueurs immobilisés", "success");
+                                  // HUD will reflect immobilized players via game state, avoid system notification
+                                  setGameTab('map');
                               } else {
                                 addNotification(res?.error || "Erreur", "error");
                               }
@@ -3606,11 +3743,12 @@ if (stage === "role_reveal" && rolesReveal) {
                           details={<>
                             Rétrécit le cercle de brouillage des joueurs (zone floue autour d'eux). Si les joueurs l'ont agrandi, une première utilisation le ramène à la normale, puis le réduit encore.
                           </>}
-                          onUse={() => {
+              onUse={() => {
                             if (jamIsMin) return;
                             socket?.emit("use_power", { kind: "zone_morph" }, (res) => {
                               if (res?.ok) {
-                                addNotification("Zone modifiée", "success");
+                // Switch to game tab when using a power
+                setGameTab('map');
                               } else if (res?.error) {
                                 if (!/Déjà au minimum/i.test(res.error)) {
                                   addNotification(res.error || "Erreur", "error");
@@ -3736,7 +3874,8 @@ if (stage === "role_reveal" && rolesReveal) {
                       setBaliseLureSelecting(false);
                       socket?.emit("use_power", { kind: "balise_leurre", lat, lng }, (res) => {
                         if (res?.ok) {
-                          addNotification("Balise-leurre programmée", "success");
+                            // HUD will show confirmation; avoid system notification
+                            setGameTab('map');
                         } else {
                           addNotification(res?.error || "Erreur", "error");
                         }
@@ -3928,6 +4067,9 @@ if (stage === "role_reveal" && rolesReveal) {
           timeLimitEndsAt={gameState?.timeLimitEndsAt}
           totalProgress={gameState?.huntStartedAt && gameState?.timeLimitEndsAt ? (Date.now() - gameState.huntStartedAt) / (gameState.timeLimitEndsAt - gameState.huntStartedAt) : 0}
           gameType={null}
+          gameMode={gameState?.settings?.gameMode || null}
+          nextBaliseAt={gameState?.nextBaliseAt || null}
+          jamLevel={jamLevel}
           onClose={() => setShowGameModal(false)}
         />}
         {showCoinsModal && <CoinsHistoryModal
@@ -3953,6 +4095,8 @@ if (stage === "role_reveal" && rolesReveal) {
             onShowOnMap={(mapFocus) =>
               onShowPlayerOnMap(mapFocus, selectedPlayer.sessionId)
             }
+            onPowerShortcut={handlePowerShortcut}
+            role={role}
           />
         )}
       </div>

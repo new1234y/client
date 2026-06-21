@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatDurationMs } from "../../lib/format";
 
 export default function ZonePhaseIndicator({ 
   currentRadius, 
@@ -55,7 +56,7 @@ export default function ZonePhaseIndicator({
         </div>
 
         <div className="flex flex-col leading-tight">
-          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}</div>
+          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{formatDurationMs((timeLeft || 0) * 1000)}</div>
           <div className="text-sm font-semibold text-blue-600">Zone rétréci</div>
         </div>
       </div>

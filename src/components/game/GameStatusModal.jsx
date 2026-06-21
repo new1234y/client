@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { formatCoins } from '../../lib/format';
 
 export default function GameStatusModal({
   timeRemaining = '2:45',
   zoneState = null,
   progress = 11,
   coins = 35,
-  playerType = 'player', // 'player' or 'cat'
+  playerType = 'player',
   shrinkZoneEnabled = true,
   timeLimitEnabled = false,
   onCoinsClick = null,
@@ -17,31 +18,21 @@ export default function GameStatusModal({
   const [displayProgress, setDisplayProgress] = useState(0);
 
   useEffect(() => {
-    // Animation de la barre de progression au montage
-    const timer = setTimeout(() => {
-      setDisplayProgress(progress);
-    }, 100);
+    const timer = setTimeout(() => setDisplayProgress(progress), 100);
     return () => clearTimeout(timer);
   }, [progress]);
 
   return (
     <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center w-full max-w-2xl px-4 ${className}`}>
 
-      {/* Fond de la barre (les "ailes" plus petites en hauteur) */}
       <div className="absolute left-4 right-4 h-16 bg-white/95 backdrop-blur-xl rounded-[40px] shadow-lg ring-1 ring-slate-200" />
 
-      {/* Conteneur principal superposé */}
       <div className="relative z-10 w-full flex items-center justify-between">
-        
-        {/* GAUCHE : Icône Joueur */}
         {!shrinkZoneEnabled && !timeLimitEnabled ? (
           <div className="flex-1 flex items-center justify-start pl-3">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlayerClick?.();
-              }}
+              onClick={(e) => { e.stopPropagation(); onPlayerClick?.(); }}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
             >
               {playerType === 'player' ? (
@@ -60,10 +51,7 @@ export default function GameStatusModal({
           <div className="flex-1 flex items-center justify-start pl-3 gap-3">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlayerClick?.();
-              }}
+              onClick={(e) => { e.stopPropagation(); onPlayerClick?.(); }}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
             >
               {playerType === 'player' ? (
@@ -80,10 +68,7 @@ export default function GameStatusModal({
 
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCoinsClick?.();
-              }}
+              onClick={(e) => { e.stopPropagation(); onCoinsClick?.(); }}
               className="flex items-center gap-1.5 hover:scale-105 transition-transform cursor-pointer"
             >
               <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -97,18 +82,14 @@ export default function GameStatusModal({
                   </linearGradient>
                 </defs>
               </svg>
-              <span className="text-lg font-bold text-[#446b9e] tabular-nums">{coins}</span>
+              <span className="text-lg font-bold text-[#446b9e] tabular-nums">{formatCoins(coins)}</span>
             </button>
           </div>
         )}
 
-        {/* CENTRE : Le Timer */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onTimerClick?.();
-          }}
+          onClick={(e) => { e.stopPropagation(); onTimerClick?.(); }}
           className="flex-shrink-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl rounded-[2.25rem] px-8 py-3 shadow-lg ring-1 ring-slate-200 hover:scale-105 transition-transform cursor-pointer mx-2"
         >
           <span className="text-[2rem] font-extrabold text-[#2563eb] tabular-nums tracking-tight leading-none mb-0.5">
@@ -119,14 +100,10 @@ export default function GameStatusModal({
           </span>
         </button>
 
-        {/* DROITE : Barre de progression ou Coins */}
         {!shrinkZoneEnabled && !timeLimitEnabled ? (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCoinsClick?.();
-            }}
+            onClick={(e) => { e.stopPropagation(); onCoinsClick?.(); }}
             className="flex-1 flex items-center justify-end pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
           >
             <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -140,25 +117,17 @@ export default function GameStatusModal({
                 </linearGradient>
               </defs>
             </svg>
-            <span className="text-lg font-bold text-[#446b9e] tabular-nums">{coins}</span>
+            <span className="text-lg font-bold text-[#446b9e] tabular-nums">{formatCoins(coins)}</span>
           </button>
         ) : (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onProgressClick?.();
-            }}
+            onClick={(e) => { e.stopPropagation(); onProgressClick?.(); }}
             className="flex-1 flex flex-col items-end justify-center pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
           >
-            <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">
-              {displayProgress}%
-            </span>
+            <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">{displayProgress}%</span>
             <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out"
-                style={{ width: `${displayProgress}%` }}
-              />
+              <div className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out" style={{ width: `${displayProgress}%` }} />
             </div>
           </button>
         )}
@@ -234,7 +203,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
           {playerStats.coins != null && (
             <div className="flex items-center justify-between rounded-lg bg-slate-100 p-3 dark:bg-slate-800">
               <span className="text-sm font-semibold text-slate-900 dark:text-white">Pièces</span>
-              <span className="text-sm font-bold text-amber-600">{playerStats.coins}</span>
+              <span className="text-sm font-bold text-amber-600">{formatCoins(playerStats.coins)}</span>
             </div>
           )}
 
