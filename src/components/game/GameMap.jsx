@@ -254,7 +254,7 @@ export default function GameMap({
   const [mapError, setMapError] = useState(null);
   const [selectedBalise, setSelectedBalise] = useState(null);
   const mapRef = useRef(null);
-  const { heading } = useDeviceOrientation();
+  const { heading, needsPermission, requestPermission } = useDeviceOrientation();
   const defaultCenter = [46.8, 2.5];
   const me = gameState?.me;
   const initialCenter = useMemo(() => {
@@ -434,7 +434,9 @@ export default function GameMap({
 
   const handleShowBaliseOnMap = (center) => {
     if (mapRef.current) {
-      mapRef.current.setView([center.lat, center.lng], 17, { animate: true });
+  // Clamp the zoom to allowed maximum so callers can request deep zooms safely in the future
+  const targetZoom = Math.min(24, 17);
+  mapRef.current.setView([center.lat, center.lng], targetZoom, { animate: true });
     }
   };
 
@@ -460,12 +462,40 @@ export default function GameMap({
         className="h-full w-full"
         zoomControl={false}
         scrollWheelZoom
+        // Allow much deeper zoom (tiles may limit actual detail). Keep high max to let users zoom in.
+        maxZoom={24}
+        minZoom={2}
         attributionControl
       >
-        <TileLayer 
-          key={basemapId} 
-          attribution={bm.attribution} 
+        {/* If the device requires a user gesture to grant orientation permission (iOS),
+            show a small unobtrusive button that the user can tap to enable orientation. */}
+        {needsPermission && (
+          <div className="absolute left-3 top-3 z-[2100]">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await requestPermission();
+                  if (!res.granted) {
+                    setMapError('Autorisation d\'accès à l\'orientation refusée.');
+                  }
+                } catch (err) {
+                  setMapError('Erreur lors de la demande d\'autorisation.');
+                }
+              }}
+              className="rounded bg-white/90 px-3 py-1 text-xs font-medium shadow-md"
+            >
+              Activer l'orientation
+            </button>
+          </div>
+        )}
+        <TileLayer
+          key={basemapId}
+          attribution={bm.attribution}
           url={bm.url}
+          // If the basemap provides a native max zoom, pass it so Leaflet can use hi-res tiles when available
+          maxNativeZoom={bm.maxNativeZoom}
+          maxZoom={24}
           eventHandlers={{
             tileerror: handleTileError,
             loaderror: handleTileError,
@@ -577,6 +607,8 @@ export default function GameMap({
         <DirectionIndicator
           center={{ lat: me.lat, lng: me.lng }}
           heading={heading}
+          jamRadius={myJam?.radiusM ?? 80}
+          isOutside={Boolean(me?.outOfBounds)}
         />
       )}
 

@@ -1,8 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export function useDeviceOrientation() {
   const [heading, setHeading] = useState(null);
   const [error, setError] = useState(null);
+  const [needsPermission, setNeedsPermission] = useState(false);
+  const listenersAddedRef = useRef(false);
+  const savedEventTypeRef = useRef('deviceorientation');
+  const savedHandlerRef = useRef(null);
 
   const handleOrientation = useCallback((event) => {
     console.log('[useDeviceOrientation] handleOrientation called:', {
@@ -16,16 +20,30 @@ export function useDeviceOrientation() {
     let newHeading = null;
 
     // Try multiple methods to get heading, in order of preference
-    if (event.webkitCompassHeading) {
+    // 1) Prefer webkitCompassHeading when provided by some iOS builds
+    if (typeof event.webkitCompassHeading === 'number') {
       // iOS Safari specific
       newHeading = event.webkitCompassHeading;
       console.log('[useDeviceOrientation] Using webkitCompassHeading:', newHeading);
     } else if (event.alpha !== null) {
       // Standard DeviceOrientationEvent
-      // alpha is the compass heading relative to north (0-360)
-      // Note: on some devices alpha might be relative to initial device orientation
-      newHeading = 360 - event.alpha;
-      console.log('[useDeviceOrientation] Using alpha (360 - alpha):', newHeading);
+      // alpha is rotation around Z axis. Its reference frame depends on the device/browser.
+      // Compensate for screen orientation (portrait/landscape) to get a stable heading.
+      try {
+        const screenAngle = (window.screen && window.screen.orientation && window.screen.orientation.angle) || (typeof window.orientation === 'number' ? window.orientation : 0);
+        let alpha = event.alpha;
+        // Normalize alpha to 0-360
+        alpha = ((alpha % 360) + 360) % 360;
+        // Add screen rotation so heading is relative to device upright orientation
+        alpha = (alpha + screenAngle) % 360;
+        // Convert to compass heading where 0 = north
+        newHeading = 360 - alpha;
+        console.log('[useDeviceOrientation] Using alpha with screenAngle', screenAngle, '->', newHeading);
+      } catch (err) {
+        console.log('[useDeviceOrientation] Error computing adjusted alpha:', err);
+        newHeading = 360 - event.alpha;
+        console.log('[useDeviceOrientation] Fallback alpha ->', newHeading);
+      }
     } else if (event.absolute && event.alpha !== null) {
       // When absolute is true, alpha is compass heading
       newHeading = event.alpha;
@@ -63,19 +81,86 @@ export function useDeviceOrientation() {
     }
   }, []);
 
+  // Helper to actually attach listeners (idempotent)
+  const addListeners = useCallback((eventType, orientationHandler) => {
+    if (listenersAddedRef.current) return;
+    try {
+      window.addEventListener(eventType, orientationHandler);
+      if (eventType !== 'deviceorientation') {
+        // also add standard event as fallback
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
+      listenersAddedRef.current = true;
+      savedEventTypeRef.current = eventType;
+      savedHandlerRef.current = orientationHandler;
+      console.log('[useDeviceOrientation] Event listeners added:', eventType);
+    } catch (err) {
+      console.log('[useDeviceOrientation] Failed to add listeners:', err);
+      setError(err.message || String(err));
+    }
+  }, [handleOrientation]);
+
+  // Exposed function to request permission from a user gesture
+  const requestPermission = useCallback(async () => {
+    console.log('[useDeviceOrientation] requestPermission called by user gesture');
+    if (!window.DeviceOrientationEvent) {
+      setError('Device orientation not supported');
+      return { granted: false, reason: 'unsupported' };
+    }
+
+    let eventType = 'deviceorientation';
+    let orientationHandler = handleOrientation;
+    if ('ondeviceorientationabsolute' in window) {
+      eventType = 'deviceorientationabsolute';
+      orientationHandler = handleOrientationAbsolute;
+      console.log('[useDeviceOrientation] deviceorientationabsolute available');
+    }
+
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        console.log('[useDeviceOrientation] Requesting iOS permission');
+        const permission = await DeviceOrientationEvent.requestPermission();
+        console.log('[useDeviceOrientation] Permission result:', permission);
+        if (permission === 'granted') {
+          addListeners(eventType, orientationHandler);
+          setNeedsPermission(false);
+          return { granted: true };
+        }
+        setError('Permission denied');
+        return { granted: false, reason: 'denied' };
+      } catch (err) {
+        console.log('[useDeviceOrientation] Permission request error:', err);
+        setError(err.message || String(err));
+        return { granted: false, reason: 'error', error: err };
+      }
+    }
+
+    // Non-iOS: attach listeners immediately
+    addListeners(eventType, orientationHandler);
+    setNeedsPermission(false);
+    return { granted: true };
+  }, [addListeners, handleOrientation, handleOrientationAbsolute]);
+
   useEffect(() => {
     console.log('[useDeviceOrientation] useEffect - initializing');
-    // Check if device orientation is supported
     if (!window.DeviceOrientationEvent) {
       console.log('[useDeviceOrientation] DeviceOrientationEvent not supported');
-      setError("Device orientation not supported");
+      setError('Device orientation not supported');
       return;
     }
 
-    let orientationHandler = handleOrientation;
-    let eventType = 'deviceorientation';
+    // If the browser requires explicit permission via DeviceOrientationEvent.requestPermission,
+    // we don't call it automatically (must be a user gesture). Instead expose requestPermission()
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      console.log('[useDeviceOrientation] DeviceOrientationEvent.requestPermission exists - user gesture required');
+      setNeedsPermission(true);
+      // Do not add listeners here; wait for explicit user call to requestPermission()
+      return;
+    }
 
-    // Try to use deviceorientationabsolute first (more accurate)
+    // Otherwise attach listeners immediately
+    let eventType = 'deviceorientation';
+    let orientationHandler = handleOrientation;
     if ('ondeviceorientationabsolute' in window) {
       eventType = 'deviceorientationabsolute';
       orientationHandler = handleOrientationAbsolute;
@@ -83,48 +168,21 @@ export function useDeviceOrientation() {
     } else {
       console.log('[useDeviceOrientation] deviceorientationabsolute not available, using deviceorientation');
     }
-
-    // iOS 13+ requires permission request
-    const requestPermission = async () => {
-      console.log('[useDeviceOrientation] Requesting permission');
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          console.log('[useDeviceOrientation] iOS 13+ detected, requesting permission');
-          const permission = await DeviceOrientationEvent.requestPermission();
-          console.log('[useDeviceOrientation] Permission result:', permission);
-          if (permission === 'granted') {
-            console.log('[useDeviceOrientation] Permission granted, adding event listeners');
-            window.addEventListener(eventType, orientationHandler);
-            // Also try standard event as fallback
-            window.addEventListener('deviceorientation', handleOrientation);
-          } else {
-            console.log('[useDeviceOrientation] Permission denied');
-            setError('Permission denied');
-          }
-        } catch (err) {
-          console.log('[useDeviceOrientation] Permission request error:', err);
-          setError(err.message);
-        }
-      } else {
-        // Non-iOS devices or older iOS
-        console.log('[useDeviceOrientation] Non-iOS or older iOS, adding event listeners directly');
-        window.addEventListener(eventType, orientationHandler);
-        // Also add standard event as fallback
-        if (eventType !== 'deviceorientation') {
-          window.addEventListener('deviceorientation', handleOrientation);
-        }
-      }
-    };
-
-    // Try to request permission on iOS
-    requestPermission();
+    addListeners(eventType, orientationHandler);
 
     return () => {
       console.log('[useDeviceOrientation] Cleanup - removing event listeners');
-      window.removeEventListener(eventType, orientationHandler);
-      window.removeEventListener('deviceorientation', handleOrientation);
+      try {
+        if (savedEventTypeRef.current && savedHandlerRef.current) {
+          window.removeEventListener(savedEventTypeRef.current, savedHandlerRef.current);
+        }
+        window.removeEventListener('deviceorientation', handleOrientation);
+      } catch (err) {
+        console.log('[useDeviceOrientation] Error during cleanup:', err);
+      }
+      listenersAddedRef.current = false;
     };
-  }, [handleOrientation, handleOrientationAbsolute]);
+  }, [addListeners, handleOrientation, handleOrientationAbsolute]);
 
-  return { heading, error };
+  return { heading, error, needsPermission, requestPermission };
 }

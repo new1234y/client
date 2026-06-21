@@ -10,15 +10,15 @@ const div = (html, className, size = 34) =>
   });
 
 export const iconSelf = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:14px;font-weight:800;color:#fff">Moi</span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);font-size:12px;font-weight:800;color:#fff">Moi</span>`,
   "pin-self",
-  40
+  34
 );
 
 export const iconSelfOutOfBounds = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#2563eb;border:4px solid #ef4444;box-shadow:0 0 10px rgba(239, 68, 68, 0.8), 0 2px 8px rgba(0,0,0,.45);font-size:14px;font-weight:800;color:#fff">Moi</span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#2563eb;border:4px solid #ef4444;box-shadow:0 0 10px rgba(239, 68, 68, 0.8), 0 2px 8px rgba(0,0,0,.45);font-size:12px;font-weight:800;color:#fff">Moi</span>`,
   "pin-self-oob",
-  40
+  34
 );
 
 export const iconAlly = div(

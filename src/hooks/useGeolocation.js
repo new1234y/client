@@ -20,8 +20,9 @@ function distanceM(lat1, lng1, lat2, lng2) {
 // Buffer zone: only update if user moves more than BUFFER_M from last reported position
 const BUFFER_M = 8;
 
-export function useGeolocation(enabled) {
-  console.log('[useGeolocation] Called with:', { enabled });
+export function useGeolocation(enabled, opts = {}) {
+  const { forceUpdate = false } = opts;
+  console.log('[useGeolocation] Called with:', { enabled, forceUpdate });
   const [position, setPosition] = useState(null);
   const [error, setError] = useState(null);
   const watchId = useRef(null);
@@ -79,7 +80,9 @@ export function useGeolocation(enabled) {
         newLat,
         newLng
       );
-      if (d < BUFFER_M) {
+      // If forceUpdate is true (e.g. player currently out of the safe zone)
+      // we bypass the buffer so position updates more eagerly.
+      if (d < BUFFER_M && !forceUpdate) {
         console.log('[useGeolocation] Position within buffer, not updating');
         return; // stay at last reported position
       }
@@ -114,8 +117,8 @@ export function useGeolocation(enabled) {
       }
     };
 
-    console.log('[useGeolocation] Starting watchPosition');
-    watchId.current = navigator.geolocation.watchPosition(onOk, onErr, {
+  console.log('[useGeolocation] Starting watchPosition');
+  watchId.current = navigator.geolocation.watchPosition(onOk, onErr, {
       enableHighAccuracy: true,
       maximumAge: 2000,
       timeout: 20000,

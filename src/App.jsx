@@ -687,7 +687,29 @@ export default function App() {
 
   const geoEnabled =
     stage === "lobby" || stage === "role_reveal" || stage === "game";
-  const { position, error: geoError } = useGeolocation(geoEnabled);
+
+  // Determine whether the player is currently outside the effective global zone
+  // so we can ask the geolocation hook to be more aggressive when outside.
+  const me = gameState?.me;
+  const gc = gameState?.effectiveGlobalCenter || gameState?.gameCenter;
+  const gr =
+    gameState?.effectiveGlobalRadiusM ??
+    gameState?.settings?.globalRadiusM;
+  let isOutside = false;
+  if (me?.lat != null && me?.lng != null && gc && Number.isFinite(gr)) {
+    // quick haversine (reuse helper if available)
+    const toRad = (d) => (d * Math.PI) / 180;
+    const R = 6371000;
+    const dLat = toRad(gc.lat - me.lat);
+    const dLon = toRad(gc.lng - me.lng);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(me.lat)) * Math.cos(toRad(gc.lat)) * Math.sin(dLon / 2) ** 2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    isOutside = dist > gr;
+  }
+
+  const { position, error: geoError } = useGeolocation(geoEnabled, { forceUpdate: isOutside });
   const lastEmit = useRef(0);
 
   const resetToEntry = useCallback((clearStorage = true) => {
