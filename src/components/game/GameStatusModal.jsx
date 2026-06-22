@@ -24,7 +24,7 @@ export default function GameStatusModal({
   }, [progress]);
 
   return (
-    <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center w-full max-w-2xl px-4 ${className}`}>
+    <div className={`fixed top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center w-full max-w-2xl px-2 ${className}`}>
 
       <div className="absolute left-4 right-4 h-16 bg-white/95 backdrop-blur-xl rounded-[40px] shadow-lg ring-1 ring-slate-200" />
 
@@ -178,7 +178,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+        className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}

@@ -26,13 +26,13 @@ export default function SharePartyModal({ code, title, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/75 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/75 p-2 backdrop-blur-sm sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Partager la partie"
       onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-3xl bg-white/90 backdrop-blur-xl p-8 shadow-2xl ring-1 ring-white/50 dark:bg-slate-900/90 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-3xl bg-white/90 backdrop-blur-xl p-4 shadow-2xl ring-1 ring-white/50 dark:bg-slate-900/90 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-center text-xl font-bold text-slate-900">
           Scanner le QR code
         </h2>

@@ -39,7 +39,7 @@ export function RoleModal({ role, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-4 pt-4 backdrop-blur-sm touch-none"
+className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -61,7 +61,7 @@ export function RoleModal({ role, onClose }) {
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-2"
+className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -174,7 +174,7 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-4 pt-4 backdrop-blur-sm touch-none"
+className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -196,7 +196,7 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-2"
+className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -394,7 +394,7 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-4 pt-4 backdrop-blur-sm touch-none"
+className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -416,7 +416,7 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-2"
+className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}

@@ -20,6 +20,15 @@ export function useDeviceOrientation() {
   const savedEventTypeRef = useRef('deviceorientation');
   const savedHandlerRef = useRef(null);
   
+  // Check if permission was previously granted
+  const [compassPermissionGranted, setCompassPermissionGranted] = useState(() => {
+    try {
+      return localStorage.getItem('compass_permission_granted') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  
   // Smoothing state
   const smoothedHeadingRef = useRef(null);
   const lastHeadingUpdateRef = useRef(0);
@@ -141,6 +150,12 @@ export function useDeviceOrientation() {
         if (permission === 'granted') {
           addListeners(eventType, orientationHandler);
           setNeedsPermission(false);
+          // Store permission in localStorage
+          try {
+            localStorage.setItem('compass_permission_granted', 'true');
+          } catch (err) {
+            console.warn('Failed to store compass permission:', err);
+          }
           return { granted: true };
         }
         setError('Permission denied');
@@ -164,14 +179,26 @@ export function useDeviceOrientation() {
     }
 
     // If the browser requires explicit permission via DeviceOrientationEvent.requestPermission,
-    // we don't call it automatically (must be a user gesture). Instead expose requestPermission()
+    // check if permission was previously granted
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      setNeedsPermission(true);
-      // Do not add listeners here; wait for explicit user call to requestPermission()
+      if (compassPermissionGranted) {
+        // Permission was previously granted, try to activate immediately
+        let eventType = 'deviceorientation';
+        let orientationHandler = handleOrientation;
+        if ('ondeviceorientationabsolute' in window) {
+          eventType = 'deviceorientationabsolute';
+          orientationHandler = handleOrientationAbsolute;
+        }
+        addListeners(eventType, orientationHandler);
+        setNeedsPermission(false);
+      } else {
+        // First time or permission not granted, show permission request
+        setNeedsPermission(true);
+      }
       return;
     }
 
-    // Otherwise attach listeners immediately
+    // Otherwise attach listeners immediately (non-iOS)
     let eventType = 'deviceorientation';
     let orientationHandler = handleOrientation;
     if ('ondeviceorientationabsolute' in window) {

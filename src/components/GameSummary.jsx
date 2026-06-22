@@ -75,7 +75,7 @@ export default function GameSummary({ summary, onLeave }) {
 
   return (
     <div className="flex min-h-full flex-col bg-slate-950">
-      <header className="shrink-0 border-b border-slate-800 p-4">
+      <header className="shrink-0 border-b border-slate-800 p-2">
         <h1 className="text-xl font-bold text-white">Récapitulatif</h1>
         <p className="font-mono text-sm text-indigo-400">{summary.code}</p>
         <p className="text-xs text-slate-500">

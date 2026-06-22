@@ -37,13 +37,13 @@ export default function ShareQRModal({ sessionId, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-2 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Inviter à cette salle"
       onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">Inviter à cette salle</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Copier le lien ou le code ne vous déconnecte pas : vous restez dans la salle.

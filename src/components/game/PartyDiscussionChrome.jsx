@@ -17,7 +17,7 @@ export default function PartyDiscussionChrome({
   if (desktop) {
     return (
       <aside className="flex h-full min-h-0 w-full max-w-[400px] shrink-0 flex-col border-l border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="shrink-0 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+        <div className="shrink-0 border-b border-slate-100 px-2 py-1 dark:border-slate-800">
           <h2 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
             Discussion
           </h2>

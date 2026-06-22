@@ -5,13 +5,13 @@ export default function QRModal({ sessionId, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-2 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Mon QR code"
       onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-semibold text-slate-900 text-center">Scan QR code</h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-600 text-center">
           Scannez ce QR code pour m'attraper

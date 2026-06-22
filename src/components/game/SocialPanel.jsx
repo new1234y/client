@@ -17,7 +17,7 @@ export default function SocialPanel({
   roleBadgeText,
 }) {
   return (
-    <div className="h-full overflow-auto bg-gradient-to-b from-[#FFF5D7]/40 via-white to-[#FDECF4]/40 px-2 pb-28 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="h-full overflow-auto bg-gradient-to-b from-[#FFF5D7]/40 via-white to-[#FDECF4]/40 px-2 pb-2 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="mx-auto max-w-lg space-y-4 py-2">
         <div className="rounded-3xl bg-gradient-to-br from-[#BFDBFE] via-[#93C5FD] to-[#2563EB] p-5 text-center text-white shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/80">Code partie</p>
