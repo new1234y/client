@@ -459,7 +459,7 @@ export default function GameMap({
         ref={mapRef}
         center={initialCenter}
         zoom={initialZoom}
-        className="h-full w-full"
+        className="h-full w-full map-full-screen"
         zoomControl={false}
         scrollWheelZoom
         // Allow much deeper zoom (tiles may limit actual detail). Keep high max to let users zoom in.
