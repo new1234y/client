@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "e444e46c-15c1-4ec8-b409-88e9780efec9"
+      }
+    },
+    "owner": "myygrc",
+    "ios": {
+      "bundleIdentifier": "com.myygrc.chasegpsclient",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

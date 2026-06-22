@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [],
+      includeAssets: ["icon.svg"],
       manifest: {
         name: "Chase GPS",
         short_name: "Chase GPS",
@@ -16,7 +16,24 @@ export default defineConfig({
         background_color: "#0f172a",
         display: "standalone",
         start_url: "/",
-        icons: [],
+        icons: [
+          {
+            src: "icon-192x192.png",
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "icon-512x512.png",
+            sizes: "512x512",
+            type: "image/png"
+          },
+          {
+            src: "icon-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable"
+          }
+        ]
       },
     }),
   ],
