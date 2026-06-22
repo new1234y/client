@@ -106,6 +106,14 @@ export default function BaliseSheet({
             <p className="font-semibold text-slate-900 dark:text-white">
               {timeLeft !== null ? formatDurationMs(timeLeft) : "--:--"}
             </p>
+            {timeLeft !== null && timeLeft > 0 && (
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-1000"
+                  style={{ width: `${Math.max(0, Math.min(100, (timeLeft / 120000) * 100))}%` }}
+                />
+              </div>
+            )}
           </div>
 
           {isBeingCaptured && (

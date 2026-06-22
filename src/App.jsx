@@ -521,6 +521,7 @@ export default function App() {
   const [midJoinWait, setMidJoinWait] = useState(null);
   const [joinRequestQueue, setJoinRequestQueue] = useState([]);
   const [partyChatMessages, setPartyChatMessages] = useState([]);
+  const [captureCooldownUntil, setCaptureCooldownUntil] = useState(null);
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined"
       ? window.matchMedia("(min-width: 768px)").matches
@@ -1092,6 +1093,8 @@ export default function App() {
 
     s.on("capture_cooldown", (data) => {
       if (data.sessionId === sessionIdRef.current) {
+        // Set capture cooldown for the player
+        setCaptureCooldownUntil(Date.now() + data.cooldownSeconds * 1000);
         addNotification(`Délai d'attente de ${data.cooldownSeconds}s avant de pouvoir capturer (2 joueurs)`, "info", data.cooldownSeconds * 1000);
       }
     });
@@ -3125,17 +3128,15 @@ if (stage === "role_reveal" && rolesReveal) {
       }
     }
     if (me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince) {
-      // Only show ghost notification if I used the power myself (invisUsedBy === sessionId)
-      if (me.invisUsedBy === sessionId) {
-        hudPowerEffects.push({
-          kind: "ghost",
-          invisUntil: me.invisUntil,
-          invisSince: me.invisSince,
-          scope: invisNotification?.scope || "self",
-          targetNames: invisNotification?.targetNames,
-        });
-        hudPowerUiNow = ghostUiNow;
-      }
+      // Show ghost notification if I'm invisible (whether I used it myself or someone else used it on me)
+      hudPowerEffects.push({
+        kind: "ghost",
+        invisUntil: me.invisUntil,
+        invisSince: me.invisSince,
+        scope: invisNotification?.scope || "self",
+        targetNames: invisNotification?.targetNames,
+      });
+      hudPowerUiNow = ghostUiNow;
     }
     if (me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow) {
       hudPowerEffects.push({ kind: "immobilized", until: me.immobilizedUntil });
@@ -3773,146 +3774,6 @@ if (stage === "role_reveal" && rolesReveal) {
                             )}
                           </div>
                         </PowerCard>
-
-                        <PowerCard
-                          title="Immobiliser un joueur"
-                          emoji="🧊"
-                          stars={3}
-                          gradient={["#3B82F6", "#60A5FA"]}
-                          locked={isCooldown("freeze_cats")}
-                          lockReason="Recharge"
-                          lockUntil={cooldownUntil("freeze_cats")}
-                          estimatedCost={estimatedFreezeCost}
-                          insufficientCoins={(me?.coins ?? 0) < estimatedFreezeCost}
-                          details={<>
-                            Cache la carte du joueur ciblé pendant un court instant. Idéal pour s'échapper ou bloquer un adversaire.
-                          </>}
-                          onUse={() => {
-                            if (isCooldown("freeze_cats")) return;
-                            const targetIds =
-                              freezeTargetMode === "all"
-                                ? []
-                                : selectedFreezeTargets;
-                            if (freezeTargetMode === "single" && !targetIds.length) {
-                              addNotification("Choisissez au moins une cible", "error");
-                              return;
-                            }
-                            const scope =
-                              freezeTargetMode === "all"
-                                ? "all"
-                                : targetIds.length > 1
-                                  ? "multi"
-                                  : "single";
-                            const payload =
-                              scope === "all"
-                                ? { kind: "freeze_cats", scope, durationSec: freezeDuration }
-                                : scope === "multi"
-                                  ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDuration }
-                                  : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDuration };
-                            socket?.emit("use_power", payload, (res) => {
-                              if (res?.ok) {
-                                setCd("freeze_cats", 90);
-                                  // HUD will reflect immobilized players via game state, avoid system notification
-                                  setGameTab('map');
-                              } else {
-                                addNotification(res?.error || "Erreur", "error");
-                              }
-                            });
-                          }}
-                        >
-                          <div className="space-y-4 text-xs text-slate-700 dark:text-slate-200">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-semibold text-slate-800 dark:text-slate-200">Cibles :</span>
-                              <div className="flex bg-slate-100 p-0.5 rounded-full dark:bg-slate-800">
-                                <button
-                                  type="button"
-                                  className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
-                                    freezeTargetMode === "all"
-                                      ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                                      : "text-slate-600 dark:text-slate-400"
-                                  }`}
-                                  onClick={() => setFreezeTargetMode("all")}
-                                >
-                                  Tous
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
-                                    freezeTargetMode === "single"
-                                      ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                                      : "text-slate-600 dark:text-slate-400"
-                                  }`}
-                                  onClick={() => setFreezeTargetMode("single")}
-                                >
-                                  Choix
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {freezeTargetMode === "single" && (
-                              <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                  Choisir les cibles
-                                </div>
-                                <div className="max-h-28 space-y-1.5 overflow-y-auto text-[13px]">
-                                  {rosterList
-                                    .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
-                                    .map((p) => {
-                                      const checked = selectedFreezeTargets.includes(p.sessionId);
-                                      return (
-                                        <div
-                                          key={p.sessionId}
-                                          onClick={() => {
-                                            setSelectedFreezeTargets((prev) => {
-                                              if (checked) return prev.filter((id) => id !== p.sessionId);
-                                              return [...prev, p.sessionId];
-                                            });
-                                          }}
-                                          className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
-                                            checked 
-                                              ? "bg-blue-50 border border-blue-200 dark:bg-blue-900/30 dark:border-blue-500/30 shadow-inner" 
-                                              : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                                          }`}
-                                        >
-                                          <span className={`truncate font-semibold ${checked ? "text-blue-900 dark:text-blue-200" : "text-slate-700 dark:text-slate-200"}`}>
-                                            {p.nickname}
-                                          </span>
-                                          {checked && <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.8)]" />}
-                                        </div>
-                                      );
-                                    })}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {freezeTargetMode === "all" && (
-                              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] font-semibold text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200 text-center">
-                                Tous les autres joueurs seront immobilisés.
-                              </div>
-                            )}
-                            
-                            <div className="space-y-4 pt-2">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
-                                <DiscreteSlider 
-                                  options={[
-                                    { label: '10s', value: 10 },
-                                    { label: '20s', value: 20 },
-                                    { label: '40s', value: 40 }
-                                  ]}
-                                  value={freezeDuration}
-                                  onChange={setFreezeDuration}
-                                  color="indigo"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="mt-2">
-                              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Coût estimé :</span>
-                              <AnimatedPrice value={estimatedFreezeCost} />
-                            </div>
-                          </div>
-                        </PowerCard>
                       </>
                     ) : (
                       <>
@@ -4021,6 +3882,146 @@ if (stage === "role_reveal" && rolesReveal) {
                         </PowerCard>
                       </>
                     )}
+
+                    <PowerCard
+                      title="Immobiliser un joueur"
+                      emoji="🧊"
+                      stars={3}
+                      gradient={["#3B82F6", "#60A5FA"]}
+                      locked={isCooldown("freeze_cats")}
+                      lockReason="Recharge"
+                      lockUntil={cooldownUntil("freeze_cats")}
+                      estimatedCost={estimatedFreezeCost}
+                      insufficientCoins={(me?.coins ?? 0) < estimatedFreezeCost}
+                      details={<>
+                        Cache la carte du joueur ciblé pendant un court instant. Idéal pour s'échapper ou bloquer un adversaire.
+                      </>}
+                      onUse={() => {
+                        if (isCooldown("freeze_cats")) return;
+                        const targetIds =
+                          freezeTargetMode === "all"
+                            ? []
+                            : selectedFreezeTargets;
+                        if (freezeTargetMode === "single" && !targetIds.length) {
+                          addNotification("Choisissez au moins une cible", "error");
+                          return;
+                        }
+                        const scope =
+                          freezeTargetMode === "all"
+                            ? "all"
+                            : targetIds.length > 1
+                              ? "multi"
+                              : "single";
+                        const payload =
+                          scope === "all"
+                            ? { kind: "freeze_cats", scope, durationSec: freezeDuration }
+                            : scope === "multi"
+                              ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDuration }
+                              : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDuration };
+                        socket?.emit("use_power", payload, (res) => {
+                          if (res?.ok) {
+                            setCd("freeze_cats", 90);
+                              // HUD will reflect immobilized players via game state, avoid system notification
+                              setGameTab('map');
+                          } else {
+                            addNotification(res?.error || "Erreur", "error");
+                          }
+                        });
+                      }}
+                    >
+                      <div className="space-y-4 text-xs text-slate-700 dark:text-slate-200">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Cibles :</span>
+                          <div className="flex bg-slate-100 p-0.5 rounded-full dark:bg-slate-800">
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                freezeTargetMode === "all"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setFreezeTargetMode("all")}
+                            >
+                              Tous
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded-full px-3 py-1 text-[13px] font-semibold transition ${
+                                freezeTargetMode === "single"
+                                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                                  : "text-slate-600 dark:text-slate-400"
+                              }`}
+                              onClick={() => setFreezeTargetMode("single")}
+                            >
+                              Choix
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {freezeTargetMode === "single" && (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Choisir les cibles
+                            </div>
+                            <div className="max-h-28 space-y-1.5 overflow-y-auto text-[13px]">
+                              {rosterList
+                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
+                                .map((p) => {
+                                  const checked = selectedFreezeTargets.includes(p.sessionId);
+                                  return (
+                                    <div
+                                      key={p.sessionId}
+                                      onClick={() => {
+                                        setSelectedFreezeTargets((prev) => {
+                                          if (checked) return prev.filter((id) => id !== p.sessionId);
+                                          return [...prev, p.sessionId];
+                                        });
+                                      }}
+                                      className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
+                                        checked 
+                                          ? "bg-blue-50 border border-blue-200 dark:bg-blue-900/30 dark:border-blue-500/30 shadow-inner" 
+                                          : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                      }`}
+                                    >
+                                      <span className={`truncate font-semibold ${checked ? "text-blue-900 dark:text-blue-200" : "text-slate-700 dark:text-slate-200"}`}>
+                                        {p.nickname}
+                                      </span>
+                                      {checked && <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.8)]" />}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {freezeTargetMode === "all" && (
+                          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] font-semibold text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200 text-center">
+                            Tous les autres joueurs seront immobilisés.
+                          </div>
+                        )}
+                        
+                        <div className="space-y-4 pt-2">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
+                            <DiscreteSlider 
+                              options={[
+                                { label: '10s', value: 10 },
+                                { label: '20s', value: 20 },
+                                { label: '40s', value: 40 }
+                              ]}
+                              value={freezeDuration}
+                              onChange={setFreezeDuration}
+                              color="indigo"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-2">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Coût estimé :</span>
+                          <AnimatedPrice value={estimatedFreezeCost} />
+                        </div>
+                      </div>
+                    </PowerCard>
                   </div>
                 </div>
               )}
@@ -4029,6 +4030,10 @@ if (stage === "role_reveal" && rolesReveal) {
 
               {gameTab === "map" && catLocked && isCat && (
                 <CatMapLockOverlay mapUnlockAt={gameState.mapUnlockAt} socket={socket} getServerTime={getServerTime} />
+              )}
+
+              {gameTab === "map" && captureCooldownUntil && Date.now() < captureCooldownUntil && isCat && (
+                <CatMapLockOverlay mapUnlockAt={captureCooldownUntil} socket={socket} getServerTime={getServerTime} />
               )}
 
               {gameTab === "map" && !(catLocked && isCat) && (
@@ -4284,6 +4289,7 @@ if (stage === "role_reveal" && rolesReveal) {
             }
             onPowerShortcut={handlePowerShortcut}
             role={role}
+            sessionId={sessionId}
           />
         )}
       </div>

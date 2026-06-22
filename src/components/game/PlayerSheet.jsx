@@ -16,6 +16,7 @@ export default function PlayerSheet({
   mapFocus = null,
   onPowerShortcut = null,
   role = null,
+  sessionId = null,
 }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -126,7 +127,7 @@ export default function PlayerSheet({
           )}
 
           {/* Super power shortcuts */}
-          {onPowerShortcut && role === "cat" && player.role === "player" && !player.spectator && (
+          {onPowerShortcut && !player.spectator && player.sessionId !== sessionId && (
             <div className="mt-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Super pouvoirs rapides

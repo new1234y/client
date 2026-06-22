@@ -53,7 +53,7 @@ export default function CoinFeed({ socket, sessionId }) {
 
   return (
     <div
-      className={`pointer-events-none absolute right-3 top-[4.5rem] z-[9999] flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold shadow-lg backdrop-blur-sm animate-slide-up md:top-20 ${
+      className={`pointer-events-none absolute right-3 top-[4.5rem] z-[9999] flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold shadow-lg backdrop-blur-sm md:top-20 ${
         currentEvent.type === "gained"
           ? "bg-emerald-500/95 text-white"
           : "bg-rose-500/95 text-white"
