@@ -102,11 +102,27 @@ export default function ScannerModal({ onScan, onClose }) {
         </svg>
       </button>
 
-      {/* Camera View */}
+      {/* Camera View - Force full screen */}
       <div
         id={regionId}
         className="absolute inset-0 w-full h-full bg-black"
+        style={{
+          width: '100vw',
+          height: '100vh',
+          objectFit: 'cover'
+        }}
       />
+      <style>{`
+        #${regionId} video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+        }
+        #${regionId} {
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}</style>
 
       {/* QR Code Scanning Area - Transparent */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

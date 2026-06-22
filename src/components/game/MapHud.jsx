@@ -354,7 +354,8 @@ export default function MapHud({
   const inner = (
     <>
       <GameStatusModal
-        timeRemaining={shrinkZoneEnabled ? fmt(zoneTimeLeft) : (gameStartedAt && timeLimitEndsAt ? fmt(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000))) : '--:--')}
+        timeRemaining={gameStartedAt && timeLimitEndsAt ? fmt(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000))) : '--:--'}
+        zoneTimeRemaining={shrinkZoneEnabled ? fmt(zoneTimeLeft) : null}
         zoneState={shrinkZoneEnabled ? phaseState : null}
         progress={Math.round(totalProgress * 100)}
         coins={coins}
@@ -362,8 +363,8 @@ export default function MapHud({
         shrinkZoneEnabled={shrinkZoneEnabled}
         timeLimitEnabled={timeLimitEnabled}
         onCoinsClick={() => onCoinsModalOpen?.()}
-        onTimerClick={() => shrinkZoneEnabled ? onZoneModalOpen?.() : onGameModalOpen?.()}
-        onProgressClick={() => onGameModalOpen?.()}
+        onTimerClick={() => onGameModalOpen?.()}
+        onProgressClick={() => shrinkZoneEnabled ? onZoneModalOpen?.() : onGameModalOpen?.()}
         onPlayerClick={() => onPlayerModalOpen?.()}
       />
 

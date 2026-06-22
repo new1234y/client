@@ -50,10 +50,15 @@ const LS_LAST_SESSION_KEY = "chase_gps_last_session";
 function saveSession(sessionId, roomCode, nickname) {
   console.log('[saveSession] Called with:', { sessionId, roomCode, nickname });
   try {
+    // Save to main keys
     localStorage.setItem(LS_SESSION_KEY, sessionId);
     localStorage.setItem(LS_ROOM_KEY, roomCode);
     localStorage.setItem(LS_NICKNAME_KEY, nickname);
-    console.log('[saveSession] Session saved successfully');
+    // Also save to backup keys (for crash recovery)
+    localStorage.setItem(LS_LAST_SESSION_KEY, sessionId);
+    localStorage.setItem(LS_LAST_ROOM_KEY, roomCode);
+    localStorage.setItem(LS_LAST_NICKNAME_KEY, nickname);
+    console.log('[saveSession] Session saved successfully (main + backup)');
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
@@ -76,13 +81,46 @@ function loadSession() {
   return null;
 }
 
+// Also try to load from backup keys (in case main keys were cleared)
+function loadSessionBackup() {
+  console.log('[loadSessionBackup] Called');
+  try {
+    const sessionId = localStorage.getItem(LS_LAST_SESSION_KEY);
+    const roomCode = localStorage.getItem(LS_LAST_ROOM_KEY);
+    const nickname = localStorage.getItem(LS_LAST_NICKNAME_KEY);
+    console.log('[loadSessionBackup] Loaded:', { sessionId, roomCode, nickname });
+    if (sessionId && roomCode) {
+      return { sessionId, roomCode, nickname: nickname || "Joueur" };
+    }
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+  console.log('[loadSessionBackup] No backup session found');
+  return null;
+}
+
 function clearSession() {
   console.log('[clearSession] Called');
   try {
     localStorage.removeItem(LS_SESSION_KEY);
     localStorage.removeItem(LS_ROOM_KEY);
     localStorage.removeItem(LS_NICKNAME_KEY);
-    console.log('[clearSession] Session cleared');
+    console.log('[clearSession] Session cleared (main keys only, backup preserved)');
+  } catch (e) {
+    console.warn("localStorage non disponible:", e);
+  }
+}
+
+function clearAllSessions() {
+  console.log('[clearAllSessions] Called');
+  try {
+    localStorage.removeItem(LS_SESSION_KEY);
+    localStorage.removeItem(LS_ROOM_KEY);
+    localStorage.removeItem(LS_NICKNAME_KEY);
+    localStorage.removeItem(LS_LAST_SESSION_KEY);
+    localStorage.removeItem(LS_LAST_ROOM_KEY);
+    localStorage.removeItem(LS_LAST_NICKNAME_KEY);
+    console.log('[clearAllSessions] All sessions cleared');
   } catch (e) {
     console.warn("localStorage non disponible:", e);
   }
@@ -166,7 +204,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
 
   if (reason === "lost_connection") {
     title = "Connexion perdue";
-    description = "Vous avez été déconnecté du serveur.";
+    description = "Tentative de reconnexion automatique...";
   } else if (reason === "session_found") {
     title = "Session trouvée";
     description = "Une partie en cours a été détectée.";
@@ -200,36 +238,60 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
         <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
           {description}
         </p>
-        
+
         {reconnectAttempt > 0 && (
           <p className="mb-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
-            Tentative {reconnectAttempt}...
+            Tentative {reconnectAttempt}... (Prochaine dans 5s)
           </p>
         )}
-        
+
         {lastError && (
           <p className="mb-4 text-xs text-red-600 dark:text-red-400">{lastError}</p>
         )}
 
         <div className="flex flex-col gap-2">
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              disabled={reconnectAttempt > 0}
-              className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50"
-            >
-              {reason === "session_found" ? "Reprendre" : "Se reconnecter"}
-            </button>
-          )}
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            >
-              {reason === "kicked" ? "Ok" : "Quitter"}
-            </button>
+          {reason === "lost_connection" ? (
+            <>
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={reconnectAttempt > 0}
+                className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50"
+              >
+                Réessayer maintenant
+              </button>
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Abandonner
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  disabled={reconnectAttempt > 0}
+                  className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 dark:shadow-none disabled:opacity-50"
+                >
+                  {reason === "session_found" ? "Reprendre" : "Se reconnecter"}
+                </button>
+              )}
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="w-full rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  {reason === "kicked" ? "Ok" : "Quitter"}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -411,8 +473,10 @@ export default function App() {
   }
 
   const [recentJamNotification, setRecentJamNotification] = useState(null);
+  const [baliseBlockedNotification, setBaliseBlockedNotification] = useState(null);
   const prevJamLevelRef = useRef('normal');
   const recentJamTimeoutRef = useRef(null);
+  const baliseBlockedTimeoutRef = useRef(null);
 
   // Side-effect: when jamLevel transitions from normal -> non-normal create a 2s transient notification
   useEffect(() => {
@@ -474,6 +538,7 @@ export default function App() {
   const sharedAudioContextRef = useRef(null);
   const [activeNoise, setActiveNoise] = useState(null); // { startedAt, durationSec, volume, by }
   const [noiseUiNow, setNoiseUiNow] = useState(() => Date.now());
+  const [invisNotification, setInvisNotification] = useState(null); // { scope, targetNames, durationSec, startedAt }
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
@@ -651,6 +716,16 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  // Clean up invisibility notification when it expires
+  useEffect(() => {
+    if (!invisNotification) return;
+    const elapsed = getServerTime() - invisNotification.startedAt;
+    const durationMs = invisNotification.durationSec * 1000;
+    if (elapsed > durationMs) {
+      setInvisNotification(null);
+    }
+  }, [invisNotification, ghostUiNow]);
+
   // Global audio unlock on user interaction (required for iOS)
   useEffect(() => {
     const unlockAudio = () => {
@@ -755,7 +830,11 @@ export default function App() {
 
   // Reconnection logic - ensures socket is connected then restores session
   const attemptReconnect = useCallback((s, attempt = 1) => {
-    const saved = loadSession();
+    let saved = loadSession();
+    if (!saved) {
+      // Try backup keys if main keys not found
+      saved = loadSessionBackup();
+    }
     if (!saved) {
       setIsReconnecting(false);
       setReconnectReason(null);
@@ -818,14 +897,11 @@ export default function App() {
             return;
           }
 
-          if (attempt < 6) {
-            const delay = Math.min(8000, 1000 * attempt);
-            reconnectRetryRef.current = setTimeout(() => {
-              attemptReconnect(s, attempt + 1);
-            }, delay);
-          } else {
-            setReconnectAttempt(0);
-          }
+          // Fixed 5 second retry interval
+          const delay = 5000;
+          reconnectRetryRef.current = setTimeout(() => {
+            attemptReconnect(s, attempt + 1);
+          }, delay);
         }
       );
     };
@@ -836,12 +912,11 @@ export default function App() {
       ensureSocketReady(s)
         .then(() => tryRestore())
         .catch(() => {
-          if (attempt < 6) {
-            const delay = Math.min(8000, 1000 * attempt);
-            reconnectRetryRef.current = setTimeout(() => {
-              attemptReconnect(s, attempt + 1);
-            }, delay);
-          }
+          // Fixed 5 second retry interval
+          const delay = 5000;
+          reconnectRetryRef.current = setTimeout(() => {
+            attemptReconnect(s, attempt + 1);
+          }, delay);
         });
       return;
     }
@@ -885,7 +960,11 @@ export default function App() {
     s.on("connect", () => {
       setConnected(true);
       lastPingRef.current = getServerTime();
-      const saved = loadSession();
+      let saved = loadSession();
+      if (!saved) {
+        // Try backup keys if main keys not found
+        saved = loadSessionBackup();
+      }
       if (saved) {
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
@@ -897,15 +976,10 @@ export default function App() {
     s.on("disconnect", () => {
       setConnected(false);
       if (stageRef.current === "entry") {
-        // On home screen, clear session and don't auto-reconnect
+        // On home screen, clear main session but keep backup for crash recovery
         clearSession();
         setRejoinCandidate(null);
-        try {
-          localStorage.removeItem(LS_LAST_ROOM_KEY);
-          localStorage.removeItem(LS_LAST_SESSION_KEY);
-        } catch (e) {
-          console.warn("localStorage non disponible:", e);
-        }
+        // Don't clear backup keys - they're for crash recovery
       } else if (stageRef.current === "lobby" || stageRef.current === "role_reveal" || stageRef.current === "game") {
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
@@ -968,6 +1042,23 @@ export default function App() {
           setNoiseUiNow(now);
         }
       }
+      
+      // Restore invisibility notification if invisibility is active
+      if (payload.me?.invisUntil && payload.me.invisSince) {
+        const now = getServerTime();
+        if (now < payload.me.invisUntil) {
+          const durationSec = Math.round((payload.me.invisUntil - payload.me.invisSince) / 1000);
+          // Check if I used the power on myself
+          if (payload.me.invisUsedBy === sessionIdRef.current) {
+            setInvisNotification({
+              scope: "self",
+              targetNames: null,
+              durationSec,
+              startedAt: payload.me.invisSince
+            });
+          }
+        }
+      }
     });
 
     s.on("game_finished", (data) => {
@@ -996,6 +1087,35 @@ export default function App() {
           }
           return current;
         });
+      }
+    });
+
+    s.on("capture_cooldown", (data) => {
+      if (data.sessionId === sessionIdRef.current) {
+        addNotification(`Délai d'attente de ${data.cooldownSeconds}s avant de pouvoir capturer (2 joueurs)`, "info", data.cooldownSeconds * 1000);
+      }
+    });
+
+    s.on("revenge_cooldown", (data) => {
+      if (data.hunterSessionId === sessionIdRef.current) {
+        addNotification(`Anti-revanche : attendez ${data.cooldownSeconds}s avant de capturer ce joueur`, "warning", data.cooldownSeconds * 1000);
+      }
+    });
+
+    s.on("balise_capture_blocked", (data) => {
+      if (data.sessionId === sessionIdRef.current) {
+        const notif = {
+          kind: 'balise_blocked',
+          message: data.message,
+          startedAt: Date.now(),
+          durationMs: 2000,
+        };
+        setBaliseBlockedNotification(notif);
+        if (baliseBlockedTimeoutRef.current) clearTimeout(baliseBlockedTimeoutRef.current);
+        baliseBlockedTimeoutRef.current = setTimeout(() => {
+          setBaliseBlockedNotification(null);
+          baliseBlockedTimeoutRef.current = null;
+        }, 2000);
       }
     });
 
@@ -1088,6 +1208,27 @@ export default function App() {
       });
     });
 
+    s.on("game_notification", ({ kind, ...data }) => {
+      if (kind === "noise") {
+        // Noise notification is already handled by play_noise event and activeNoise state
+        // No additional action needed
+      } else if (kind === "invisibility") {
+        // Store invisibility notification for HUD display
+        setInvisNotification({
+          scope: data.scope,
+          targetNames: data.targetNames,
+          durationSec: data.durationSec,
+          startedAt: getServerTime()
+        });
+        // Also show toast notification
+        if (data.scope === "self") {
+          addNotification("Vous êtes maintenant invisible", "game_info", 3000);
+        } else if (data.scope === "other") {
+          addNotification(`${data.targetNames} est/sont invisible(s)`, "game_info", 3000);
+        }
+      }
+    });
+
     s.on("immobilized", ({ until, by, durationSec }) => {
       // L'overlay d'immobilisation est déjà géré côté UI via me.immobilizedUntil ;
       // pas de notification toast supplémentaire ici pour garder un impact visuel fort.
@@ -1157,6 +1298,7 @@ export default function App() {
 
     s.on("join_request_accepted", (payload) => {
       const nick = lastNicknameRef.current || nickname.trim() || "Joueur";
+      // Save session immediately to localStorage (even if connection fails later)
       saveSession(payload.sessionId, payload.code, nick);
       setSessionId(payload.sessionId);
       setIsHost(Boolean(payload.isHost));
@@ -1366,10 +1508,11 @@ export default function App() {
         setErrorBanner(res?.error || "Impossible de creer la salle.");
         return;
       }
+      // Save session immediately to localStorage (even if connection fails later)
+      saveSession(res.sessionId, res.code, trimmedNickname);
       if (window.history.replaceState) {
         window.history.replaceState({}, "", window.location.pathname);
       }
-      saveSession(res.sessionId, res.code, trimmedNickname);
       setSessionId(res.sessionId);
       setIsHost(true);
       setLobby(res.lobby);
@@ -1432,10 +1575,11 @@ export default function App() {
         if (reqId !== entryReqRef.current) return;
         setEntryBusyKind(null);
         if (res?.ok) {
+          // Save session immediately to localStorage (even if connection fails later)
+          saveSession(res.sessionId, res.code, trimmedNickname);
           if (window.history.replaceState) {
             window.history.replaceState({}, "", window.location.pathname);
           }
-          saveSession(res.sessionId, res.code, trimmedNickname);
           setSessionId(res.sessionId);
           setIsHost(res.isHost);
           setLobby(res.lobby);
@@ -1918,12 +2062,22 @@ export default function App() {
         if (s) attemptReconnect(s);
       }}
       onCancel={() => {
+        // Stop reconnection attempts
+        if (reconnectRetryRef.current) {
+          clearTimeout(reconnectRetryRef.current);
+          reconnectRetryRef.current = null;
+        }
+        setIsReconnecting(false);
+        setReconnectAttempt(0);
+        setReconnectError(null);
+        setReconnectReason(null);
+
         if (reconnectReason === "kicked") {
-          setIsReconnecting(false);
-          setReconnectReason(null);
           resetToEntry();
         } else {
-          leaveGame();
+          // Clear ALL sessions (main + backup) when user explicitly abandons
+          clearAllSessions();
+          resetToEntry();
         }
       }}
     />
@@ -2043,13 +2197,14 @@ export default function App() {
                       (res) => {
                         setEntryBusyKind(null);
                         if (res?.ok) {
+                          // Save session immediately to localStorage (even if connection fails later)
+                          saveSession(res.sessionId, res.code, trimmedNickname);
                           if (window.history.replaceState) {
                             window.history.replaceState({}, "", window.location.pathname);
                           }
-                          saveSession(res.sessionId, res.code, trimmedNickname);
                           setSessionId(res.sessionId);
                           setIsHost(res.isHost);
-                          
+
                           if (res.phase === "lobby" && res.lobby) {
                             setLobby(res.lobby);
                             setStage("lobby");
@@ -2971,12 +3126,17 @@ if (stage === "role_reveal" && rolesReveal) {
       }
     }
     if (me?.invisUntil && me.invisUntil > ghostUiNow && me?.invisSince) {
-      hudPowerEffects.push({
-        kind: "ghost",
-        invisUntil: me.invisUntil,
-        invisSince: me.invisSince,
-      });
-      hudPowerUiNow = ghostUiNow;
+      // Only show ghost notification if I used the power myself (invisUsedBy === sessionId)
+      if (me.invisUsedBy === sessionId) {
+        hudPowerEffects.push({
+          kind: "ghost",
+          invisUntil: me.invisUntil,
+          invisSince: me.invisSince,
+          scope: invisNotification?.scope || "self",
+          targetNames: invisNotification?.targetNames,
+        });
+        hudPowerUiNow = ghostUiNow;
+      }
     }
     if (me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow) {
       hudPowerEffects.push({ kind: "immobilized", until: me.immobilizedUntil });
@@ -2987,6 +3147,12 @@ if (stage === "role_reveal" && rolesReveal) {
     if (recentJamNotification) {
       hudPowerEffects.push(recentJamNotification);
       hudPowerUiNow = getServerTime();
+  }
+
+    // If we have a balise blocked notification (2s), show it
+    if (baliseBlockedNotification) {
+      hudPowerEffects.push(baliseBlockedNotification);
+      hudPowerUiNow = Date.now();
   }
 
     // Check for balise capture in progress - only show for the player capturing

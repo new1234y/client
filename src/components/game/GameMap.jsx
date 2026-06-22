@@ -471,44 +471,49 @@ export default function GameMap({
             show a clear overlay with explanation and a button the user can tap to enable orientation. */}
         {needsPermission && (
           <div className="absolute left-1/2 top-4 z-[2100] -translate-x-1/2 w-[min(92%,420px)]">
-            <div className="rounded-lg bg-white/95 px-4 py-3 text-sm shadow-lg dark:bg-slate-900/95 dark:text-slate-100">
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <div className="font-semibold">Activer l'orientation (iPhone)</div>
-                  <div className="mt-1 text-[13px] text-slate-600 dark:text-slate-300">
-                    Pour afficher le halo d'orientation, iOS demande la permission d'accès aux capteurs de mouvement.
-                    Appuyez sur « Activer » ci-dessous, puis autorisez "Mouvement et orientation" dans la boîte de dialogue Safari.
+            <div className="rounded-2xl bg-gradient-to-br from-white/95 to-blue-50/95 px-5 py-4 text-sm shadow-2xl dark:from-slate-900/95 dark:to-slate-800/95 dark:text-slate-100 border border-blue-200/50 dark:border-slate-700/50">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 mt-1">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
                   </div>
-                  <div className="mt-3 flex gap-2">
+                </div>
+                <div className="flex-1">
+                  <div className="text-base font-bold text-slate-900 dark:text-white">Activer la boussole</div>
+                  <div className="mt-2 text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Pour une expérience optimale, le jeu a besoin d'accéder à la boussole de votre téléphone. Cela permet d'afficher votre direction en temps réel sur la carte.
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2">
                     <button
                       type="button"
                       onClick={async () => {
                         try {
                           const res = await requestPermission();
                           if (!res.granted) {
-                            // Provide a helpful message explaining how to enable in settings
                             setMapError(
-                              "Autorisation d'accès à l'orientation refusée. Si vous utilisez Safari, ouvrez Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
+                              "Autorisation refusée. Pour activer la boussole : Réglages → Safari → Mouvement et orientation, puis rechargez la page."
                             );
                           }
                         } catch (err) {
                           setMapError("Erreur lors de la demande d'autorisation. Vérifiez que vous êtes sur Safari et que la page est servie en HTTPS.");
                         }
                       }}
-                      className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white shadow"
+                      className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98]"
                     >
-                      Activer
+                      Activer la boussole
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setMapError(
-                          "Pour activer l'orientation : ouvrez Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
+                          "Pour activer la boussole manuellement : Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
                         );
                       }}
-                      className="rounded bg-gray-100 px-3 py-1 text-xs font-medium dark:bg-gray-800"
+                      className="w-full rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300 transition hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Plus d'infos
+                      Passer pour le moment
                     </button>
                   </div>
                 </div>

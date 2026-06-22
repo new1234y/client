@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
+// Linear interpolation function for smoothing
+function lerp(start, end, factor) {
+  return start + (end - start) * factor;
+}
+
+// Smooth angle interpolation (handles 0/360 wraparound)
+function lerpAngle(start, end, factor) {
+  const diff = end - start;
+  const shortestDiff = ((diff + 180) % 360) - 180;
+  return (start + shortestDiff * factor + 360) % 360;
+}
+
 export function useDeviceOrientation() {
   const [heading, setHeading] = useState(null);
   const [error, setError] = useState(null);
@@ -7,15 +19,14 @@ export function useDeviceOrientation() {
   const listenersAddedRef = useRef(false);
   const savedEventTypeRef = useRef('deviceorientation');
   const savedHandlerRef = useRef(null);
+  
+  // Smoothing state
+  const smoothedHeadingRef = useRef(null);
+  const lastHeadingUpdateRef = useRef(0);
+  const smoothingFactor = 0.15; // Lerp factor for Android (lower = more smoothing)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   const handleOrientation = useCallback((event) => {
-    console.log('[useDeviceOrientation] handleOrientation called:', {
-      webkitCompassHeading: event.webkitCompassHeading,
-      alpha: event.alpha,
-      beta: event.beta,
-      gamma: event.gamma,
-      absolute: event.absolute
-    });
 
     let newHeading = null;
 
@@ -24,7 +35,6 @@ export function useDeviceOrientation() {
     if (typeof event.webkitCompassHeading === 'number') {
       // iOS Safari specific
       newHeading = event.webkitCompassHeading;
-      console.log('[useDeviceOrientation] Using webkitCompassHeading:', newHeading);
     } else if (event.alpha !== null) {
       // Standard DeviceOrientationEvent
       // alpha is rotation around Z axis. Its reference frame depends on the device/browser.
@@ -38,48 +48,61 @@ export function useDeviceOrientation() {
         alpha = (alpha + screenAngle) % 360;
         // Convert to compass heading where 0 = north
         newHeading = 360 - alpha;
-        console.log('[useDeviceOrientation] Using alpha with screenAngle', screenAngle, '->', newHeading);
       } catch (err) {
-        console.log('[useDeviceOrientation] Error computing adjusted alpha:', err);
         newHeading = 360 - event.alpha;
-        console.log('[useDeviceOrientation] Fallback alpha ->', newHeading);
       }
     } else if (event.absolute && event.alpha !== null) {
       // When absolute is true, alpha is compass heading
       newHeading = event.alpha;
-      console.log('[useDeviceOrientation] Using absolute alpha:', newHeading);
     }
 
     if (newHeading !== null && !isNaN(newHeading)) {
       // Normalize to 0-360 range
       newHeading = newHeading % 360;
       if (newHeading < 0) newHeading += 360;
-      console.log('[useDeviceOrientation] Final heading after normalization:', newHeading);
+      
+      // Apply smoothing for Android devices to prevent micro-oscillations
+      if (!isIOS) {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastHeadingUpdateRef.current;
+        
+        // Only apply smoothing if we have a previous value and updates are frequent
+        if (smoothedHeadingRef.current !== null && timeSinceLastUpdate < 100) {
+          newHeading = lerpAngle(smoothedHeadingRef.current, newHeading, smoothingFactor);
+        }
+        
+        smoothedHeadingRef.current = newHeading;
+        lastHeadingUpdateRef.current = now;
+      }
+      
       setHeading(newHeading);
-    } else {
-      console.log('[useDeviceOrientation] Could not determine heading from event');
     }
-  }, []);
+  }, [isIOS]);
 
   const handleOrientationAbsolute = useCallback((event) => {
-    console.log('[useDeviceOrientation] handleOrientationAbsolute called:', {
-      alpha: event.alpha,
-      beta: event.beta,
-      gamma: event.gamma,
-      absolute: event.absolute
-    });
     // deviceorientationabsolute provides more accurate compass heading
     if (event.alpha !== null) {
       let newHeading = event.alpha;
       // Normalize to 0-360 range
       newHeading = newHeading % 360;
       if (newHeading < 0) newHeading += 360;
-      console.log('[useDeviceOrientation] Using absolute alpha:', newHeading);
+      
+      // Apply smoothing for Android devices
+      if (!isIOS) {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastHeadingUpdateRef.current;
+        
+        if (smoothedHeadingRef.current !== null && timeSinceLastUpdate < 100) {
+          newHeading = lerpAngle(smoothedHeadingRef.current, newHeading, smoothingFactor);
+        }
+        
+        smoothedHeadingRef.current = newHeading;
+        lastHeadingUpdateRef.current = now;
+      }
+      
       setHeading(newHeading);
-    } else {
-      console.log('[useDeviceOrientation] Could not determine heading from absolute event');
     }
-  }, []);
+  }, [isIOS]);
 
   // Helper to actually attach listeners (idempotent)
   const addListeners = useCallback((eventType, orientationHandler) => {
@@ -93,16 +116,13 @@ export function useDeviceOrientation() {
       listenersAddedRef.current = true;
       savedEventTypeRef.current = eventType;
       savedHandlerRef.current = orientationHandler;
-      console.log('[useDeviceOrientation] Event listeners added:', eventType);
     } catch (err) {
-      console.log('[useDeviceOrientation] Failed to add listeners:', err);
       setError(err.message || String(err));
     }
   }, [handleOrientation]);
 
   // Exposed function to request permission from a user gesture
   const requestPermission = useCallback(async () => {
-    console.log('[useDeviceOrientation] requestPermission called by user gesture');
     if (!window.DeviceOrientationEvent) {
       setError('Device orientation not supported');
       return { granted: false, reason: 'unsupported' };
@@ -113,14 +133,11 @@ export function useDeviceOrientation() {
     if ('ondeviceorientationabsolute' in window) {
       eventType = 'deviceorientationabsolute';
       orientationHandler = handleOrientationAbsolute;
-      console.log('[useDeviceOrientation] deviceorientationabsolute available');
     }
 
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
-        console.log('[useDeviceOrientation] Requesting iOS permission');
         const permission = await DeviceOrientationEvent.requestPermission();
-        console.log('[useDeviceOrientation] Permission result:', permission);
         if (permission === 'granted') {
           addListeners(eventType, orientationHandler);
           setNeedsPermission(false);
@@ -129,7 +146,6 @@ export function useDeviceOrientation() {
         setError('Permission denied');
         return { granted: false, reason: 'denied' };
       } catch (err) {
-        console.log('[useDeviceOrientation] Permission request error:', err);
         setError(err.message || String(err));
         return { granted: false, reason: 'error', error: err };
       }
@@ -142,9 +158,7 @@ export function useDeviceOrientation() {
   }, [addListeners, handleOrientation, handleOrientationAbsolute]);
 
   useEffect(() => {
-    console.log('[useDeviceOrientation] useEffect - initializing');
     if (!window.DeviceOrientationEvent) {
-      console.log('[useDeviceOrientation] DeviceOrientationEvent not supported');
       setError('Device orientation not supported');
       return;
     }
@@ -152,7 +166,6 @@ export function useDeviceOrientation() {
     // If the browser requires explicit permission via DeviceOrientationEvent.requestPermission,
     // we don't call it automatically (must be a user gesture). Instead expose requestPermission()
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      console.log('[useDeviceOrientation] DeviceOrientationEvent.requestPermission exists - user gesture required');
       setNeedsPermission(true);
       // Do not add listeners here; wait for explicit user call to requestPermission()
       return;
@@ -164,21 +177,17 @@ export function useDeviceOrientation() {
     if ('ondeviceorientationabsolute' in window) {
       eventType = 'deviceorientationabsolute';
       orientationHandler = handleOrientationAbsolute;
-      console.log('[useDeviceOrientation] Using deviceorientationabsolute');
     } else {
-      console.log('[useDeviceOrientation] deviceorientationabsolute not available, using deviceorientation');
     }
     addListeners(eventType, orientationHandler);
 
     return () => {
-      console.log('[useDeviceOrientation] Cleanup - removing event listeners');
       try {
         if (savedEventTypeRef.current && savedHandlerRef.current) {
           window.removeEventListener(savedEventTypeRef.current, savedHandlerRef.current);
         }
         window.removeEventListener('deviceorientation', handleOrientation);
       } catch (err) {
-        console.log('[useDeviceOrientation] Error during cleanup:', err);
       }
       listenersAddedRef.current = false;
     };

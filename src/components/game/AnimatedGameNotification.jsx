@@ -24,6 +24,8 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
           return `balise_lure:${e.id || e.lat || e.lng || ''}`;
         case 'balise_capture':
           return `balise_capture:${e.baliseId || ''}:${e.nickname || ''}:${e.isMyCapture || ''}`;
+        case 'balise_blocked':
+          return `balise_blocked:${e.message || ''}`;
         case 'fake_position':
           return `fake_position:${e.until || ''}`;
         case 'join_request':
@@ -233,11 +235,22 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
   const remainingMs = Math.max(0, rest);
   const remainingSec = Math.max(1, Math.round(remainingMs / 1000));
 
+      // Check if this is self-invisibility or other-invisibility
+      const isSelf = currentEffect.scope === "self";
+      const targetNames = currentEffect.targetNames;
+
       return (
         <>
           <div className="flex items-center gap-2">
             <span className="text-2xl">👻</span>
-            <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Mode ghost actif</p>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Mode ghost actif</p>
+              {!isSelf && targetNames && (
+                <p className="text-xs font-semibold text-blue-700">
+                  {targetNames} invisible(s)
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3 mt-2">
             <div className="flex-1 h-2 overflow-hidden rounded-full bg-blue-200">
@@ -398,6 +411,17 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
             )}
           </div>
         </>
+      );
+    }
+
+    if (currentEffect.kind === "balise_blocked") {
+      return (
+        <div className="mt-2 overflow-hidden rounded-xl bg-blue-600 px-3 py-2 text-white animate-[slideDown_0.25s_ease-out]">
+          <p className="text-[10px] font-bold uppercase tracking-wider">Balise bloquée</p>
+          <p className="text-[11px] font-semibold">
+            {currentEffect.message}
+          </p>
+        </div>
       );
     }
 

@@ -3,6 +3,7 @@ import { formatCoins } from '../../lib/format';
 
 export default function GameStatusModal({
   timeRemaining = '2:45',
+  zoneTimeRemaining = null,
   zoneState = null,
   progress = 11,
   coins = 35,
@@ -125,10 +126,21 @@ export default function GameStatusModal({
             onClick={(e) => { e.stopPropagation(); onProgressClick?.(); }}
             className="flex-1 flex flex-col items-end justify-center pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
           >
-            <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">{displayProgress}%</span>
-            <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out" style={{ width: `${displayProgress}%` }} />
-            </div>
+            {shrinkZoneEnabled && zoneTimeRemaining ? (
+              <>
+                <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">{zoneTimeRemaining}</span>
+                <span className="text-[9px] font-semibold text-[#5c728e] uppercase tracking-wider">
+                  {zoneState === 'waiting' ? 'En Attente' : zoneState === 'shrinking' ? 'Rétrécissement' : zoneState === 'stopped' ? 'Arrêté' : 'Zone'}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">{displayProgress}%</span>
+                <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out" style={{ width: `${displayProgress}%` }} />
+                </div>
+              </>
+            )}
           </button>
         )}
 
