@@ -2,7 +2,8 @@
   "name": "chase-gps-client",
   "private": true,
   "version": "1.0.0",
-  "type": "module",  "scripts": {
+  "type": "module",
+  "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
@@ -16,8 +17,8 @@
     "leaflet": "^1.9.4",
     "mapbox-gl": "^3.24.0",
     "qrcode.react": "^4.1.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^7.18.0",
     "socket.io-client": "^4.7.5"
