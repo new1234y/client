@@ -2131,10 +2131,9 @@ export default function App() {
   if (stage === "entry") {
     return (
       <div className="flex min-h-full flex-col bg-white p-4 pb-8 relative">
-        <RadarBackground />
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
-        
+
         <header className="mb-8 flex items-start justify-between gap-3 pt-4 relative z-10">
           <div>
             <h1 className="text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">

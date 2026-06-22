@@ -32,7 +32,7 @@ export default function BaliseSheet({
   const isBeingCaptured = balise.beingCapturedBy !== null;
   const isMyCapture = balise.beingCapturedBy === mySessionId;
   const captureProgress = balise.captureProgress || 0;
-  const captureTime = 30 * 1000; // 30 seconds
+  const captureTime = 20 * 1000; // 20 seconds
   const capturePercent = Math.min(100, (captureProgress / captureTime) * 100);
 
   const handleShowOnMap = () => {
