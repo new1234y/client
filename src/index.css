@@ -10,6 +10,7 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
+  padding-top: env(safe-area-inset-top);
 }
 
 .leaflet-container {
@@ -404,4 +405,15 @@ input[type="range"]::-moz-range-thumb:active {
 /* Small extra margin at bottom for better visual separation */
 .bottom-margin {
   margin-bottom: 8px;
+}
+
+/* Improve touch responsiveness on WebApp */
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button, a, [role="button"] {
+  cursor: pointer;
+  touch-action: manipulation;
 }

@@ -165,10 +165,10 @@ import { formatCoins } from '../../lib/format';
 function PodiumPillar({ place, player, accent }) {
   if (!player) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-end gap-2 text-center sm:gap-3">
+      <div className="flex flex-1 flex-col items-center justify-end gap-1 text-center">
         <div
-          className="w-full rounded-2xl sm:rounded-3xl bg-white/60 p-2 sm:p-4 text-[10px] sm:text-sm font-semibold text-slate-500 shadow-inner"
-          style={{ minHeight: place === 1 ? "4rem" : "3rem" }}
+          className="w-full rounded-xl bg-white/60 p-1.5 text-[9px] font-semibold text-slate-500 shadow-inner"
+          style={{ minHeight: place === 1 ? "2.5rem" : "2rem" }}
         >
           —
         </div>
@@ -176,7 +176,7 @@ function PodiumPillar({ place, player, accent }) {
     );
   }
   const crown = place === 1;
-  const podiumHeight = place === 1 ? "h-28 sm:h-44" : place === 2 ? "h-24 sm:h-36" : "h-20 sm:h-28";
+  const podiumHeight = place === 1 ? "h-32 sm:h-48 md:h-64 lg:h-80" : place === 2 ? "h-24 sm:h-36 md:h-52 lg:h-64" : "h-20 sm:h-32 md:h-44 lg:h-56";
   const gradientColor =
     place === 1
       ? "bg-gradient-to-b from-amber-400 via-yellow-500 to-amber-600"
@@ -191,41 +191,41 @@ function PodiumPillar({ place, player, accent }) {
       : "shadow-orange-500/40";
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-end gap-3 sm:gap-5 text-center">
-      <div className="space-y-1 sm:space-y-2">
+    <div className="flex flex-1 flex-col items-center justify-end gap-2 sm:gap-3 md:gap-5 text-center min-w-0">
+      <div className="space-y-1 sm:space-y-1 md:space-y-2 w-full">
         {crown && (
           <div className="flex justify-center">
-            <span className="text-3xl sm:text-4xl drop-shadow-lg animate-bounce">👑</span>
+            <span className="text-xl sm:text-3xl md:text-4xl drop-shadow-lg animate-bounce">👑</span>
           </div>
         )}
         <div className="relative">
           <div className={`absolute inset-0 rounded-full blur-xl opacity-50 ${gradientColor}`}></div>
-          <div className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-black text-white ${gradientColor} shadow-lg ${shadowColor}`}>
+          <div className={`relative w-12 h-12 sm:w-16 md:w-20 sm:h-16 md:h-20 rounded-full flex items-center justify-center text-lg sm:text-2xl md:text-3xl font-black text-white ${gradientColor} shadow-lg ${shadowColor} mx-auto`}>
             {player.nickname?.charAt(0)?.toUpperCase() || '?'}
           </div>
         </div>
-        <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white max-w-[10ch] sm:max-w-[14ch] truncate">
+        <p className="text-xs sm:text-sm md:text-base font-bold text-slate-900 dark:text-white truncate px-1">
           {player.nickname}
         </p>
-        <div className="flex items-center justify-center gap-2">
-          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+        <div className="flex flex-col items-center gap-1 sm:gap-2">
+          <p className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400">
             {player.catTimeLabel}
           </p>
-          <span className="flex items-center gap-1 text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
-            <span>🪙</span>
+          <span className="flex items-center gap-1 sm:gap-1 text-[10px] sm:text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 sm:px-2 py-1 rounded-full">
+            <span className="text-[10px] sm:text-xs">🪙</span>
             {formatCoins(player.coins)}
           </span>
         </div>
-        <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+        <p className="text-[10px] sm:text-[10px] font-medium text-slate-500 dark:text-slate-400">
           {formatDistance(player.distanceMeters)}
         </p>
       </div>
       <div
-        className={`w-full rounded-2xl sm:rounded-3xl ${podiumHeight} ${gradientColor} shadow-2xl ${shadowColor} relative overflow-hidden`}
+        className={`w-full rounded-xl sm:rounded-2xl md:rounded-3xl ${podiumHeight} ${gradientColor} shadow-2xl ${shadowColor} relative overflow-hidden`}
       >
         <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
         <div className="relative flex h-full items-end justify-center">
-          <div className="w-full rounded-t-2xl sm:rounded-t-3xl bg-white/95 py-2 sm:py-3 text-xs sm:text-sm font-black text-slate-800 dark:bg-white/90">
+          <div className="w-full rounded-t-xl sm:rounded-t-2xl md:rounded-t-3xl bg-white/95 py-2 sm:py-2 md:py-3 text-[10px] sm:text-xs md:text-sm font-black text-slate-800 dark:bg-white/90">
             {player.badgeLabel}
           </div>
         </div>
@@ -273,7 +273,12 @@ function SummaryPodiumView({
     if (Array.isArray(gameAnalytics.catTimeRanking) && gameAnalytics.catTimeRanking.length > 0) {
       return gameAnalytics.catTimeRanking;
     }
-    return players.map((p) => ({ sessionId: p.sessionId, catTimeMs: analyticsPlayers[p.sessionId]?.catTimeMs ?? p.totalCatTimeMs ?? 0 }));
+    // Fallback: build ranking from individual player analytics
+    return players.map((p) => ({
+      sessionId: p.sessionId,
+      catTimeMs: analyticsPlayers[p.sessionId]?.catTimeMs ?? p.totalCatTimeMs ?? 0,
+      distanceMeters: analyticsPlayers[p.sessionId]?.distanceMeters ?? 0,
+    }));
   }, [gameAnalytics.catTimeRanking, players, analyticsPlayers]);
 
   const decoratedRanking = useMemo(() => {
@@ -282,7 +287,13 @@ function SummaryPodiumView({
         const data = playersById[row.sessionId];
         if (!data) return null;
         const analyticsRow = analyticsPlayers[row.sessionId] || {};
-        const catTimeMs = analyticsRow.catTimeMs ?? row.catTimeMs ?? data.totalCatTimeMs ?? 0;
+        // Use individual player analytics data, with fallbacks only if analytics is completely missing
+        const catTimeMs = analyticsRow.catTimeMs ?? row.catTimeMs ?? 0;
+        const distanceMeters = analyticsRow.distanceMeters ?? 0;
+        const coins = analyticsRow.coins ?? 0;
+        const timeAsPlayerMs = analyticsRow.timeAsPlayerMs ?? 0;
+        const maxSpeedKmh = analyticsRow.maxSpeedKmh ?? 0;
+
         return {
           sessionId: row.sessionId,
           nickname: data.nickname,
@@ -296,9 +307,13 @@ function SummaryPodiumView({
               : catTimeMs < 180000
               ? "Insaisissable"
               : "Résilient",
-          stats: analyticsRow,
-          coins: analyticsRow.coins ?? data.coins ?? 0,
-          distanceMeters: analyticsRow.distanceMeters ?? 0,
+          stats: {
+            ...analyticsRow,
+            timeAsPlayerMs,
+            maxSpeedKmh,
+          },
+          coins,
+          distanceMeters,
         };
       })
       .filter(Boolean);
@@ -328,53 +343,53 @@ function SummaryPodiumView({
   const myDistance = analyticsPlayers[summary?.mySessionId]?.distanceMeters || 0;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
+    <div className="relative flex h-screen flex-col bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 overflow-hidden">
       <ConfettiField seed={summary?.code} />
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 pb-8 pt-8 sm:px-8">
-        {/* Main ranking area - 70-80% of screen height */}
-        <main className="flex-1 min-h-[70vh] flex flex-col">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 py-1 sm:px-4 sm:py-1 md:px-6 md:py-2">
+        {/* Main ranking area */}
+        <main className="flex-1 flex flex-col justify-center min-h-0">
           {gameMode === "infection" ? (
-            <div className="flex h-full flex-col items-center justify-center gap-8">
-              <div className="w-full max-w-xl rounded-3xl bg-white/85 p-8 text-center shadow-[0_25px_45px_rgba(15,23,42,0.08)]">
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-emerald-500">Survivant·e</p>
-                <h2 className="mt-2 text-4xl font-black text-slate-900">
+            <div className="flex flex-col items-center justify-center gap-1 sm:gap-2 md:gap-3 h-full">
+              <div className="w-full max-w-xl rounded-2xl sm:rounded-3xl bg-white/85 p-1.5 sm:p-3 md:p-4 text-center shadow-[0_25px_45px_rgba(15,23,42,0.08)]">
+                <p className="text-[9px] sm:text-xs font-semibold uppercase tracking-[0.3em] sm:tracking-[0.4em] text-emerald-500">Survivant·e</p>
+                <h2 className="mt-1 sm:mt-2 text-lg sm:text-2xl md:text-3xl font-black text-slate-900">
                   {lastSurvivor ? lastSurvivor.nickname : decoratedRanking[0]?.nickname || "—"}
                 </h2>
-                <p className="mt-3 text-sm text-slate-500">
+                <p className="mt-1 sm:mt-2 text-[10px] sm:text-sm text-slate-500">
                   {lastSurvivor
                     ? "A tenu jusqu'au bout sans devenir chat."
                     : "Dernier joueur en vie introuvable : consultez les stats pour plus de détails."}
                 </p>
                 {lastSurvivor && (
-                  <p className="mt-4 rounded-full bg-emerald-100 px-4 py-2 text-xs font-semibold text-emerald-700">
+                  <p className="mt-1 sm:mt-2 rounded-full bg-emerald-100 px-2 sm:px-4 py-0.5 sm:py-1 text-[9px] sm:text-xs font-semibold text-emerald-700">
                     {formatDurationMs(gameAnalytics.durationMs)} de survie
                   </p>
                 )}
               </div>
-              <div className="w-full max-w-2xl rounded-3xl bg-white/80 p-6 shadow-[0_20px_40px_rgba(15,23,42,0.08)]">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
+              <div className="w-full max-w-2xl rounded-2xl sm:rounded-3xl bg-white/80 p-1.5 sm:p-3 md:p-4 shadow-[0_20px_40px_rgba(15,23,42,0.08)]">
+                <h3 className="text-[9px] sm:text-xs md:text-sm font-semibold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-slate-500">
                   Ordre des joueurs devenus chats
                 </h3>
-                <ul className="mt-4 space-y-2">
+                <ul className="mt-1 sm:mt-2 space-y-0.5 sm:space-y-1">
                   {infectionOrder.length > 0 ? (
                     infectionOrder.map((item, idx) => (
                       <li
                         key={item.sessionId}
-                        className="flex items-center justify-between rounded-2xl border border-slate-200/60 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm"
+                        className="flex items-center justify-between rounded-xl sm:rounded-2xl border border-slate-200/60 bg-white px-2 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-sm font-medium text-slate-700 shadow-sm"
                       >
-                        <span className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FDE68A] font-semibold text-slate-800">
+                        <span className="flex items-center gap-2 sm:gap-3">
+                          <span className="flex h-5 w-5 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#FDE68A] text-[9px] sm:text-sm font-semibold text-slate-800">
                             {idx + 1}
                           </span>
                           {item.nickname}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-[9px] sm:text-xs text-slate-400">
                           {item.time ? formatClock(item.time) : "—"}
                         </span>
                       </li>
                     ))
                   ) : (
-                    <li className="rounded-2xl bg-white/60 px-4 py-3 text-center text-sm text-slate-500">
+                    <li className="rounded-xl sm:rounded-2xl bg-white/60 px-2 sm:px-4 py-1.5 sm:py-2 text-center text-[10px] sm:text-sm text-slate-500">
                       Aucun passage en chat enregistré.
                     </li>
                   )}
@@ -382,15 +397,15 @@ function SummaryPodiumView({
               </div>
             </div>
           ) : (
-            <div className="flex h-full flex-col justify-between gap-8">
-              <div className="relative rounded-[40px] bg-white/80 p-8 shadow-[0_40px_60px_rgba(15,23,42,0.08)] dark:bg-slate-900/80">
-                <p className="text-center text-xs font-semibold uppercase tracking-[0.5em] text-[#2563EB]">
+            <div className="flex flex-col justify-center gap-1 sm:gap-2 md:gap-3 h-full">
+              <div className="relative rounded-2xl sm:rounded-[40px] bg-white/80 p-1.5 sm:p-2 md:p-3 shadow-[0_20px_40px_rgba(15,23,42,0.08)] sm:shadow-[0_40px_60px_rgba(15,23,42,0.08)] dark:bg-slate-900/80">
+                <p className="text-center text-[9px] sm:text-xs font-semibold uppercase tracking-[0.3em] sm:tracking-[0.5em] text-[#2563EB]">
                   WIN!
                 </p>
-                <h2 className="mt-2 text-center text-3xl font-black text-slate-900 dark:text-white">
+                <h2 className="mt-0.5 sm:mt-1 text-center text-xs sm:text-lg md:text-xl font-black text-slate-900 dark:text-white">
                   Classement des meilleurs survivants
                 </h2>
-                <div className="mt-8 flex flex-row flex-wrap items-end justify-center gap-4 sm:gap-6 md:gap-10">
+                <div className="mt-1 sm:mt-2 md:mt-3 flex flex-row flex-wrap items-end justify-center gap-1.5 sm:gap-2 md:gap-4">
                   <PodiumPillar
                     place={2}
                     player={topThree[1] || topThree[0] || null}
@@ -409,40 +424,40 @@ function SummaryPodiumView({
                 </div>
               </div>
               {others.length > 0 && (
-                <div className="rounded-3xl bg-white/70 p-6 shadow-[0_25px_45px_rgba(15,23,42,0.08)] dark:bg-slate-900/70">
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+                <div className="rounded-2xl sm:rounded-3xl bg-white/70 p-1.5 sm:p-2 md:p-3 shadow-[0_15px_30px_rgba(15,23,42,0.08)] sm:shadow-[0_25px_45px_rgba(15,23,42,0.08)] dark:bg-slate-900/70">
+                  <p className="text-[9px] sm:text-xs font-semibold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-slate-500">
                     Suite du classement
                   </p>
-                  <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <ul className="mt-1 sm:mt-2 grid gap-1 sm:gap-1.5 grid-cols-1 sm:grid-cols-2">
                     {others.map((player, idx) => (
                       <li
                         key={player.sessionId}
-                        className="flex flex-col rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        className="flex flex-col rounded-xl sm:rounded-2xl border border-slate-200/70 bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                       >
                         <span className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-100">
-                          <span className="flex items-center gap-2">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#DBEAFE] font-bold text-slate-700">
+                          <span className="flex items-center gap-2 sm:gap-2">
+                            <span className="flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-[#DBEAFE] text-[10px] sm:text-xs font-bold text-slate-700">
                               {idx + 4}
                             </span>
                             {player.nickname}
                           </span>
-                          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                          <span className="text-[10px] sm:text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-400">
                             {player.badgeLabel}
                           </span>
                         </span>
                         <div className="mt-1 flex items-center justify-between">
-                          <span className="text-xs font-medium uppercase tracking-[0.2em] text-[#2563EB]">
+                          <span className="text-[10px] sm:text-xs font-medium uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[#2563EB]">
                             {player.catTimeLabel}
                           </span>
-                          <span className="flex items-center gap-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+                          <span className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+                            <svg className="h-2.5 w-2.5 sm:h-3 sm:w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
                             {formatCoins(player.coins)}
                           </span>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
-                          <span>Vitesse max&nbsp;: {formatSpeedKmh(player.stats?.maxSpeedKmh)}</span>
-                          <span>Distance&nbsp;: {formatDistance(player.distanceMeters)}</span>
-                          <span>Temps joueur&nbsp;: {formatDurationMs(player.stats?.timeAsPlayerMs)}</span>
+                        <div className="mt-1 grid grid-cols-3 gap-0.5 text-[9px] sm:text-[10px] text-slate-500">
+                          <span>Vmax: {formatSpeedKmh(player.stats?.maxSpeedKmh)}</span>
+                          <span>Dist: {formatDistance(player.distanceMeters)}</span>
+                          <span>Tps: {formatDurationMs(player.stats?.timeAsPlayerMs)}</span>
                         </div>
                       </li>
                     ))}
@@ -453,71 +468,102 @@ function SummaryPodiumView({
           )}
         </main>
 
-        {/* Bottom info boxes */}
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Mode</p>
-            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+        {/* Bottom info boxes - fully responsive */}
+        <div className="mt-1 sm:mt-2 grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1.5">
+          <div className="rounded-xl sm:rounded-2xl bg-white/80 px-1.5 sm:px-2 py-1 sm:py-1.5 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">Mode</p>
+            <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-slate-900 dark:text-white">
               {gameMode === "infection" ? "Infection" : "Tag Swap"}
             </p>
           </div>
-          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Temps</p>
-            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+          <div className="rounded-xl sm:rounded-2xl bg-white/80 px-1.5 sm:px-2 py-1 sm:py-1.5 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">Temps</p>
+            <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-slate-900 dark:text-white">
               {formatDurationMs(gameAnalytics.durationMs)}
             </p>
           </div>
-          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Ma distance</p>
-            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-              {formatDistance(myDistance)}
+          <div className="rounded-xl sm:rounded-2xl bg-white/80 px-1.5 sm:px-2 py-1 sm:py-1.5 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">Dist Totale</p>
+            <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-slate-900 dark:text-white">
+              {formatDistance(gameAnalytics.totalDistanceMeters)}
             </p>
           </div>
-          <div className="rounded-2xl bg-white/80 px-4 py-3 shadow-sm backdrop-blur dark:bg-slate-900/80">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Événements</p>
-            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-              {gameAnalytics.totalCaptures || 0} captures
+          <div className="rounded-xl sm:rounded-2xl bg-white/80 px-1.5 sm:px-2 py-1 sm:py-1.5 shadow-sm backdrop-blur dark:bg-slate-900/80">
+            <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">Captures</p>
+            <p className="mt-0.5 text-[9px] sm:text-[10px] font-bold text-slate-900 dark:text-white">
+              {gameAnalytics.totalCaptures || 0}
             </p>
           </div>
         </div>
 
-        {/* Share buttons */}
-        <div className="mt-4 flex flex-wrap gap-2 justify-center">
-          <button
-            type="button"
-            onClick={onShare}
-            disabled={shareBusy || (!publicRecapUrl && !shareBusy)}
-            className="rounded-full bg-[#2563EB] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white shadow-lg transition hover:bg-[#1d4ed8] disabled:opacity-60"
-          >
-            {shareBusy ? "Partage…" : "Partager"}
-          </button>
-          {publicRecapUrl && (
+        {/* Game stats section */}
+        <div className="mt-1 sm:mt-2 rounded-2xl sm:rounded-3xl bg-white/70 p-1.5 sm:p-2 shadow-sm backdrop-blur dark:bg-slate-900/70">
+          <p className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-slate-500 mb-1 sm:mb-1.5">Stats de partie</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-1.5 text-[8px] sm:text-[9px]">
+            <div className="text-center">
+              <p className="text-slate-500">Joueurs</p>
+              <p className="font-bold text-slate-900 dark:text-white">{gameAnalytics.playerCount || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-500">Brouillages</p>
+              <p className="font-bold text-slate-900 dark:text-white">{gameAnalytics.totalJamEvents || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-500">Temps Chat</p>
+              <p className="font-bold text-slate-900 dark:text-white">{formatDurationMs(gameAnalytics.totalCatTimeMs)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-500">Vmax Moy</p>
+              <p className="font-bold text-slate-900 dark:text-white">{formatSpeedKmh(gameAnalytics.totalDistanceMeters && gameAnalytics.durationMs ? (gameAnalytics.totalDistanceMeters / 1000) / (gameAnalytics.durationMs / 3600000) : 0)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-500">Survivants</p>
+              <p className="font-bold text-slate-900 dark:text-white">{players.filter(p => !p.captured && !p.spectator).length}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-500">Code</p>
+              <p className="font-bold text-slate-900 dark:text-white">{summary.code}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Share buttons - compact on mobile */}
+        <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-1.5 justify-between items-center">
+          <div className="flex flex-wrap gap-1 sm:gap-1.5">
             <button
               type="button"
-              onClick={copyRecap}
-              className="rounded-full border border-[#2563EB]/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] transition hover:bg-[#2563EB]/10 dark:text-indigo-300 dark:border-indigo-500/40 dark:hover:bg-indigo-500/10"
+              onClick={onShowStats}
+              className="rounded-full bg-slate-800 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow transition hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
             >
-              {copied ? "Lien copié" : "Copier le lien"}
+              Stats
             </button>
-          )}
+            <button
+              type="button"
+              onClick={onShare}
+              disabled={shareBusy || (!publicRecapUrl && !shareBusy)}
+              className="rounded-full bg-slate-800 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow transition hover:bg-slate-700 disabled:opacity-60 dark:bg-slate-700 dark:hover:bg-slate-600"
+            >
+              {shareBusy ? "Partage…" : "Partager"}
+            </button>
+            {publicRecapUrl && (
+              <button
+                type="button"
+                onClick={copyRecap}
+                className="rounded-full bg-slate-800 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow transition hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
+              >
+                {copied ? "Copié" : "Lien"}
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onLeave}
+            className="rounded-full bg-red-600 px-2.5 sm:px-3 py-1 sm:py-1.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-white shadow transition hover:bg-red-700"
+          >
+            Quitter
+          </button>
         </div>
       </div>
-      <footer className="relative z-10 flex flex-wrap items-center justify-center gap-3 bg-white/80 px-6 py-6 shadow-[0_-12px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:bg-slate-900/80">
-        <button
-          type="button"
-          onClick={onLeave}
-          className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white shadow-lg transition hover:bg-slate-700"
-        >
-          Quitter
-        </button>
-        <button
-          type="button"
-          onClick={onShowStats}
-          className="rounded-full border border-slate-900/20 px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-slate-800 transition hover:bg-slate-900 hover:text-white dark:text-slate-100 dark:border-slate-600"
-        >
-          Statistiques
-        </button>
-      </footer>
     </div>
   );
 }

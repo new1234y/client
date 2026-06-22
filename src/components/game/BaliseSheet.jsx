@@ -27,7 +27,7 @@ export default function BaliseSheet({
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [balise.expiresAt]);
+  }, [balise.expiresAt, balise.id]);
 
   const isBeingCaptured = balise.beingCapturedBy !== null;
   const isMyCapture = balise.beingCapturedBy === mySessionId;
@@ -46,12 +46,17 @@ export default function BaliseSheet({
     <div
       className="fixed inset-0 z-[2500] flex items-end justify-center bg-black/60"
       onClick={onClose}
+      onTouchEnd={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg animate-slide-up rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900"
+        className="w-full max-w-lg animate-slide-up rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
       >
         <div className="flex justify-center py-3">
           <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-700" />
@@ -147,7 +152,15 @@ export default function BaliseSheet({
         <div className="px-5">
           <button
             type="button"
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
             className="w-full rounded-xl bg-slate-100 py-3.5 text-base font-semibold text-slate-700 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
           >
             Fermer

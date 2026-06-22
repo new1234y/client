@@ -24,7 +24,7 @@ export default function BottomNav({
   const iconCls = "h-6 w-6";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-6 safe-bottom md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-4 md:hidden">
       <nav className="relative rounded-[40px] bg-white p-2 shadow-lg ring-1 ring-slate-200 backdrop-blur-xl">
         <div className="flex items-center gap-1">
           <button
