@@ -97,7 +97,7 @@ export default function GameStatusModal({
             {!shrinkZoneEnabled && !timeLimitEnabled ? '♾️' : timeRemaining}
           </span>
           <span className="text-[9px] font-bold uppercase tracking-wider text-[#5c728e] whitespace-nowrap">
-            {!shrinkZoneEnabled && !timeLimitEnabled ? 'Sans Limite' : shrinkZoneEnabled ? (zoneState === 'waiting' ? 'En Attente' : zoneState === 'shrinking' ? 'Rétrécissement' : zoneState === 'stopped' ? 'Arrêté' : 'Temps Restant') : 'Temps Restant'}
+            {!shrinkZoneEnabled && !timeLimitEnabled ? 'Sans Limite' : 'Temps Restant'}
           </span>
         </button>
 

@@ -347,8 +347,14 @@ export default function MapHud({
 
   const fmt = (s) => {
     if (s == null) return "--:--";
-    const m = Math.floor(s / 60);
-    return `${m}:${String(s % 60).padStart(2, "0")}`;
+    const totalMinutes = Math.floor(s / 60);
+    const seconds = s % 60;
+    if (totalMinutes >= 60) {
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+    return `${totalMinutes}:${String(seconds).padStart(2, "0")}`;
   };
 
   const inner = (
