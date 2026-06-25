@@ -35,6 +35,7 @@ import { ensureSocketReady } from "./lib/backend.js";
 import { resolvePlayerMapFocus } from "./lib/resolvePlayerMapFocus.js";
 import { playGhostNoiseSound } from "./lib/playGhostNoiseSound.js";
 import SettingsPage from "./components/SettingsPage.jsx";
+import logger from "./lib/logger.js";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
@@ -48,7 +49,7 @@ const LS_LAST_ROOM_KEY = "chase_gps_last_room";
 const LS_LAST_SESSION_KEY = "chase_gps_last_session";
 
 function saveSession(sessionId, roomCode, nickname) {
-  console.log('[saveSession] Called with:', { sessionId, roomCode, nickname });
+  logger.log('[saveSession] Called with:', { sessionId, roomCode, nickname });
   try {
     // Save to main keys
     localStorage.setItem(LS_SESSION_KEY, sessionId);
@@ -58,61 +59,61 @@ function saveSession(sessionId, roomCode, nickname) {
     localStorage.setItem(LS_LAST_SESSION_KEY, sessionId);
     localStorage.setItem(LS_LAST_ROOM_KEY, roomCode);
     localStorage.setItem(LS_LAST_NICKNAME_KEY, nickname);
-    console.log('[saveSession] Session saved successfully (main + backup)');
+    logger.log('[saveSession] Session saved successfully (main + backup)');
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
 }
 
 function loadSession() {
-  console.log('[loadSession] Called');
+  logger.log('[loadSession] Called');
   try {
     const sessionId = localStorage.getItem(LS_SESSION_KEY);
     const roomCode = localStorage.getItem(LS_ROOM_KEY);
     const nickname = localStorage.getItem(LS_NICKNAME_KEY);
-    console.log('[loadSession] Loaded:', { sessionId, roomCode, nickname });
+    logger.log('[loadSession] Loaded:', { sessionId, roomCode, nickname });
     if (sessionId && roomCode) {
       return { sessionId, roomCode, nickname: nickname || "Joueur" };
     }
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
-  console.log('[loadSession] No session found');
+  logger.log('[loadSession] No session found');
   return null;
 }
 
 // Also try to load from backup keys (in case main keys were cleared)
 function loadSessionBackup() {
-  console.log('[loadSessionBackup] Called');
+  logger.log('[loadSessionBackup] Called');
   try {
     const sessionId = localStorage.getItem(LS_LAST_SESSION_KEY);
     const roomCode = localStorage.getItem(LS_LAST_ROOM_KEY);
     const nickname = localStorage.getItem(LS_LAST_NICKNAME_KEY);
-    console.log('[loadSessionBackup] Loaded:', { sessionId, roomCode, nickname });
+    logger.log('[loadSessionBackup] Loaded:', { sessionId, roomCode, nickname });
     if (sessionId && roomCode) {
       return { sessionId, roomCode, nickname: nickname || "Joueur" };
     }
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
-  console.log('[loadSessionBackup] No backup session found');
+  logger.log('[loadSessionBackup] No backup session found');
   return null;
 }
 
 function clearSession() {
-  console.log('[clearSession] Called');
+  logger.log('[clearSession] Called');
   try {
     localStorage.removeItem(LS_SESSION_KEY);
     localStorage.removeItem(LS_ROOM_KEY);
     localStorage.removeItem(LS_NICKNAME_KEY);
-    console.log('[clearSession] Session cleared (main keys only, backup preserved)');
+    logger.log('[clearSession] Session cleared (main keys only, backup preserved)');
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
 }
 
 function clearAllSessions() {
-  console.log('[clearAllSessions] Called');
+  logger.log('[clearAllSessions] Called');
   try {
     localStorage.removeItem(LS_SESSION_KEY);
     localStorage.removeItem(LS_ROOM_KEY);
@@ -120,48 +121,48 @@ function clearAllSessions() {
     localStorage.removeItem(LS_LAST_SESSION_KEY);
     localStorage.removeItem(LS_LAST_ROOM_KEY);
     localStorage.removeItem(LS_LAST_NICKNAME_KEY);
-    console.log('[clearAllSessions] All sessions cleared');
+    logger.log('[clearAllSessions] All sessions cleared');
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
 }
 
 function saveLastNickname(nickname) {
-  console.log('[saveLastNickname] Called with:', { nickname });
+  logger.log('[saveLastNickname] Called with:', { nickname });
   try {
     localStorage.setItem(LS_LAST_NICKNAME_KEY, nickname);
-    console.log('[saveLastNickname] Saved');
+    logger.log('[saveLastNickname] Saved');
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
   }
 }
 
 function loadLastNickname() {
-  console.log('[loadLastNickname] Called');
+  logger.log('[loadLastNickname] Called');
   try {
     const result = localStorage.getItem(LS_LAST_NICKNAME_KEY) || "";
-    console.log('[loadLastNickname] Result:', result);
+    logger.log('[loadLastNickname] Result:', result);
     return result;
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
     return "";
   }
 }
 
 function loadLastRoom() {
-  console.log('[loadLastRoom] Called');
+  logger.log('[loadLastRoom] Called');
   try {
     const result = localStorage.getItem(LS_LAST_ROOM_KEY) || "";
-    console.log('[loadLastRoom] Result:', result);
+    logger.log('[loadLastRoom] Result:', result);
     return result;
   } catch (e) {
-    console.warn("localStorage non disponible:", e);
+    logger.warn("localStorage non disponible:", e);
     return "";
   }
 }
 
 function roleBadgeText(p) {
-  console.log('[roleBadgeText] Called with:', { role: p.role, originalRole: p.originalRole, spectator: p.spectator });
+  logger.log('[roleBadgeText] Called with:', { role: p.role, originalRole: p.originalRole, spectator: p.spectator });
   if (p.spectator) return "Spectateur";
   if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
   if (p.role === "cat") return "Chat";
@@ -170,27 +171,27 @@ function roleBadgeText(p) {
 }
 
 function getCodeFromUrl() {
-  console.log('[getCodeFromUrl] Called');
+  logger.log('[getCodeFromUrl] Called');
   try {
     const params = new URLSearchParams(window.location.search);
     const result = params.get("code") || "";
-    console.log('[getCodeFromUrl] Result:', result);
+    logger.log('[getCodeFromUrl] Result:', result);
     return result;
   } catch {
-    console.log('[getCodeFromUrl] Error parsing URL');
+    logger.log('[getCodeFromUrl] Error parsing URL');
     return "";
   }
 }
 
 function getRecapIdFromPath() {
-  console.log('[getRecapIdFromPath] Called');
+  logger.log('[getRecapIdFromPath] Called');
   try {
     const m = window.location.pathname.match(/^\/recap\/([A-Za-z0-9]+)\/?$/);
     const result = m ? m[1].toUpperCase() : null;
-    console.log('[getRecapIdFromPath] Result:', result);
+    logger.log('[getRecapIdFromPath] Result:', result);
     return result;
   } catch {
-    console.log('[getRecapIdFromPath] Error parsing path');
+    logger.log('[getRecapIdFromPath] Error parsing path');
     return null;
   }
 }
@@ -732,7 +733,7 @@ export default function App() {
     const unlockAudio = () => {
       if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === 'suspended') {
         sharedAudioContextRef.current.resume();
-        console.log('[Global unlock] AudioContext resumed');
+        logger.log('[Global unlock] AudioContext resumed');
       }
     };
 
@@ -789,7 +790,7 @@ export default function App() {
   const lastEmit = useRef(0);
 
   const resetToEntry = useCallback((clearStorage = true) => {
-    console.log('[resetToEntry] Called with:', { clearStorage });
+    logger.log('[resetToEntry] Called with:', { clearStorage });
     if (clearStorage) {
       clearSession();
     }
@@ -826,17 +827,26 @@ export default function App() {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    console.log('[resetToEntry] Reset complete');
+    logger.log('[resetToEntry] Reset complete');
   }, []);
 
-  // Reconnection logic - ensures socket is connected then restores session
-  const attemptReconnect = useCallback((s, attempt = 1) => {
-    let saved = loadSession();
-    if (!saved) {
-      // Try backup keys if main keys not found
+  // Reconnection logic - ensures socket is connected then restores session with perfect fallback
+  const attemptReconnect = useCallback((s, attempt = 1, useBackup = false) => {
+    let saved = useBackup ? loadSessionBackup() : loadSession();
+    
+    // If main session failed and we haven't tried backup yet, try it
+    if (!saved && !useBackup) {
+      logger.log('[attemptReconnect] Main session not found, trying backup');
       saved = loadSessionBackup();
+      if (saved) {
+        // Retry with backup immediately
+        attemptReconnect(s, attempt, true);
+        return;
+      }
     }
+    
     if (!saved) {
+      logger.log('[attemptReconnect] No session found, giving up');
       setIsReconnecting(false);
       setReconnectReason(null);
       return;
@@ -844,11 +854,30 @@ export default function App() {
 
     const tryRestore = () => {
       setReconnectAttempt(attempt);
+      setReconnectError(null);
+      
+      // Add timeout for the reconnection attempt
+      const timeoutId = setTimeout(() => {
+        logger.log('[attemptReconnect] Reconnection timeout, retrying...');
+        setReconnectError("Délai d'attente dépassé");
+        
+        // Retry with exponential backoff: 2s, 4s, 8s, 16s, max 30s
+        const backoffDelay = Math.min(30000, Math.pow(2, attempt) * 1000);
+        logger.log(`[attemptReconnect] Retrying in ${backoffDelay}ms (attempt ${attempt})`);
+        
+        reconnectRetryRef.current = setTimeout(() => {
+          attemptReconnect(s, attempt + 1, useBackup);
+        }, backoffDelay);
+      }, 10000); // 10 second timeout for each attempt
+
       s.emit(
         "reconnect_session",
         { sessionId: saved.sessionId, roomCode: saved.roomCode },
         (res) => {
+          clearTimeout(timeoutId); // Clear timeout on response
+          
           if (res?.ok) {
+            logger.log('[attemptReconnect] Reconnection successful');
             if (reconnectRetryRef.current) {
               clearTimeout(reconnectRetryRef.current);
               reconnectRetryRef.current = null;
@@ -861,6 +890,9 @@ export default function App() {
             setSessionId(res.sessionId);
             setIsHost(res.isHost);
 
+            // Restore the session with the correct keys
+            saveSession(res.sessionId, saved.roomCode, saved.nickname);
+
             if (res.phase === "lobby" && res.lobby) {
               setLobby(res.lobby);
               if (res.lobby.partyChat) setPartyChatMessages(res.lobby.partyChat);
@@ -869,7 +901,6 @@ export default function App() {
               setRolesReveal(res.rolesReveal);
               if (res.rolesReveal.partyChat) setPartyChatMessages(res.rolesReveal.partyChat);
               setHasSeenRole(false);
-              // Don't reset isFlipped - let user control when to flip
               setStage("role_reveal");
             } else if (res.phase === "playing" && res.gameState) {
               setGameState(res.gameState);
@@ -883,45 +914,71 @@ export default function App() {
             return;
           }
 
+          logger.log('[attemptReconnect] Reconnection failed:', res?.error);
           setReconnectError(res?.error || "Échec de reconnexion");
 
-          if (
+          // Check if error is permanent (session expired/terminated)
+          const isPermanentError =
             res?.error?.includes("expir") ||
             res?.error?.includes("n'existe plus") ||
             res?.error?.includes("n'existe") ||
-            res?.error?.includes("termin")
-          ) {
+            res?.error?.includes("termin") ||
+            res?.error?.includes("invalide") ||
+            res?.error?.includes("not found");
+
+          if (isPermanentError) {
+            logger.log('[attemptReconnect] Permanent error, clearing session');
             clearSession();
+            clearAllSessions(); // Clear both main and backup
             setIsReconnecting(false);
             setReconnectReason(null);
             resetToEntry(false);
             return;
           }
 
-          // Fixed 5 second retry interval
-          const delay = 5000;
+          // If we haven't tried backup yet and this is the first attempt, try backup
+          if (!useBackup && attempt === 1) {
+            logger.log('[attemptReconnect] Trying backup session');
+            attemptReconnect(s, attempt + 1, true);
+            return;
+          }
+
+          // Retry with exponential backoff
+          const backoffDelay = Math.min(30000, Math.pow(2, attempt) * 1000);
+          logger.log(`[attemptReconnect] Retrying in ${backoffDelay}ms (attempt ${attempt})`);
+          
           reconnectRetryRef.current = setTimeout(() => {
-            attemptReconnect(s, attempt + 1);
-          }, delay);
+            attemptReconnect(s, attempt + 1, useBackup);
+          }, backoffDelay);
         }
       );
     };
 
+    // Ensure socket is connected before attempting restore
     if (!s?.connected) {
+      logger.log('[attemptReconnect] Socket not connected, waiting...');
       setIsReconnecting(true);
       setReconnectReason("lost_connection");
+      
       ensureSocketReady(s)
-        .then(() => tryRestore())
-        .catch(() => {
-          // Fixed 5 second retry interval
-          const delay = 5000;
+        .then(() => {
+          logger.log('[attemptReconnect] Socket ready, attempting restore');
+          tryRestore();
+        })
+        .catch((err) => {
+          logger.log('[attemptReconnect] Socket ready failed:', err);
+          setReconnectError("Impossible de connecter au serveur");
+          
+          // Retry with exponential backoff
+          const backoffDelay = Math.min(30000, Math.pow(2, attempt) * 1000);
           reconnectRetryRef.current = setTimeout(() => {
-            attemptReconnect(s, attempt + 1);
-          }, delay);
+            attemptReconnect(s, attempt + 1, useBackup);
+          }, backoffDelay);
         });
       return;
     }
 
+    logger.log('[attemptReconnect] Socket connected, attempting restore');
     tryRestore();
   }, [resetToEntry]);
 
@@ -1010,8 +1067,8 @@ export default function App() {
       if (stageRef.current === "entry") return;
       setIsReconnecting(false);
       setReconnectReason(null);
-      console.log('[Client] roles_reveal payload received:', payload);
-      console.log('[Client] Players with location:', payload.players?.filter(p => p.lat != null && p.lng != null).length, '/', payload.players?.length);
+      logger.log('[Client] roles_reveal payload received:', payload);
+      logger.log('[Client] Players with location:', payload.players?.filter(p => p.lat != null && p.lng != null).length, '/', payload.players?.length);
       setRolesReveal(payload);
       if (payload.partyChat) setPartyChatMessages(payload.partyChat);
       setHasSeenRole(false);
@@ -1164,9 +1221,9 @@ export default function App() {
           osc.start();
           outOfBoundsAudioRef.current = { audioCtx, osc, gain };
 
-          console.log('[player_out_of_bounds] Pulsing sound playing, AudioContext state:', audioCtx.state);
+          logger.log('[player_out_of_bounds] Pulsing sound playing, AudioContext state:', audioCtx.state);
         } catch (e) {
-          console.warn("AudioContext non disponible ou bloque", e);
+          logger.warn("AudioContext non disponible ou bloque", e);
         }
       } else {
         addNotification(`${data.nickname} est sorti de la zone!`, "warning", 4000);
@@ -1182,7 +1239,7 @@ export default function App() {
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
             osc.stop(audioCtx.currentTime + 0.3);
           } catch (e) {
-            console.warn("Error stopping audio", e);
+            logger.warn("Error stopping audio", e);
           }
           outOfBoundsAudioRef.current = null;
         }
@@ -1200,7 +1257,7 @@ export default function App() {
 
     s.on("play_noise", ({ durationSec, volume = "medium", by }) => {
       playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, durationSec, volume).catch((e) => {
-        console.warn("AudioContext non disponible pour bruit", e);
+        logger.warn("AudioContext non disponible pour bruit", e);
       });
 
       setActiveNoise({
@@ -1395,16 +1452,16 @@ export default function App() {
 
   useEffect(() => {
     if (!socket || !position) {
-      console.log('[Position emit] Skipped:', { hasSocket: !!socket, hasPosition: !!position });
+      logger.log('[Position emit] Skipped:', { hasSocket: !!socket, hasPosition: !!position });
       return;
     }
     const now = getServerTime();
     if (now - lastEmit.current < 800) {
-      console.log('[Position emit] Rate limited');
+      logger.log('[Position emit] Rate limited');
       return;
     }
     lastEmit.current = now;
-    console.log('[Position emit] Sending position:', { lat: position.lat, lng: position.lng });
+    logger.log('[Position emit] Sending position:', { lat: position.lat, lng: position.lng });
     socket.emit("position", { lat: position.lat, lng: position.lng });
   }, [socket, position]);
 
@@ -1418,7 +1475,7 @@ export default function App() {
       );
 
       if (playersWithoutLocation.length > 0) {
-        console.log('[Location check] Players without location:', playersWithoutLocation.map(p => p.nickname));
+        logger.log('[Location check] Players without location:', playersWithoutLocation.map(p => p.nickname));
         // Show notification to remind players to enable location
         addNotification(
           `${playersWithoutLocation.length} joueur(s) doivent activer leur localisation`,
@@ -1454,7 +1511,7 @@ export default function App() {
     };
 
   const unlockAudioAndVibration = useCallback(() => {
-    console.log('[unlockAudioAndVibration] Called');
+    logger.log('[unlockAudioAndVibration] Called');
     try {
       // Create or reuse shared AudioContext
       if (!sharedAudioContextRef.current) {
@@ -1475,13 +1532,13 @@ export default function App() {
       gain.gain.value = 0; // silent
       osc.start();
       osc.stop(audioCtx.currentTime + 0.1);
-      console.log('[unlockAudioAndVibration] Audio unlocked, state:', audioCtx.state);
+      logger.log('[unlockAudioAndVibration] Audio unlocked, state:', audioCtx.state);
     } catch(e) {
-      console.log('[unlockAudioAndVibration] Audio unlock failed:', e);
+      logger.log('[unlockAudioAndVibration] Audio unlock failed:', e);
     }
     if (navigator.vibrate) {
       try { navigator.vibrate(1); } catch(e) {}
-      console.log('[unlockAudioAndVibration] Vibration unlocked');
+      logger.log('[unlockAudioAndVibration] Vibration unlocked');
     }
   }, []);
 
@@ -1525,13 +1582,13 @@ export default function App() {
 
   const respondJoinRequest = useCallback(
     (requestId, accept) => {
-      console.log('[respondJoinRequest] Called with:', { requestId, accept });
+      logger.log('[respondJoinRequest] Called with:', { requestId, accept });
       if (!socket) {
-        console.log('[respondJoinRequest] No socket');
+        logger.log('[respondJoinRequest] No socket');
         return;
       }
       socket.emit("respond_join_request", { requestId, accept }, (res) => {
-        console.log('[respondJoinRequest] Response:', res);
+        logger.log('[respondJoinRequest] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Action impossible.");
         setJoinRequestQueue((q) => q.filter((x) => x.requestId !== requestId));
         setJoinRequestEffect(null);
@@ -1626,13 +1683,13 @@ export default function App() {
 
   const pushSettings = useCallback(
     (partial) => {
-      console.log('[pushSettings] Called with:', partial);
+      logger.log('[pushSettings] Called with:', partial);
       if (!socket) {
-        console.log('[pushSettings] No socket');
+        logger.log('[pushSettings] No socket');
         return;
       }
       socket.emit("update_settings", partial, (res) => {
-        console.log('[pushSettings] Response:', res);
+        logger.log('[pushSettings] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Mise a jour refusee.");
         else if (res.lobby) setLobby(res.lobby);
       });
@@ -1641,28 +1698,28 @@ export default function App() {
   );
 
   const onRevealRoles = useCallback(() => {
-    console.log('[onRevealRoles] Called');
+    logger.log('[onRevealRoles] Called');
     if (!socket) {
-      console.log('[onRevealRoles] No socket');
+      logger.log('[onRevealRoles] No socket');
       return;
     }
     socket.emit("start_roles", {}, (res) => {
-      console.log('[onRevealRoles] Response:', res);
+      logger.log('[onRevealRoles] Response:', res);
       // Error is prevented by button being disabled, so no need to show error banner
-      if (!res?.ok) console.error('[onRevealRoles] Error:', res?.error);
+      if (!res?.ok) logger.error('[onRevealRoles] Error:', res?.error);
     });
   }, [socket]);
 
   const adminAddTime = useCallback(
     (minutes) => {
-      console.log('[adminAddTime] Called with:', minutes);
+      logger.log('[adminAddTime] Called with:', minutes);
       if (!socket) {
-        console.log('[adminAddTime] No socket');
+        logger.log('[adminAddTime] No socket');
         return;
       }
       const m = Math.max(1, Math.floor(Number(minutes) || 0));
       socket.emit("admin_add_time", { minutes: m }, (res) => {
-        console.log('[adminAddTime] Response:', res);
+        logger.log('[adminAddTime] Response:', res);
         if (!res?.ok) setErrorBanner(res?.error || "Ajout de temps refusé.");
         else addNotification(`+${m} min ajoutées à la partie`, "success");
       });
@@ -1773,42 +1830,42 @@ export default function App() {
   }, [gameState?.roster, gameState?.allies, gameState?.catsExact, gameState?.preyForCat, gameState?.adminPreyPreview, gameState?.spectators, gameState?.me, rolesReveal?.players, role, isHost, sessionId]);
 
   const onBeginHunt = useCallback(() => {
-    console.log('[onBeginHunt] Called');
+    logger.log('[onBeginHunt] Called');
     if (!socket) {
-      console.log('[onBeginHunt] No socket');
+      logger.log('[onBeginHunt] No socket');
       return;
     }
     if (geoError) {
-      console.log('[onBeginHunt] Geolocation error:', geoError);
+      logger.log('[onBeginHunt] Geolocation error:', geoError);
       // Don't show notification - button should be disabled with message
       return;
     }
     if (!position) {
-      console.log('[onBeginHunt] No position available');
+      logger.log('[onBeginHunt] No position available');
       // Don't show notification - button should be disabled with message
       return;
     }
 
     socket.emit("begin_hunt", {}, (res) => {
-      console.log('[onBeginHunt] Response:', res);
+      logger.log('[onBeginHunt] Response:', res);
       // Error is prevented by button being disabled, so no need to show error banner
-      if (!res?.ok) console.error('[onBeginHunt] Error:', res?.error);
+      if (!res?.ok) logger.error('[onBeginHunt] Error:', res?.error);
     });
   }, [socket, geoError, position]);
 
   const onScanResult = useCallback(
     (text) => {
-      console.log('[onScanResult] Called with:', { text });
+      logger.log('[onScanResult] Called with:', { text });
       if (!socket || !text) {
-        console.log('[onScanResult] No socket or text');
+        logger.log('[onScanResult] No socket or text');
         return;
       }
       const id = String(text).trim();
       socket.emit("capture_scan", { targetSessionId: id }, (res) => {
-        console.log('[onScanResult] Response:', res);
+        logger.log('[onScanResult] Response:', res);
         if (!res?.ok) {
           // Only show error for legitimate failures, not for preventable ones
-          console.error('[onScanResult] Error:', res?.error);
+          logger.error('[onScanResult] Error:', res?.error);
         } else {
           setShowScan(false);
         }
@@ -1819,15 +1876,15 @@ export default function App() {
 
   const adminKick = useCallback(
     (targetSessionId) => {
-      console.log('[adminKick] Called with:', { targetSessionId });
+      logger.log('[adminKick] Called with:', { targetSessionId });
       if (!socket) {
-        console.log('[adminKick] No socket');
+        logger.log('[adminKick] No socket');
         return;
       }
       socket.emit("admin_kick", { targetSessionId }, (res) => {
-        console.log('[adminKick] Response:', res);
+        logger.log('[adminKick] Response:', res);
         if (!res?.ok) {
-          console.error('[adminKick] Error:', res?.error);
+          logger.error('[adminKick] Error:', res?.error);
         }
       });
     },
@@ -1836,15 +1893,15 @@ export default function App() {
 
   const adminSetRole = useCallback(
     (targetSessionId, r) => {
-      console.log('[adminSetRole] Called with:', { targetSessionId, role: r });
+      logger.log('[adminSetRole] Called with:', { targetSessionId, role: r });
       if (!socket) {
-        console.log('[adminSetRole] No socket');
+        logger.log('[adminSetRole] No socket');
         return;
       }
       socket.emit("admin_set_role", { targetSessionId, role: r }, (res) => {
-        console.log('[adminSetRole] Response:', res);
+        logger.log('[adminSetRole] Response:', res);
         if (!res?.ok) {
-          console.error('[adminSetRole] Error:', res?.error);
+          logger.error('[adminSetRole] Error:', res?.error);
         }
       });
     },
@@ -1852,15 +1909,15 @@ export default function App() {
   );
 
   const adminEndGame = useCallback(() => {
-    console.log('[adminEndGame] Called');
+    logger.log('[adminEndGame] Called');
     if (!socket) {
-      console.log('[adminEndGame] No socket');
+      logger.log('[adminEndGame] No socket');
       return;
     }
     socket.emit("admin_end_game", {}, (res) => {
-      console.log('[adminEndGame] Response:', res);
+      logger.log('[adminEndGame] Response:', res);
       if (!res?.ok) {
-        console.error('[adminEndGame] Error:', res?.error);
+        logger.error('[adminEndGame] Error:', res?.error);
       } else {
         setGameTab("map");
       }
@@ -1876,7 +1933,7 @@ export default function App() {
         localStorage.setItem(LS_LAST_ROOM_KEY, saved.roomCode);
         localStorage.setItem(LS_LAST_SESSION_KEY, saved.sessionId);
       } catch (e) {
-        console.warn("localStorage non disponible:", e);
+        logger.warn("localStorage non disponible:", e);
       }
     }
 
@@ -1905,7 +1962,7 @@ export default function App() {
       if (!socket) return;
       socket.emit("party_chat_send", msg, (res) => {
         if (!res?.ok) {
-          console.error('[partyChatSend] Error:', res?.error);
+          logger.error('[partyChatSend] Error:', res?.error);
         }
       });
     },
@@ -2027,17 +2084,17 @@ export default function App() {
             // Data not yet saved to Supabase, retry
             retryCount++;
             if (retryCount < maxRetries) {
-              console.log(`[recap] Game data not found, retrying (${retryCount}/${maxRetries})...`);
+              logger.log(`[recap] Game data not found, retrying (${retryCount}/${maxRetries})...`);
               setTimeout(fetchRecap, retryDelay);
             } else {
-              console.log('[recap] Max retries reached, showing error');
+              logger.log('[recap] Max retries reached, showing error');
               setRecapErr(true);
               setRecapLoading(false);
             }
           }
         }
       } catch (e) {
-        console.error('Failed to fetch recap from Supabase:', e);
+        logger.error('Failed to fetch recap from Supabase:', e);
         if (alive) {
           setRecapErr(true);
           setRecapLoading(false);
@@ -2244,7 +2301,7 @@ export default function App() {
                       localStorage.removeItem(LS_LAST_ROOM_KEY);
                       localStorage.removeItem(LS_LAST_SESSION_KEY);
                     } catch (e) {
-                      console.warn("localStorage non disponible:", e);
+                      logger.warn("localStorage non disponible:", e);
                     }
                     setRejoinCandidate(null);
                   }}
@@ -2759,13 +2816,13 @@ if (stage === "role_reveal" && rolesReveal) {
   const myRole = myPlayer?.role;
 
   const handleCardClick = () => {
-    console.log('[handleCardClick] Card clicked, isFlipped:', isFlipped);
+    logger.log('[handleCardClick] Card clicked, isFlipped:', isFlipped);
     setIsFlipped(prev => !prev);
     if (!hasSeenRole) {
       setHasSeenRole(true);
       socket?.emit("player_saw_role", {}, (res) => {
         if (!res?.ok) {
-          console.error("Failed to mark role as seen");
+          logger.error("Failed to mark role as seen");
         }
       });
     }
@@ -2857,7 +2914,7 @@ if (stage === "role_reveal" && rolesReveal) {
                 className="relative h-64 w-80 cursor-pointer"
                 style={{ perspective: '1000px' }}
                 onClick={() => {
-                  console.log('[Card] Clicked directly, current isFlipped:', isFlipped);
+                  logger.log('[Card] Clicked directly, current isFlipped:', isFlipped);
                   handleCardClick();
                 }}
               >
@@ -3179,7 +3236,7 @@ if (stage === "role_reveal" && rolesReveal) {
         until: me.fakePosition.until,
         onCancel: () => {
           socket?.emit("use_power", { kind: "fake_position_cancel" }, (res) => {
-            if (!res?.ok) console.error('[fake_position_cancel] Error:', res?.error);
+            if (!res?.ok) logger.error('[fake_position_cancel] Error:', res?.error);
           });
         },
       });
