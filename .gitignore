@@ -1,5 +1,5 @@
 .env
-.env.example
+.env.vercel
 .env.local
 .env.production.local
 node_modules/
