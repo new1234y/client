@@ -416,3 +416,115 @@ button, a, [role="button"] {
   cursor: pointer;
   touch-action: manipulation;
 }
+
+/* ═══════════════ IMMERSIVE LANDING PAGE ═══════════════ */
+.landing-dots {
+  background-image: radial-gradient(circle, rgba(59, 130, 246, 0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.landing-dots-muted {
+  background-image: radial-gradient(circle, rgba(100, 116, 139, 0.16) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.landing-dots-dark {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+  background-size: 25px 25px;
+}
+
+.dark .landing-dots {
+  background-image: radial-gradient(circle, rgba(96, 165, 250, 0.2) 1px, transparent 1px);
+}
+
+.dark .landing-dots-muted {
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+}
+
+.dot-map {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.13) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.75s ease, transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes landing-marker-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  60% { transform: scale(1.65); opacity: 0; }
+}
+
+@keyframes landing-zone-shrink {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(0.62); }
+}
+
+@keyframes landing-route-flow {
+  to { border-color: transparent; }
+}
+
+@keyframes landing-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes landing-scan {
+  0%, 100% { transform: translateY(-105px); opacity: 0.4; }
+  50% { transform: translateY(105px); opacity: 1; }
+}
+
+@keyframes landing-radar {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes landing-slide-in {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes landing-power-pop {
+  from { opacity: 0; transform: scale(0.8) rotate(-6deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes landing-podium-rise {
+  from { transform: scaleY(0); transform-origin: bottom; }
+  to { transform: scaleY(1); transform-origin: bottom; }
+}
+
+.landing-marker-pulse { animation: landing-marker-pulse 2.4s ease-out infinite; }
+.landing-zone { animation: landing-zone-shrink 7s ease-in-out infinite; }
+.landing-route { animation: landing-route-flow 1.2s ease-in-out infinite alternate; }
+.landing-float { animation: landing-float 3.2s ease-in-out infinite; }
+.landing-scan-line { animation: landing-scan 3s ease-in-out infinite; }
+.landing-radar { animation: landing-radar 14s linear infinite; }
+.landing-slide { animation: landing-slide-in 0.45s ease-out both; }
+.landing-power-symbol { animation: landing-power-pop 0.45s ease-out both; }
+.landing-podium { animation: landing-podium-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+html { scroll-behavior: smooth; }
+section[id] { scroll-margin-top: 64px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .landing-reveal { opacity: 1; transform: none; transition: none; }
+  .landing-marker-pulse,
+  .landing-zone,
+  .landing-route,
+  .landing-float,
+  .landing-scan-line,
+  .landing-radar,
+  .landing-slide,
+  .landing-power-symbol,
+  .landing-podium { animation: none !important; }
+}
