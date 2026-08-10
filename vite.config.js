@@ -11,9 +11,9 @@ export default defineConfig({
       manifest: {
         name: "Chase GPS",
         short_name: "Chase GPS",
-        description: "Jeu de poursuite géolocalisé",
-        theme_color: "#0f172a",
-        background_color: "#0f172a",
+        description: "Jeu de poursuite GPS grandeur nature en temps réel",
+        theme_color: "#ffffff",
+        background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
         icons: [
@@ -40,6 +40,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: true,
     proxy: {
       "/api": { target: "http://localhost:3001", changeOrigin: true },
       "/health": { target: "http://localhost:3001", changeOrigin: true },

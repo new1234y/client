@@ -35,6 +35,7 @@ import { ensureSocketReady } from "./lib/backend.js";
 import { resolvePlayerMapFocus } from "./lib/resolvePlayerMapFocus.js";
 import { playGhostNoiseSound } from "./lib/playGhostNoiseSound.js";
 import SettingsPage from "./components/SettingsPage.jsx";
+import HomePage from "./components/HomePage.jsx";
 import logger from "./lib/logger.js";
 
 const SOCKET_URL =
@@ -2189,6 +2190,108 @@ export default function App() {
 
   // Entry screen
   if (stage === "entry") {
+    return (
+      <>
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        {reconnectModal}
+        {rejoinCandidate && connected && !isReconnecting && !resumeCandidate && (
+          <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-slate-950">Partie précédente</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Rejoindre la salle <span className="font-mono font-bold text-blue-600">{rejoinCandidate.roomCode}</span> avec le pseudo <span className="font-semibold text-slate-950">{rejoinCandidate.nickname}</span> ?
+              </p>
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trimmedNickname = rejoinCandidate.nickname.trim();
+                    const trimmedRoomCode = rejoinCandidate.roomCode.trim();
+                    const existingSessionId = rejoinCandidate.sessionId;
+                    unlockAudioAndVibration();
+                    setErrorBanner(null);
+                    setNicknameError(null);
+                    setEntryBusyKind("join");
+                    socket.emit("join_room", { code: trimmedRoomCode, nickname: trimmedNickname, sessionId: existingSessionId }, (res) => {
+                      setEntryBusyKind(null);
+                      if (res?.ok) {
+                        saveSession(res.sessionId, res.code, trimmedNickname);
+                        if (window.history.replaceState) window.history.replaceState({}, "", window.location.pathname);
+                        setSessionId(res.sessionId);
+                        setIsHost(res.isHost);
+                        if (res.phase === "role_reveal" && res.rolesReveal) {
+                          setRolesReveal(res.rolesReveal);
+                          setHasSeenRole(false);
+                          setStage("role_reveal");
+                        } else if (res.phase === "playing" && res.gameState) {
+                          setGameState(res.gameState);
+                          setRole(res.gameState.me?.role ?? null);
+                          setStage("game");
+                        } else if (res.lobby) {
+                          setLobby(res.lobby);
+                          setStage("lobby");
+                        }
+                        setRejoinCandidate(null);
+                        return;
+                      }
+                      setErrorBanner(res?.error || "Impossible de rejoindre.");
+                      setRejoinCandidate(null);
+                    });
+                  }}
+                  className="w-full rounded-2xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700"
+                >
+                  Oui, rejoindre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem(LS_LAST_ROOM_KEY);
+                      localStorage.removeItem(LS_LAST_SESSION_KEY);
+                    } catch (e) {
+                      logger.warn("localStorage non disponible:", e);
+                    }
+                    setRejoinCandidate(null);
+                  }}
+                  className="w-full rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-600 hover:bg-slate-200"
+                >
+                  Non, ignorer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <HomePage
+          connected={connected}
+          nickname={nickname}
+          setNickname={setNickname}
+          nicknameError={nicknameError}
+          setNicknameError={setNicknameError}
+          roomCodeInput={roomCodeInput}
+          setRoomCodeInput={setRoomCodeInput}
+          entryBusyKind={entryBusyKind}
+          errorBanner={errorBanner}
+          onCreate={onCreate}
+          onJoin={onJoin}
+          onCancel={() => {
+            entryReqRef.current += 1;
+            setEntryBusyKind(null);
+          }}
+          onOpenSettings={() => navigate("/settings")}
+          midJoinWait={midJoinWait}
+          onCancelMidJoin={() => setMidJoinWait(null)}
+        />
+      </>
+    );
+  }
+
+  /* Legacy entry screen retained below for reference, but unreachable. */
+  if (false) {
     return (
       <div className="flex min-h-full flex-col bg-white p-4 pb-8 relative">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
