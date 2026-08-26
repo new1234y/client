@@ -7,6 +7,16 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials. Check VITE_SUPABASE_URL and VITE_SUPABASE_KEY in .env file');
 }
 
+// SECURITY: Validate Supabase URL format
+if (supabaseUrl && !supabaseUrl.startsWith('https://')) {
+  console.error('SECURITY: Supabase URL must use HTTPS in production');
+}
+
+// SECURITY: Use anon key for client-side (never use service role key in frontend)
+if (supabaseKey && supabaseKey.length > 200) {
+  console.warn('SECURITY: Possible service role key detected in frontend. Use anon key instead.');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function getGameByCode(code) {
