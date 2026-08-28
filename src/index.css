@@ -1,4 +1,5 @@
 @import "leaflet/dist/leaflet.css";
+@import "mapbox-gl/dist/mapbox-gl.css";
 
 @tailwind base;
 @tailwind components;
@@ -31,14 +32,16 @@ body,
   }
 }
 
-/* ═══════════════ GLOBAL WHITE BACKGROUND ═══════════════ */
+/* Default page chrome — no !important so dark mode can win */
 body {
-  background-color: #FFFFFF !important;
-  color: #1E293B !important;
+  background-color: #ffffff;
+  color: #1e293b;
 }
 
-html, body, #root {
-  background-color: #FFFFFF !important;
+html.dark body,
+html.dark #root {
+  background-color: #020617;
+  color: #f8fafc;
 }
 
 /* ═══════════════ VIBRANT COLOR PALETTE VARIABLES ═══════════════ */
@@ -269,7 +272,7 @@ input[type="range"]::-moz-range-thumb:active {
   position: fixed;
   pointer-events: none;
   height: 2px;
-  background: linear-gradient(to right, var(--vibrant-blue), var(--vibrant-gold), var(--vibrant-pink));
+  background: #2563EB;
   border-radius: 1px;
   opacity: 0;
   will-change: width, left, opacity;
@@ -335,7 +338,8 @@ input[type="range"]::-moz-range-thumb:active {
 
 /* ═══════════════ DARK MODE OVERRIDES ═══════════════ */
 .dark body, .dark #root {
-  background-color: #0f172a !important;
+  background-color: #020617;
+  color: #f8fafc;
 }
 
 /* ═══════════════ CIRCULAR LOBBY ANIMATIONS ═══════════════ */
@@ -527,4 +531,151 @@ section[id] { scroll-margin-top: 64px; }
   .landing-slide,
   .landing-power-symbol,
   .landing-podium { animation: none !important; }
+}
+
+/* Mapbox GL — full-size, compact attribution */
+.mapboxgl-map,
+.map-full-screen .mapboxgl-canvas-container,
+.map-full-screen .mapboxgl-canvas {
+  height: 100%;
+  width: 100%;
+}
+.mapboxgl-ctrl-attrib {
+  font-size: 10px;
+  line-height: 1.2;
+}
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-left {
+  margin: 2px;
+}
+html.dark .mapboxgl-ctrl-attrib {
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+}
+html.dark .mapboxgl-ctrl-attrib a {
+  color: #93c5fd;
+}
+.chase-mbx-pin { pointer-events: auto; }
+
+/* Contraste élevé (Paramètres) */
+html.high-contrast body {
+  font-weight: 600;
+}
+html.high-contrast.dark body,
+html.high-contrast.dark #root {
+  background-color: #000000;
+  color: #ffffff;
+}
+html.high-contrast button,
+html.high-contrast input,
+html.high-contrast select {
+  border-width: 2px;
+}
+
+
+/* Sheets: slide-up + fade overlay */
+.sheet-overlay {
+  animation: sheet-fade-in 240ms ease;
+}
+.sheet-panel {
+  animation: slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes sheet-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.seg-thumb {
+  transition: left 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-pane {
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease;
+  will-change: transform, opacity;
+}
+.tab-pane-active {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 2;
+}
+.tab-pane-left {
+  transform: translateX(-18%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.tab-pane-right {
+  transform: translateX(18%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.stage-enter {
+  animation: stage-slide 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes stage-slide {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.chase-balise-pulse {
+  animation: balise-signal 1.6s ease-out infinite;
+}
+@keyframes balise-signal {
+  0% { transform: scale(0.7); opacity: 0.7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+html.accent-amber {
+  --vibrant-blue: #f59e0b;
+  --vibrant-blue-dark: #d97706;
+}
+html.accent-slate {
+  --vibrant-blue: #475569;
+  --vibrant-blue-dark: #334155;
+}
+html.accent-amber .bg-blue-600 { background-color: #f59e0b !important; }
+html.accent-amber .hover\:bg-blue-700:hover { background-color: #d97706 !important; }
+html.accent-amber .text-blue-600 { color: #d97706 !important; }
+html.accent-slate .bg-blue-600 { background-color: #475569 !important; }
+html.accent-slate .hover\:bg-blue-700:hover { background-color: #334155 !important; }
+html.accent-slate .text-blue-600 { color: #334155 !important; }
+
+html.reduce-motion .sheet-overlay,
+html.reduce-motion .sheet-panel,
+html.reduce-motion .seg-thumb,
+html.reduce-motion .tab-pane,
+html.reduce-motion .stage-enter,
+html.reduce-motion .chase-balise-pulse,
+html.reduce-motion .animate-slide-up,
+html.reduce-motion .self-player-ring {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-overlay,
+  .sheet-panel,
+  .seg-thumb,
+  .tab-pane,
+  .stage-enter,
+  .chase-balise-pulse,
+  .animate-slide-up {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+#qr-reader__dashboard_section,
+#qr-reader__header_message,
+#qr-reader__status_span,
+#qr-reader__dashboard_section_csr,
+#qr-reader__dashboard_section_swaplink {
+  display: none !important;
 }

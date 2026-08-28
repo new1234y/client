@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatDurationMs, formatCoins } from '../../lib/format';
+import { getServerTime } from "../../lib/serverTime.js";
 
-function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
+function AnimatedGameNotification({ effect, uiNow, onGhostCancel, visible = true }) {
   // Gestion de l'état de l'animation : 'hidden' | 'entering' | 'exiting'
   // Track per-item animation states so each notification can exit independently
   const [items, setItems] = useState([]); // { key, effect, anim: 'entering'|'exiting' }
@@ -95,7 +96,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
 
     setItems(next);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectKey, uiNow]);
+  }, [effectKey]);
 
   // Helper function to determine notification duration based on type
   const getNotificationDuration = (ef) => {
@@ -165,7 +166,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
     if (hasDurationEffect) {
       const fakePosEffect = effects.find(e => e.kind === 'fake_position');
       if (fakePosEffect && fakePosEffect.until) {
-        return Math.max(0, fakePosEffect.until - Date.now());
+        return Math.max(0, fakePosEffect.until - getServerTime());
       }
     }
 
@@ -204,12 +205,12 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">
-              {currentEffect.volume === "high" ? "🔊" : currentEffect.volume === "low" ? "🔈" : "🔉"}
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/></svg>
             </span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Bruit fantôme</p>
-              <p className="text-xs font-semibold text-blue-700">
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Bruit fantôme</p>
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {currentEffect.by} fait vibrer ({volumeLabel})
               </p>
             </div>
@@ -242,11 +243,11 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">👻</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="10" r="4"/><path d="M8 14c-2 2-3 4-3 6h14c0-2-1-4-3-6"/></svg></span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Mode ghost actif</p>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Mode ghost actif</p>
               {!isSelf && targetNames && (
-                <p className="text-xs font-semibold text-blue-700">
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                   {targetNames} invisible(s)
                 </p>
               )}
@@ -264,7 +265,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
               <button
                 type="button"
                 onClick={onGhostCancel}
-                className="pointer-events-auto px-3 py-1 text-xs font-semibold text-blue-600 bg-white rounded-full border border-blue-300 hover:bg-blue-50"
+                className="pointer-events-auto rounded-full border border-blue-300 bg-white px-3 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:bg-slate-800 dark:text-blue-300 dark:hover:bg-slate-700"
               >
                 Visible
               </button>
@@ -285,10 +286,10 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🧊</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2v20M4.9 6.5 19 17.5M4.9 17.5 19 6.5"/></svg></span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Immobilisé</p>
-              <p className="text-xs font-semibold text-blue-700">Carte gelée</p>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Immobilisé</p>
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Carte gelée</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-2">
@@ -323,40 +324,20 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📡</span>
-            <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Cercle de brouillage</p>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0"/></svg></span>
+            <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Cercle de brouillage</p>
           </div>
           <div className="flex flex-col gap-2 mt-3">
-            {showTransition && (
-              <div className="text-xs font-semibold text-blue-700 mb-1 text-center">
-                {labelToText(prevLabel)} → {labelToText(jamLevel)}
-              </div>
-            )}
             <div className="flex items-center gap-2">
-              <div 
-                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isSmall ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
-                style={{
-                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
-                }}
-              />
-              <div 
-                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isNormal ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
-                style={{
-                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
-                }}
-              />
-              <div 
-                className={`h-2 flex-1 rounded-full transition-all duration-700 ease-in-out ${isLarge ? 'bg-green-500 shadow-lg shadow-green-500/50 scale-110' : 'bg-gray-200 scale-100'}`}
-                style={{
-                  transition: 'background-color 700ms ease-in-out, transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 700ms ease-in-out'
-                }}
-              />
+              <div className={`h-2 flex-1 rounded-full ${isSmall ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"}`} />
+              <div className={`h-2 flex-1 rounded-full ${isNormal ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"}`} />
+              <div className={`h-2 flex-1 rounded-full ${isLarge ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"}`} />
             </div>
             {/* Progress UI intentionally hidden — transient notification still exists and will be removed after 2s by App */}
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isSmall ? 'text-red-500' : 'text-gray-400'}`}>Petit</span>
-              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isNormal ? 'text-yellow-500' : 'text-gray-400'}`}>Moyen</span>
-              <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-700 ${isLarge ? 'text-green-500' : 'text-gray-400'}`}>Grand</span>
+              <span className={`text-xs font-semibold flex-1 text-center ${isSmall ? 'text-blue-600' : 'text-slate-400'}`}>Petit</span>
+              <span className={`text-xs font-semibold flex-1 text-center ${isNormal ? 'text-blue-600' : 'text-slate-400'}`}>Moyen</span>
+              <span className={`text-xs font-semibold flex-1 text-center ${isLarge ? 'text-blue-600' : 'text-slate-400'}`}>Grand</span>
             </div>
           </div>
         </>
@@ -367,7 +348,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🎯</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></span>
             <p className="text-sm font-semibold text-blue-900">
               Touchez la carte pour placer le leurre
             </p>
@@ -390,10 +371,10 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🎯</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Capture de balise</p>
-              <p className="text-xs font-semibold text-blue-700">
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Capture de balise</p>
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {isMyCapture ? "Vous capturez" : `${currentEffect.nickname} capture`} la balise
               </p>
             </div>
@@ -427,14 +408,14 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
 
     if (currentEffect.kind === "fake_position") {
       const until = currentEffect.until || 0;
-      const remainingMs = Math.max(0, until - Date.now());
+      const remainingMs = Math.max(0, until - getServerTime());
   const remainingMsSafe2 = Math.max(0, remainingMs);
   const remainingSec = Math.max(0, Math.ceil(remainingMsSafe2 / 1000));
 
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🎭</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><path d="M8 10h.01M16 10h.01M8 15c1.2 1.3 2.7 2 4 2s2.8-.7 4-2"/></svg></span>
             <div>
               <p className="text-sm font-bold uppercase tracking-wider text-purple-900">Leurre de position</p>
               <p className="text-xs font-semibold text-purple-700">
@@ -460,10 +441,10 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
       return (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">👤</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="3"/><path d="M5 20c.6-4 2.5-6 7-6s6.4 2 7 6"/></svg></span>
             <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-blue-900">Demande de rejoindre</p>
-              <p className="text-xs font-semibold text-blue-700">
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Demande de rejoindre</p>
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {currentEffect.nickname} veut rejoindre la partie
               </p>
             </div>
@@ -552,8 +533,15 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
           }
         }
       `}</style>
-      <div className="fixed inset-0 z-40 pointer-events-none flex items-start justify-center pt-16 gap-3">
-        {items.map((it, index) => {
+      <div className={`fixed inset-0 z-40 pointer-events-none flex items-start justify-center pt-[max(4rem,calc(env(safe-area-inset-top)+3.5rem))] gap-3 ${visible ? "" : "hidden"}`}>
+        {(() => {
+          const enteringItems = items.filter((it) => it.anim !== "exiting");
+          const exitingItems = items.filter((it) => it.anim === "exiting");
+          const queued = enteringItems.slice(2);
+          const shown = [...enteringItems.slice(0, 2), ...exitingItems.slice(0, 2)];
+          void queued;
+          return shown;
+        })().map((it) => {
           const e = it.effect;
           const content = getContent(e);
           if (!content) return null;
@@ -568,9 +556,9 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                   : 'slideOut 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
                 animationIterationCount: '1'
               }}
-              onAnimationEnd={() => {
+              onAnimationEnd={(ev) => {
+                if (ev.target !== ev.currentTarget) return;
                 if (!entering) {
-                  // remove item after exit animation
                   setItems(prev => prev.filter(x => x.key !== it.key));
                 }
               }}
@@ -583,7 +571,7 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel }) {
                 }}
               />
 
-              <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-4 border border-blue-200 overflow-hidden pointer-events-auto">
+              <div className="relative overflow-hidden rounded-2xl border border-blue-200 bg-white/95 p-4 text-slate-950 shadow-2xl pointer-events-auto backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95 dark:text-white">
                 {content}
               </div>
             </div>

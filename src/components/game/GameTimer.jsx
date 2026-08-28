@@ -1,23 +1,8 @@
-import { useEffect, useState } from "react";
+import { remainingSeconds, useServerNow } from "../../hooks/useServerNow.js";
 
 export default function GameTimer({ endsAt, className = "" }) {
-  const [timeLeft, setTimeLeft] = useState(null);
-
-  useEffect(() => {
-    if (!endsAt) {
-      setTimeLeft(null);
-      return;
-    }
-
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
-      setTimeLeft(remaining);
-    };
-
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [endsAt]);
+  const now = useServerNow();
+  const timeLeft = remainingSeconds(endsAt, now);
 
   if (timeLeft == null) return null;
 

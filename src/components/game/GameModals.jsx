@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
 import { formatDurationMs } from "../../lib/format";
 import Button from "../ui/Button.jsx";
+import { remainingMs, remainingSeconds, useServerNow } from "../../hooks/useServerNow.js";
 
 export function RoleModal({ role, onClose }) {
   const roleInfo = {
     cat: {
-      icon: "🐱",
+      icon: "chat",
       title: "Chat",
       description: "Vous êtes le Chat ! Attrapez tous les joueurs avant la fin de la partie.",
       abilities: [
@@ -15,9 +15,9 @@ export function RoleModal({ role, onClose }) {
       ]
     },
     player: {
-      icon: "🏃",
-      title: "Joueur",
-      description: "Vous êtes un Joueur ! Survivez jusqu'à la fin de la partie en évitant le Chat.",
+      icon: "souris",
+      title: "Souris",
+      description: "Vous êtes une Souris ! Survivez jusqu'à la fin de la partie en évitant le Chat.",
       abilities: [
         "Bouger pour éviter d'être attrapé",
         "Utiliser des pouvoirs de défense (invisibilité, etc.)",
@@ -25,7 +25,7 @@ export function RoleModal({ role, onClose }) {
       ]
     },
     spectator: {
-      icon: "👁️",
+      icon: "spec",
       title: "Spectateur",
       description: "Vous êtes un Spectateur ! Observez la partie sans y participer.",
       abilities: [
@@ -39,7 +39,7 @@ export function RoleModal({ role, onClose }) {
 
   return (
     <div
-className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
+className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -61,7 +61,7 @@ className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-
       }}
     >
       <div
-className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
+className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -69,8 +69,18 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{info.icon}</span>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{info.title}</h2>
+            <span className={`flex h-11 w-11 items-center justify-center rounded-full text-white ${info.icon === "chat" ? "bg-blue-600" : info.icon === "souris" ? "bg-amber-500" : "bg-slate-500"}`}>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {info.icon === "chat" ? (
+                  <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></>
+                ) : info.icon === "souris" ? (
+                  <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>
+                ) : (
+                  <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></>
+                )}
+              </svg>
+            </span>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white">{info.title}</h2>
           </div>
           <button
             type="button"
@@ -116,20 +126,15 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
 }
 
 export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius, nextRadius, gameStartedAt, timeLimitEndsAt, shrinkZoneEnabled, timeLimitEnabled, onClose }) {
-  const [phases, setPhases] = useState([]);
-  const [gameTimeLeft, setGameTimeLeft] = useState(null);
-
-  useEffect(() => {
-    if (!gameStartedAt || !timeLimitEndsAt || !totalPhases || !shrinkZoneEnabled) {
-      setPhases([]);
-      return;
-    }
+  const now = useServerNow();
+  const phases = (() => {
+    if (!gameStartedAt || !timeLimitEndsAt || !totalPhases || !shrinkZoneEnabled) return [];
     const total = timeLimitEndsAt - gameStartedAt;
     const phaseDuration = total / totalPhases;
-    const phaseData = Array.from({ length: totalPhases }).map((_, i) => {
+    return Array.from({ length: totalPhases }).map((_, i) => {
       const startTs = gameStartedAt + i * phaseDuration;
       const endTs = startTs + phaseDuration;
-      const remaining = Math.max(0, Math.ceil((startTs - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((startTs - now) / 1000));
       return {
         index: i + 1,
         startTs,
@@ -141,19 +146,10 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
         isPast: i < currentPhase - 1
       };
     });
-    setPhases(phaseData);
-  }, [gameStartedAt, timeLimitEndsAt, totalPhases, currentPhase, shrinkZoneEnabled]);
-
-  useEffect(() => {
-    if (!timeLimitEndsAt || !timeLimitEnabled || shrinkZoneEnabled) {
-      setGameTimeLeft(null);
-      return;
-    }
-    const tick = () => setGameTimeLeft(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [timeLimitEndsAt, timeLimitEnabled, shrinkZoneEnabled]);
+  })();
+  const gameTimeLeft = (!timeLimitEndsAt || !timeLimitEnabled || shrinkZoneEnabled)
+    ? null
+    : remainingSeconds(timeLimitEndsAt, now);
 
   const fmt = (s) => {
     if (s == null) return "--:--";
@@ -163,7 +159,7 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
   const calculateProgress = () => {
     if (!shrinkZoneEnabled && timeLimitEnabled && timeLimitEndsAt && gameStartedAt) {
       const total = timeLimitEndsAt - gameStartedAt;
-      const elapsed = Date.now() - gameStartedAt;
+      const elapsed = now - gameStartedAt;
       return Math.min(1, Math.max(0, elapsed / total));
     }
     if (shrinkZoneEnabled && totalPhases && currentPhase) {
@@ -174,7 +170,7 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
 
   return (
     <div
-className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
+className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -196,7 +192,7 @@ className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-
       }}
     >
       <div
-className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
+className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -239,10 +235,10 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
                   key={phase.index}
                   className={`flex items-center gap-3 rounded-lg p-3 ${
                     phase.isCurrent
-                      ? "bg-blue-100 border-2 border-blue-600"
+                      ? "border-2 border-blue-600 bg-blue-100 dark:bg-blue-950/40"
                       : phase.isPast
-                        ? "bg-slate-100 opacity-60"
-                        : "bg-slate-50"
+                        ? "bg-slate-100 opacity-60 dark:bg-slate-800"
+                        : "bg-slate-50 dark:bg-slate-800/60"
                   }`}
                 >
                   <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -250,7 +246,7 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
                       ? "bg-blue-600 text-white"
                       : phase.isPast
                         ? "bg-slate-400 text-white"
-                        : "bg-slate-200 text-slate-600"
+                        : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200"
                   }`}>
                     {phase.index}
                   </div>
@@ -272,7 +268,7 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
               <div className="text-5xl font-black tabular-nums text-blue-600 mb-2">
                 {fmt(gameTimeLeft)}
               </div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Temps restant</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Temps restant</p>
             </div>
 
             <div className="bg-slate-100 rounded-xl p-4 dark:bg-slate-800">
@@ -280,7 +276,7 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Progression</span>
                 <span className="text-sm font-bold text-blue-600">{Math.round(calculateProgress() * 100)}%</span>
               </div>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div
                   className="h-full rounded-full bg-blue-600 transition-all duration-300"
                   style={{ width: `${calculateProgress() * 100}%` }}
@@ -305,7 +301,10 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
           </>
         ) : (
           <div className="text-center py-8">
-            <div className="text-4xl mb-4">♾️</div>
+            <span className="relative mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600">
+              <span className="absolute inset-2 rounded-full border border-white/70" />
+              <span className="h-2 w-2 rounded-full bg-white" />
+            </span>
             <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">Partie sans limite</p>
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Cette partie n'a pas de limite de temps ni de rétrécissement de zone.
@@ -329,30 +328,9 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
 }
 
 export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameType, onClose, gameMode = null, nextBaliseAt = null, jamLevel = null }) {
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [nextBaliseTimeLeft, setNextBaliseTimeLeft] = useState(null);
-
-  useEffect(() => {
-    if (!timeLimitEndsAt) {
-      setTimeLeft(null);
-      return;
-    }
-    const tick = () => setTimeLeft(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [timeLimitEndsAt]);
-
-  useEffect(() => {
-    if (!nextBaliseAt) {
-      setNextBaliseTimeLeft(null);
-      return;
-    }
-    const tick = () => setNextBaliseTimeLeft(Math.max(0, nextBaliseAt - Date.now()));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [nextBaliseAt]);
+  const now = useServerNow();
+  const timeLeft = remainingSeconds(timeLimitEndsAt, now);
+  const nextBaliseTimeLeft = remainingMs(nextBaliseAt, now);
 
   const fmt = (s) => {
     if (s == null) return "--:--";
@@ -394,7 +372,7 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
 
   return (
     <div
-className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-2 pt-2 backdrop-blur-sm touch-none"
+className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -416,7 +394,7 @@ className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/75 p-
       }}
     >
       <div
-className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 mt-1"
+className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -446,7 +424,7 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
             <div className="text-5xl font-black tabular-nums text-blue-600 mb-2">
               {fmt(timeLeft)}
             </div>
-            <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Temps restant</p>
+            <p className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Temps restant</p>
           </div>
 
           <div className="bg-slate-100 rounded-xl p-4 dark:bg-slate-800">
@@ -454,7 +432,7 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Progression</span>
               <span className="text-sm font-bold text-blue-600">{Math.round(totalProgress * 100)}%</span>
             </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
               <div
                 className="h-full rounded-full bg-blue-600 transition-all duration-300"
                 style={{ width: `${totalProgress * 100}%` }}
@@ -481,42 +459,20 @@ className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate
           {jamConfig && (
             <div className="bg-slate-100 rounded-xl p-4 dark:bg-slate-800">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">📡</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0 1 14 0"/></svg></span>
                 <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Cercle de brouillage</p>
               </div>
               <div className="flex flex-col gap-2">
                 {/* Progress bars with visual effects */}
                 <div className="flex items-center gap-2">
-                  <div 
-                    className={`h-2 flex-1 rounded-full ${jamLevel === 'small' ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
-                    style={{
-                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
-                    }}
-                  />
-                  <div 
-                    className={`h-2 flex-1 rounded-full ${jamLevel === 'medium' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
-                    style={{
-                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
-                    }}
-                  />
-                  <div 
-                    className={`h-2 flex-1 rounded-full ${jamLevel === 'large' ? 'bg-green-500 shadow-lg shadow-green-500/50 scale-110' : 'bg-slate-200 scale-100'}`}
-                    style={{
-                      transition: 'background-color 300ms ease-in-out, transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease-in-out'
-                    }}
-                  />
+                  <div className={`h-2 flex-1 rounded-full ${jamLevel === 'small' ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                  <div className={`h-2 flex-1 rounded-full ${jamLevel === 'normal' || jamLevel === 'medium' ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                  <div className={`h-2 flex-1 rounded-full ${jamLevel === 'large' ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
                 </div>
-                {/* Labels */}
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'small' ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`}>Petit</span>
-                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'medium' ? 'text-yellow-500' : 'text-slate-400 dark:text-slate-500'}`}>Moyen</span>
-                  <span className={`text-xs font-semibold flex-1 text-center transition-colors duration-300 ${jamLevel === 'large' ? 'text-green-500' : 'text-slate-400 dark:text-slate-500'}`}>Grand</span>
-                </div>
-                {/* Current level indicator */}
-                <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    Actuel : <span className={`font-bold ${jamLevel === 'small' ? 'text-red-600' : jamLevel === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>{jamConfig.label}</span>
-                  </p>
+                  <span className={`text-xs font-semibold flex-1 text-center ${jamLevel === 'small' ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500'}`}>Petit</span>
+                  <span className={`text-xs font-semibold flex-1 text-center ${jamLevel === 'normal' || jamLevel === 'medium' ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500'}`}>Moyen</span>
+                  <span className={`text-xs font-semibold flex-1 text-center ${jamLevel === 'large' ? 'text-blue-600' : 'text-slate-400 dark:text-slate-500'}`}>Grand</span>
                 </div>
               </div>
             </div>

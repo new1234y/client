@@ -9,7 +9,7 @@ export default function PartyDiscussionChrome({
   onSend,
   position,
   disabled,
-  hideFab = false,
+  hideFab = true,
   fabBottomClass = "bottom-24",
   fabAlignClass = "right-3",
   onFocusLocation,

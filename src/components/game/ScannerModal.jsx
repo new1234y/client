@@ -1,11 +1,41 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { haptic } from "../../lib/haptic.js";
+
+async function boostScreen() {
+  const restore = [];
+  try {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      await el.requestFullscreen().catch(() => {});
+      restore.push(async () => {
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      });
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    if ("wakeLock" in navigator) {
+      const lock = await navigator.wakeLock.request("screen");
+      restore.push(async () => { try { await lock.release(); } catch {} });
+    }
+  } catch {
+    // ignore
+  }
+  return async () => {
+    for (const fn of restore.reverse()) {
+      try { await fn(); } catch {}
+    }
+  };
+}
 
 export default function ScannerModal({ onScan, onClose }) {
   const [err, setErr] = useState(null);
   const scanned = useRef(false);
   const scannerRef = useRef(null);
   const onScanRef = useRef(onScan);
+  const restoreRef = useRef(async () => {});
   onScanRef.current = onScan;
 
   const stopCamera = useCallback(() => {
@@ -17,33 +47,40 @@ export default function ScannerModal({ onScan, onClose }) {
 
   const handleClose = useCallback(() => {
     stopCamera();
+    restoreRef.current?.();
     onClose();
   }, [stopCamera, onClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    boostScreen().then((restore) => {
+      if (!cancelled) restoreRef.current = restore;
+      else restore();
+    });
+    return () => {
+      cancelled = true;
+      restoreRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     const html5QrCode = new Html5Qrcode("qr-reader");
     scannerRef.current = html5QrCode;
 
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const config = { fps: 12, qrbox: { width: 260, height: 260 } };
 
     html5QrCode.start(
       { facingMode: "environment" },
       config,
       (decodedText) => {
         if (!scanned.current) {
-          console.log('[ScannerModal] QR code scanned SUCCESSFULLY:', decodedText);
           scanned.current = true;
-          if (navigator.vibrate) {
-            navigator.vibrate(100);
-          }
+          haptic(15);
           onScanRef.current?.(decodedText);
         }
       },
-      (errorMessage) => {
-        // Silently ignore scan errors
-      }
-    ).catch((err) => {
-      console.error('[ScannerModal] Camera start failed:', err);
+      () => {}
+    ).catch(() => {
       setErr("Impossible d'accéder à la caméra");
     });
 
@@ -54,60 +91,45 @@ export default function ScannerModal({ onScan, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex flex-col bg-black"
+      className="sheet-overlay fixed inset-0 z-[2000] flex flex-col bg-black"
       role="dialog"
       aria-modal="true"
-      aria-label="Scanner QR Code"
-      onClick={handleClose}
+      aria-label="Scanner le QR"
     >
-      <div id="qr-reader" style={{ width: '100%', height: '100%' }}></div>
-      
-      {/* Close Button */}
-      <button
-        type="button"
-        onClick={handleClose}
-        className="absolute top-2 right-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60 ring-2 ring-white/20"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
+      <div id="qr-reader" className="absolute inset-0 h-full w-full [&>div]:h-full [&>div]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover" />
 
-      {/* QR Code Scanning Area - Transparent */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative w-64 h-64">
-          <div className="absolute inset-0 border-2 border-vibrant-blue/40 rounded-lg"></div>
-          {/* Corner markers - Vibrant Blue */}
-          <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-vibrant-blue rounded-tl-lg"></div>
-          <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-vibrant-blue rounded-tr-lg"></div>
-          <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-vibrant-blue rounded-bl-lg"></div>
-          <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-vibrant-blue rounded-br-lg"></div>
-          {/* Scanning line animation */}
-          <div className="absolute inset-0 overflow-hidden rounded-lg">
-            <div className="w-full h-1 bg-vibrant-blue/60 animate-[scan_2s_ease-in-out_infinite]" style={{ animation: 'scan 2s ease-in-out infinite' }}></div>
-          </div>
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-black/55" />
+        <div className="absolute left-1/2 top-1/2 h-[min(72vw,280px)] w-[min(72vw,280px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-2 ring-white/80" />
+        <div className="absolute left-1/2 top-1/2 h-[min(72vw,280px)] w-[min(72vw,280px)] -translate-x-1/2 -translate-y-1/2">
+          <span className="absolute left-0 top-0 h-10 w-10 rounded-tl-3xl border-l-4 border-t-4 border-blue-400" />
+          <span className="absolute right-0 top-0 h-10 w-10 rounded-tr-3xl border-r-4 border-t-4 border-blue-400" />
+          <span className="absolute bottom-0 left-0 h-10 w-10 rounded-bl-3xl border-b-4 border-l-4 border-blue-400" />
+          <span className="absolute bottom-0 right-0 h-10 w-10 rounded-br-3xl border-b-4 border-r-4 border-blue-400" />
         </div>
       </div>
-      <style>{`
-        @keyframes scan {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(248px); }
-        }
-      `}</style>
+
+      <p className="absolute left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-10 -translate-x-1/2 rounded-full bg-black/45 px-4 py-2 text-xs font-black uppercase tracking-widest text-white backdrop-blur-sm">
+        Scanner le QR
+      </p>
 
       {err && (
-        <div className="absolute top-16 left-2 right-2 z-20">
-          <p className="rounded-2xl bg-red-950/90 p-3 text-sm text-red-200 backdrop-blur-sm">{err}</p>
+        <div className="absolute top-20 left-3 right-3 z-20">
+          <p className="rounded-2xl bg-red-950/90 p-3 text-sm text-red-200">{err}</p>
         </div>
       )}
 
-      {/* Scanning Instruction */}
-      <div className="absolute bottom-4 left-0 right-0 z-10 text-center">
-        <p className="text-white/80 text-sm font-medium backdrop-blur-sm bg-black/30 inline-block px-4 py-2 rounded-full">
-          Centrez le QR code dans le cadre
-        </p>
-      </div>
+      <p className="absolute bottom-28 left-0 right-0 z-10 text-center text-sm font-semibold text-white/90">
+        Cadrez le QR : la capture est validée.
+      </p>
+
+      <button
+        type="button"
+        onClick={handleClose}
+        className="absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-10 min-h-12 w-[min(92%,20rem)] -translate-x-1/2 rounded-full bg-white px-6 text-base font-black text-slate-950"
+      >
+        Fermer
+      </button>
     </div>
   );
 }

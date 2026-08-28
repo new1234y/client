@@ -6,7 +6,7 @@ export default function CoinsBadge({ coins, coinHistory = [], className = "", on
     <button
       type="button"
       onClick={() => onOpen?.()}
-      className={`pointer-events-auto flex items-center gap-3 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-lg ring-1 ring-slate-200 hover:scale-105 transition-transform ${className}`}
+      className={`pointer-events-auto flex items-center gap-3 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 shadow-lg ring-1 ring-slate-200 transition-transform hover:scale-105 dark:bg-slate-900 dark:text-white dark:ring-slate-700 ${className}`}
     >
       <div className="flex items-center justify-center h-8 w-8 rounded-full bg-transparent">
         <svg className="h-8 w-8 drop-shadow-sm" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -29,7 +29,7 @@ export default function CoinsBadge({ coins, coinHistory = [], className = "", on
 export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm touch-none"
+      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -51,7 +51,7 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+        className="sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -59,10 +59,10 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">🪙</span>
+            <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5"/><path d="M12 7v10M9 9l3-2 3 2M9 15l3 2 3-2" stroke="#B45309" strokeWidth="1.5" strokeLinecap="round"/></svg>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Historique des pièces</h2>
-              <p className="text-sm text-slate-500">Total : {formatCoins(coins)} pièces</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Total : {formatCoins(coins)} pièces</p>
             </div>
           </div>
           <button
@@ -100,12 +100,6 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
               </div>
             ))
           )}
-        </div>
-
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg dark:bg-blue-900/20">
-          <p className="text-xs text-blue-700 dark:text-blue-300">
-            💡 Gagnez des pièces en capturant des joueurs, en survivant aux réductions de zone, et en participant activement à la partie.
-          </p>
         </div>
 
         <button

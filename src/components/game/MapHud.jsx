@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { remainingSeconds, useServerNow } from "../../hooks/useServerNow.js";
 import { formatDurationMs } from "../../lib/format";
-import GameTimer from "./GameTimer.jsx";
 import GameStatusModal from "./GameStatusModal.jsx";
 import AnimatedGameNotification from "./AnimatedGameNotification.jsx";
 
@@ -17,7 +17,7 @@ function JamPill({ jamLevel }) {
             className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold border ${
               active
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-slate-500 border-slate-300"
+                : "border-slate-300 bg-white text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
             }`}
           >
             {JAM_LABELS[lvl]}
@@ -40,21 +40,10 @@ function ZonePhaseRow({
   gameStartedAt,
   timeLimitEndsAt,
 }) {
-  const [timeLeft, setTimeLeft] = useState(null);
-
-  useEffect(() => {
-    const timerTarget =
-      phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
-    if (!timerTarget) {
-      setTimeLeft(null);
-      return;
-    }
-    const tick = () =>
-      setTimeLeft(Math.max(0, Math.ceil((timerTarget - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [phaseEndsAt, shrinkStartsAt, phaseState]);
+  const now = useServerNow();
+  const timerTarget =
+    phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
+  const timeLeft = remainingSeconds(timerTarget, now);
 
   if (!shrinkZoneEnabled || currentRadius == null) return null;
 
@@ -96,7 +85,7 @@ function ZonePhaseRow({
         {perPhaseStarts && (
           <div className="flex gap-2 mt-1">
             {perPhaseStarts.map((startTs, i) => {
-                      const remaining = Math.max(0, Math.ceil((startTs - Date.now()) / 1000));
+                      const remaining = Math.max(0, Math.ceil((startTs - now) / 1000));
                       const label = remaining <= 0 ? "--:--" : formatDurationMs(remaining * 1000);
               return (
                 <div key={i} className="text-[10px] text-slate-500 tabular-nums">
@@ -108,9 +97,9 @@ function ZonePhaseRow({
         )}
       </div>
 
-      <div className="h-3 w-px bg-slate-300" />
+      <div className="h-3 w-px bg-slate-300 dark:bg-slate-600" />
 
-      <span className="text-[11px] font-semibold text-slate-700">
+      <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
         {Math.round(currentRadius)}m
         {nextRadius && nextRadius !== currentRadius && (
           <span className="text-orange-500"> → {Math.round(nextRadius)}m</span>
@@ -119,8 +108,8 @@ function ZonePhaseRow({
 
       {phaseState && (
         <>
-          <div className="h-3 w-px bg-slate-300" />
-          <span className="text-[10px] font-medium text-slate-500">
+          <div className="h-3 w-px bg-slate-300 dark:bg-slate-600" />
+          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
             {phaseState === "waiting" && "Attente"}
             {phaseState === "shrinking" && "Rétrécissement"}
             {phaseState === "stopped" && "Arrêté"}
@@ -130,7 +119,7 @@ function ZonePhaseRow({
 
       {timeLeft != null && timeLeft > 0 && phaseState !== "stopped" && (
         <>
-          <div className="h-3 w-px bg-slate-300" />
+          <div className="h-3 w-px bg-slate-300 dark:bg-slate-600" />
           <span className="font-mono text-[11px] font-bold text-blue-600">
             {minutes}:{String(seconds).padStart(2, "0")}
           </span>
@@ -157,8 +146,8 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
       <div className="mt-2 overflow-hidden rounded-xl bg-blue-600 px-3 py-2 text-white animate-[slideDown_0.25s_ease-out]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg shrink-0">
-              {effect.volume === "high" ? "🔊" : effect.volume === "low" ? "🔈" : "🔉"}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/></svg>
             </span>
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wider">Bruit fantôme</p>
@@ -193,7 +182,7 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-100">
-              👻 Mode ghost actif
+              Mode ghost actif
             </p>
             <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-blue-400">
               <div
@@ -225,7 +214,7 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
     return (
       <div className="mt-2 overflow-hidden rounded-xl bg-blue-600 px-3 py-2 text-white animate-[slideDown_0.25s_ease-out]">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🧊</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2v20M4.9 6.5 19 17.5M4.9 17.5 19 6.5"/></svg></span>
           <div className="flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider">Immobilisé</p>
             <p className="text-[11px]">Carte gelée — {formatDurationMs(remainingSec * 1000)} restantes</p>
@@ -250,7 +239,7 @@ function PowerExtension({ effect, uiNow, onGhostCancel }) {
     return (
       <div className="mt-2 overflow-hidden rounded-xl bg-blue-600 px-3 py-2 text-white animate-[slideDown_0.25s_ease-out]">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🎯</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></span>
           <p className="text-[11px] font-semibold">
             Touchez la carte pour placer le leurre
           </p>
@@ -294,56 +283,20 @@ export default function MapHud({
   coins = 0,
   onCoinsModalOpen = null,
   onPlayerModalOpen = null,
+  notificationsVisible = true,
 }) {
-  const [baliseLeft, setBaliseLeft] = useState(null);
-  const [totalProgress, setTotalProgress] = useState(0);
-  const [zoneTimeLeft, setZoneTimeLeft] = useState(null);
+  const now = useServerNow();
   const baliseTarget = baliseExpiresAt || nextBaliseAt;
+  const baliseLeft = remainingSeconds(baliseTarget, now);
+  const zoneTimerTarget =
+    phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
+  const zoneTimeLeft = remainingSeconds(zoneTimerTarget, now);
+  const totalProgress = (gameStartedAt && timeLimitEndsAt)
+    ? Math.min(1, Math.max(0, (now - gameStartedAt) / (timeLimitEndsAt - gameStartedAt)))
+    : 0;
   const roleColor = role === "cat" ? "text-[#FB7185]" : "text-[#60A5FA]";
-  const roleLabel = role === "cat" ? "Chat" : role === "player" ? "Joueur" : "—";
-  const roleIcon = role === "cat" ? "🐱" : role === "player" ? "🏃" : "👁️";
-
-  useEffect(() => {
-    if (!baliseTarget) {
-      setBaliseLeft(null);
-      return;
-    }
-    const tick = () =>
-      setBaliseLeft(Math.max(0, Math.ceil((baliseTarget - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [baliseTarget]);
-
-  useEffect(() => {
-    if (!gameStartedAt || !timeLimitEndsAt) {
-      setTotalProgress(0);
-      return;
-    }
-    const tick = () => {
-      const total = timeLimitEndsAt - gameStartedAt;
-      const elapsed = Date.now() - gameStartedAt;
-      setTotalProgress(Math.min(1, Math.max(0, elapsed / total)));
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [gameStartedAt, timeLimitEndsAt]);
-
-  useEffect(() => {
-    // Show time remaining for current phase state
-    const timerTarget =
-      phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
-    if (!timerTarget) {
-      setZoneTimeLeft(null);
-      return;
-    }
-    const tick = () =>
-      setZoneTimeLeft(Math.max(0, Math.ceil((timerTarget - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [phaseEndsAt, shrinkStartsAt, phaseState]);
+  const roleLabel = role === "cat" ? "Chat" : role === "player" ? "Souris" : "—";
+  const roleIcon = role === "cat" ? "chat" : role === "player" ? "souris" : "spec";
 
   const fmt = (s) => {
     if (s == null) return "--:--";
@@ -360,9 +313,11 @@ export default function MapHud({
   const inner = (
     <>
       <GameStatusModal
-        timeRemaining={gameStartedAt && timeLimitEndsAt ? fmt(Math.max(0, Math.ceil((timeLimitEndsAt - Date.now()) / 1000))) : '--:--'}
+        timeRemaining={gameStartedAt && timeLimitEndsAt ? fmt(Math.max(0, Math.ceil((timeLimitEndsAt - now) / 1000))) : '--:--'}
         zoneTimeRemaining={shrinkZoneEnabled ? fmt(zoneTimeLeft) : null}
         zoneState={shrinkZoneEnabled ? phaseState : null}
+        currentPhase={currentPhase}
+        totalPhases={totalPhases}
         progress={Math.round(totalProgress * 100)}
         coins={coins}
         playerType={role}
@@ -374,11 +329,11 @@ export default function MapHud({
         onPlayerClick={() => onPlayerModalOpen?.()}
       />
 
-      <AnimatedGameNotification 
-        key={Array.isArray(powerEffect) ? powerEffect.map(e => e.kind).join('-') : (powerEffect ? powerEffect.kind : 'none')}
-        effect={powerEffect} 
-        uiNow={powerUiNow} 
-        onGhostCancel={onGhostCancel} 
+      <AnimatedGameNotification
+        effect={powerEffect}
+        uiNow={powerUiNow}
+        onGhostCancel={onGhostCancel}
+        visible={notificationsVisible}
       />
     </>
   );
@@ -388,17 +343,11 @@ export default function MapHud({
 }
 
 function CatLockBadge({ mapUnlockAt, socket }) {
-  const [left, setLeft] = useState(0);
+  const now = useServerNow();
+  const left = remainingSeconds(mapUnlockAt, now) || 0;
   useEffect(() => {
-    const tick = () => {
-      const r = Math.max(0, Math.ceil((mapUnlockAt - Date.now()) / 1000));
-      setLeft(r);
-      if (r === 0) socket?.emit("refresh_state");
-    };
-    tick();
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [mapUnlockAt, socket]);
+    if (left === 0) socket?.emit("refresh_state");
+  }, [left, socket]);
   if (left <= 0) return null;
   return (
     <span className="rounded-full bg-[#FB7185]/20 px-2 py-0.5 text-[10px] font-bold text-[#FB7185]">

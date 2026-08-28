@@ -5,8 +5,8 @@ function roleBadgeText(p) {
   if (p.spectator) return "Spectateur";
   if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
   if (p.role === "cat") return "Chat";
-  if (p.role === "player" && p.originalRole === "cat") return "Joueur (ex-chat)";
-  return "Joueur";
+  if (p.role === "player" && p.originalRole === "cat") return "Souris (ex-chat)";
+  return "Souris";
 }
 
 export default function PlayerSheet({
@@ -46,13 +46,13 @@ export default function PlayerSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[2500] flex items-end justify-center bg-black/60"
+      className="sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg animate-slide-up rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900"
+        className="sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-center py-3">
@@ -61,8 +61,12 @@ export default function PlayerSheet({
 
         <div className="px-5 pb-4">
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-2xl dark:bg-slate-800">
-              {player.role === "cat" ? "🐱" : "🏃"}
+            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white ${player.role === "cat" ? "bg-blue-600" : "bg-amber-500"}`}>
+              {player.role === "cat" ? (
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>
+              ) : (
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+              )}
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -71,7 +75,7 @@ export default function PlayerSheet({
               <p className={`text-sm font-medium ${roleColor}`}>{roleBadgeText(player)}</p>
               {player.coins !== undefined && (
                 <div className="mt-1 flex items-center gap-1.5">
-                  <span className="text-yellow-500">🪙</span>
+                  <svg className="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
                   <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
                     {formatCoins(player.coins)}
                   </span>
@@ -87,7 +91,7 @@ export default function PlayerSheet({
                   {isDisconnected ? "Déconnecté" : "En ligne"}
                 </p>
                 {player.invisible && (
-                  <span className="text-xs text-violet-500">· Ghost 👻</span>
+                  <span className="text-xs text-violet-500">· Ghost</span>
                 )}
               </div>
             </div>
@@ -140,7 +144,7 @@ export default function PlayerSheet({
                   onClick={() => onPowerShortcut({ type: 'noise', target: player.sessionId, defaultSettings: true })}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-orange-600 hover:to-amber-600 active:scale-[0.98]"
                 >
-                  <span className="text-lg">🔊</span>
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
                   Faire sonner
                 </button>
                 <button
@@ -163,7 +167,7 @@ export default function PlayerSheet({
                   onClick={() => onPowerShortcut({ type: 'invis', target: player.sessionId, defaultSettings: true })}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-violet-600 hover:to-purple-600 active:scale-[0.98]"
                 >
-                  <span className="text-lg">👻</span>
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="10" r="4"/><path d="M8 14c-2 2-3 4-3 6h14c0-2-1-4-3-6"/></svg>
                   Rendre invisible
                 </button>
                 <button
@@ -186,7 +190,7 @@ export default function PlayerSheet({
                   onClick={() => onPowerShortcut({ type: 'freeze', target: player.sessionId, defaultSettings: true })}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-cyan-600 hover:to-blue-600 active:scale-[0.98]"
                 >
-                  <span className="text-lg">🧊</span>
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2v20M4.9 6.5 19 17.5M4.9 17.5 19 6.5"/></svg>
                   Immobiliser
                 </button>
                 <button

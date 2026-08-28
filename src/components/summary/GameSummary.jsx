@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import SliderWithParticles from "../ui/SliderWithParticles.jsx";
 import {
@@ -18,7 +19,8 @@ import {
   useMap,
 } from "react-leaflet";
 import "../../lib/map/leafletFix.js";
-import { BASEMAPS } from "../../lib/map/basemaps.js";
+import { BASEMAPS, resolveBasemap } from "../../lib/map/basemaps.js";
+import { getOsmApiKey } from "../../lib/map/osmKey.js";
 import {
   iconCat,
   iconAlly,
@@ -175,32 +177,20 @@ function PodiumPillar({ place, player, accent }) {
       </div>
     );
   }
-  const crown = place === 1;
   const podiumHeight = place === 1 ? "h-32 sm:h-48 md:h-64 lg:h-80" : place === 2 ? "h-24 sm:h-36 md:h-52 lg:h-64" : "h-20 sm:h-32 md:h-44 lg:h-56";
-  const gradientColor =
+  const barColor =
     place === 1
-      ? "bg-gradient-to-b from-amber-400 via-yellow-500 to-amber-600"
+      ? "bg-blue-600"
       : place === 2
-      ? "bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500"
-      : "bg-gradient-to-b from-orange-300 via-orange-400 to-orange-500";
-  const shadowColor =
-    place === 1
-      ? "shadow-amber-500/40"
-      : place === 2
-      ? "shadow-slate-500/40"
-      : "shadow-orange-500/40";
+      ? "bg-slate-300 dark:bg-slate-500"
+      : "bg-amber-500";
 
   return (
     <div className="flex flex-1 flex-col items-center justify-end gap-2 sm:gap-3 md:gap-5 text-center min-w-0">
       <div className="space-y-1 sm:space-y-1 md:space-y-2 w-full">
-        {crown && (
-          <div className="flex justify-center">
-            <span className="text-xl sm:text-3xl md:text-4xl drop-shadow-lg animate-bounce">👑</span>
-          </div>
-        )}
         <div className="relative">
-          <div className={`absolute inset-0 rounded-full blur-xl opacity-50 ${gradientColor}`}></div>
-          <div className={`relative w-12 h-12 sm:w-16 md:w-20 sm:h-16 md:h-20 rounded-full flex items-center justify-center text-lg sm:text-2xl md:text-3xl font-black text-white ${gradientColor} shadow-lg ${shadowColor} mx-auto`}>
+          <div className={`absolute inset-0 rounded-full blur-xl opacity-50 ${barColor}`}></div>
+          <div className={`relative w-12 h-12 sm:w-16 md:w-20 sm:h-16 md:h-20 rounded-full flex items-center justify-center text-lg sm:text-2xl md:text-3xl font-black text-white ${barColor} shadow-lg mx-auto`}>
             {player.nickname?.charAt(0)?.toUpperCase() || '?'}
           </div>
         </div>
@@ -212,7 +202,7 @@ function PodiumPillar({ place, player, accent }) {
             {player.catTimeLabel}
           </p>
           <span className="flex items-center gap-1 sm:gap-1 text-[10px] sm:text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 sm:px-2 py-1 rounded-full">
-            <span className="text-[10px] sm:text-xs">🪙</span>
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5"/></svg>
             {formatCoins(player.coins)}
           </span>
         </div>
@@ -221,9 +211,9 @@ function PodiumPillar({ place, player, accent }) {
         </p>
       </div>
       <div
-        className={`w-full rounded-xl sm:rounded-2xl md:rounded-3xl ${podiumHeight} ${gradientColor} shadow-2xl ${shadowColor} relative overflow-hidden`}
+        className={`relative w-full overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl ${podiumHeight} ${barColor}`}
       >
-        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+        
         <div className="relative flex h-full items-end justify-center">
           <div className="w-full rounded-t-xl sm:rounded-t-2xl md:rounded-t-3xl bg-white/95 py-2 sm:py-2 md:py-3 text-[10px] sm:text-xs md:text-sm font-black text-slate-800 dark:bg-white/90">
             {player.badgeLabel}
@@ -401,7 +391,7 @@ function SummaryPodiumView({
             <div className="flex flex-col justify-center gap-1 sm:gap-2 md:gap-3 h-full">
               <div className="relative rounded-2xl sm:rounded-[40px] bg-white/80 p-1.5 sm:p-2 md:p-3 shadow-[0_20px_40px_rgba(15,23,42,0.08)] sm:shadow-[0_40px_60px_rgba(15,23,42,0.08)] dark:bg-slate-900/80">
                 <p className="text-center text-[9px] sm:text-xs font-semibold uppercase tracking-[0.3em] sm:tracking-[0.5em] text-[#2563EB]">
-                  WIN!
+                  Classement final
                 </p>
                 <h2 className="mt-0.5 sm:mt-1 text-center text-xs sm:text-lg md:text-xl font-black text-slate-900 dark:text-white">
                   Classement des meilleurs survivants
@@ -674,8 +664,9 @@ const SPEED_CYCLE = [1, 2, 4];
 const SPEED_MULTIPLIERS = { 1: 6, 2: 12, 4: 24 };
 
 export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
-  const { theme, toggleTheme } = useTheme();
-  const [basemapId, setBasemapId] = useState("dark");
+  const { theme } = useTheme();
+  const navigate = useNavigate();
+  const [basemapId, setBasemapId] = useState(() => (theme === "dark" ? "dark" : "light"));
   const [offsetMs, setOffsetMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(0);
@@ -734,7 +725,8 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       .finally(() => setShareBusy(false));
   }, [summary, readOnlyRecap]);
 
-  const bm = BASEMAPS[basemapId] || BASEMAPS.dark;
+  const osmKey = getOsmApiKey();
+  const bm = resolveBasemap(basemapId, osmKey);
   const t0 = summary?.huntStartedAt ?? 0;
   const t1 = summary?.endedAt ?? t0;
   const duration = Math.max(1, t1 - t0);
@@ -933,8 +925,8 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               <button type="button" onClick={() => setShowPanel((v) => !v)} className="rounded-full bg-[#BFDBFE] px-3 py-1 text-[10px] font-bold text-blue-900">{showPanel ? "Masquer" : "Détails"}</button>
               <button type="button" onClick={() => setShareOpen(true)} disabled={!publicRecapUrl && !shareBusy} className="rounded-full bg-[#2563EB] px-3 py-1 text-[10px] font-bold text-white disabled:opacity-50">Partager</button>
               <button type="button" onClick={downloadStats} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">JSON</button>
-              <button type="button" onClick={onLeave} className="rounded-full bg-rose-100 px-3 py-1 text-[10px] font-bold text-rose-700">Quitter</button>
-              <button type="button" onClick={toggleTheme} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold dark:bg-slate-700">{theme === "dark" ? "☀" : "🌙"}</button>
+              <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">Quitter</button>
+              <button type="button" onClick={() => navigate("/settings")} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700" title="Paramètres" aria-label="Paramètres"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
             </div>
           </div>
         </div>
@@ -948,7 +940,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             scrollWheelZoom
             attributionControl
           >
-            <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
+            <TileLayer key={`${basemapId}-${osmKey ? "keyed" : "osm"}`} attribution={bm.attribution} url={bm.url} />
             <RecapFitBounds paths={summary.paths} center={summary.gameCenter} />
             {showZone && zoneCenter && zoneR > 0 && (
                 <Circle
@@ -1060,7 +1052,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                     <span>Dist. {formatDistance(st.distanceMeters)}</span>
                     <span>Vmax {formatSpeedKmh(st.maxSpeedKmh)}</span>
                     <span>Chat {formatDurationMs(st.catTimeMs ?? p.totalCatTimeMs)}</span>
-                            <span>🪙 {formatCoins(st.coins ?? p.coins ?? 0)}</span>
+                            <span className="inline-flex items-center gap-1"><svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#F59E0B" stroke="#D97706" strokeWidth="1.5"/></svg>{formatCoins(st.coins ?? p.coins ?? 0)}</span>
                   </span>
                 </label>
               );})}

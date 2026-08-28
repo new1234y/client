@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Circle, Popup } from "react-leaflet";
 import "../leafletFix.js";
-import { BASEMAPS } from "../mapBasemaps.js";
+import { BASEMAPS, resolveBasemap } from "../mapBasemaps.js";
+import { getOsmApiKey } from "../lib/map/osmKey.js";
 
 function formatTime(t) {
   return new Date(t).toLocaleTimeString("fr-FR", {
@@ -30,7 +31,8 @@ function timelineLabel(ev) {
 
 export default function GameSummary({ summary, onLeave }) {
   const [basemapId, setBasemapId] = useState("dark");
-  const bm = BASEMAPS[basemapId] || BASEMAPS.dark;
+  const osmKey = getOsmApiKey();
+  const bm = resolveBasemap(basemapId, osmKey);
 
   const center = useMemo(() => {
     const gc = summary?.gameCenter;
@@ -110,7 +112,7 @@ export default function GameSummary({ summary, onLeave }) {
           scrollWheelZoom
           attributionControl
         >
-          <TileLayer key={basemapId} attribution={bm.attribution} url={bm.url} />
+          <TileLayer key={`${basemapId}-${osmKey ? "keyed" : "osm"}`} attribution={bm.attribution} url={bm.url} />
           {summary.gameCenter && summary.globalRadiusM != null && (
             <Circle
               center={[summary.gameCenter.lat, summary.gameCenter.lng]}

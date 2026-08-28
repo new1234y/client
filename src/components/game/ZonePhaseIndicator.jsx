@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { formatDurationMs } from "../../lib/format";
+import { remainingSeconds, useServerNow } from "../../hooks/useServerNow.js";
 
 export default function ZonePhaseIndicator({ 
   currentRadius, 
@@ -8,24 +8,9 @@ export default function ZonePhaseIndicator({
   shrinkStartsAt,
   phaseState,
 }) {
-  const [timeLeft, setTimeLeft] = useState(null);
-
-  useEffect(() => {
-    const timerTarget = phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
-    if (!timerTarget) {
-      setTimeLeft(null);
-      return;
-    }
-
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((timerTarget - Date.now()) / 1000));
-      setTimeLeft(remaining);
-    };
-
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [phaseEndsAt, shrinkStartsAt, phaseState]);
+  const now = useServerNow();
+  const timerTarget = phaseState === "waiting" && shrinkStartsAt ? shrinkStartsAt : phaseEndsAt;
+  const timeLeft = remainingSeconds(timerTarget, now);
 
   if (!currentRadius) return null;
 
@@ -40,7 +25,7 @@ export default function ZonePhaseIndicator({
   const dash = (percent / 100) * c;
 
   return (
-    <div className="pointer-events-auto flex items-center gap-4 rounded-2xl bg-white border border-slate-300 px-5 py-3 shadow-md">
+    <div className="pointer-events-auto flex items-center gap-4 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-slate-950 shadow-md dark:border-slate-700 dark:bg-slate-900 dark:text-white">
       {/* Left: clock with blue ring + time */}
       <div className="flex items-center gap-4">
         <div className="relative flex items-center justify-center h-12 w-12">
@@ -56,12 +41,12 @@ export default function ZonePhaseIndicator({
         </div>
 
         <div className="flex flex-col leading-tight">
-          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">{formatDurationMs((timeLeft || 0) * 1000)}</div>
+          <div className="text-2xl font-extrabold tabular-nums text-slate-950 dark:text-white">{formatDurationMs((timeLeft || 0) * 1000)}</div>
           <div className="text-sm font-semibold text-blue-600">Zone rétréci</div>
         </div>
       </div>
 
-      <div className="h-12 w-px bg-slate-200" />
+      <div className="h-12 w-px bg-slate-200 dark:bg-slate-700" />
 
       {/* Right: circular percent + label */}
       <div className="flex items-center gap-3">
@@ -79,9 +64,9 @@ export default function ZonePhaseIndicator({
               strokeDasharray={`${dash} ${c - dash}`}
             />
           </svg>
-          <div className="absolute text-sm text-slate-900 font-semibold">{percent}%</div>
+          <div className="absolute text-sm font-semibold text-slate-950 dark:text-white">{percent}%</div>
         </div>
-        <div className="text-xs text-slate-500 uppercase">ZONE</div>
+        <div className="text-xs uppercase text-slate-500 dark:text-slate-400">ZONE</div>
       </div>
     </div>
   );

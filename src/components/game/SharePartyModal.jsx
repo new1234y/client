@@ -26,42 +26,42 @@ export default function SharePartyModal({ code, title, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/75 p-2 backdrop-blur-sm sm:items-center"
+      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-5"
       role="dialog"
       aria-modal="true"
       aria-label="Partager la partie"
       onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-3xl bg-white/90 backdrop-blur-xl p-4 shadow-2xl ring-1 ring-white/50 dark:bg-slate-900/90 dark:ring-slate-700" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-center text-xl font-bold text-slate-900">
+      <div className="sheet-panel w-full max-w-md rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-center text-xl font-bold text-slate-950 dark:text-white">
           Scanner le QR code
         </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
+        <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-300">
           Montrez ce code pour inviter des joueurs à rejoindre votre partie.
         </p>
 
         <div className="mt-6 flex justify-center">
-          <div className="rounded-3xl bg-white p-6 ring-2 ring-blue-500/20 shadow-lg">
+          <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200">
             <QRCodeSVG value={joinUrl} size={200} level="M" />
           </div>
         </div>
 
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex-1 border-t border-slate-200"></div>
-          <span className="text-xs font-semibold text-slate-600">
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
             ou entrez le code manuellement
           </span>
-          <div className="flex-1 border-t border-slate-200"></div>
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1 rounded-3xl border-2 border-slate-200 bg-slate-50 px-4 py-4">
-            <p className="font-mono text-3xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+          <div className="flex-1 rounded-3xl border-2 border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800">
+            <p className="break-all font-mono text-3xl font-black tracking-[0.18em] text-blue-600">
               {code}
             </p>
           </div>
           <Button
-            variant="primaryGradient"
+            variant="primary"
             onClick={handleShare}
             className="h-14 w-14 flex-shrink-0"
             aria-label="Partager"

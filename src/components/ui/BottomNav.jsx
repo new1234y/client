@@ -13,20 +13,21 @@ export default function BottomNav({
   onQuit,
 }) {
   const tabCls = (active, disabled) =>
-    `flex flex-1 flex-col items-center justify-center gap-1 rounded-full px-4 py-2 text-[11px] font-semibold transition ${
+    `flex min-h-11 min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-3 py-2 text-[11px] font-bold transition ${
       disabled
         ? "opacity-30"
         : active
-        ? "bg-gradient-to-r from-vibrant-blue to-vibrant-blue-dark text-white shadow-lg"
-          : "text-slate-600 hover:bg-slate-100"
+        ? "bg-blue-600 text-white"
+          : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
     }`;
 
-  const iconCls = "h-6 w-6";
+  const iconCls = "h-5 w-5";
+  const centerLabel = centerAction === "scan" ? "Scan" : centerAction === "qr" ? "QR" : "";
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-1 md:hidden">
-      <nav className="relative rounded-[40px] bg-white p-2 shadow-lg ring-1 ring-slate-200 backdrop-blur-xl">
-        <div className="flex items-center gap-1">
+    <div className="fixed bottom-0 left-0 right-0 z-[900] flex justify-center pb-[max(4px,env(safe-area-inset-bottom))] md:hidden">
+      <nav className="relative mx-2 w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/95">
+        <div className="flex items-end gap-0.5">
           <button
             type="button"
             disabled={!canShowMap}
@@ -36,7 +37,7 @@ export default function BottomNav({
             className={tabCls(activeTab === "map", !canShowMap)}
             aria-current={activeTab === "map" ? "page" : undefined}
           >
-            <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+            <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -54,7 +55,7 @@ export default function BottomNav({
             className={tabCls(activeTab === "social", false)}
             aria-current={activeTab === "social" ? "page" : undefined}
           >
-            <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+            <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -64,15 +65,15 @@ export default function BottomNav({
             Social
           </button>
 
-          <div className="relative -mt-6 flex h-[60px] w-[60px] shrink-0 items-center justify-center">
+          <div className="relative -mt-5 flex min-w-[64px] shrink-0 flex-col items-center justify-center pb-0.5">
             <button
               type="button"
               onClick={onCenterAction}
               disabled={!centerAction}
-              className={`flex h-[52px] w-[52px] items-center justify-center rounded-full text-white shadow-lg transition active:scale-[0.96] ${
+              className={`flex h-12 w-12 items-center justify-center rounded-full text-white transition active:scale-[0.96] ${
                 centerAction
-                  ? "bg-gradient-to-br from-vibrant-pink to-vibrant-orange"
-                  : "bg-slate-200"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500"
               }`}
               aria-label={
                 centerAction === "scan"
@@ -83,33 +84,21 @@ export default function BottomNav({
               }
             >
               {centerAction === "scan" ? (
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"
-                  />
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4m8 0h4v4M4 16v4h4m8 0h4v-4M7 12h10" />
                 </svg>
               ) : (
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h3v3h-3v-3z"
-                  />
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 16.5h3v3h-3v-3z" />
                 </svg>
               )}
             </button>
+            {centerLabel && (
+              <span className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                {centerLabel}
+              </span>
+            )}
           </div>
 
           {showPowers && (
@@ -122,7 +111,7 @@ export default function BottomNav({
               className={tabCls(activeTab === "powers" && !chatOpen, disablePowers)}
               aria-current={activeTab === "powers" ? "page" : undefined}
             >
-              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -139,11 +128,11 @@ export default function BottomNav({
               onClick={onMore}
               className={tabCls(activeTab === "admin" && !chatOpen, false)}
             >
-              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
                 />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -157,7 +146,7 @@ export default function BottomNav({
               onClick={onQuit}
               className={tabCls(false, false)}
             >
-              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24">
+              <svg className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -172,4 +161,3 @@ export default function BottomNav({
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 import React, { useRef, useCallback } from "react";
 
-export default function DiscreteSlider({ options, value, onChange, color = "indigo" }) {
+export default function DiscreteSlider({ options, value, onChange, color = "blue" }) {
   const containerRef = useRef(null);
   
   const selectedIndex = options.findIndex((o) => o.value === value) !== -1 
@@ -24,7 +24,7 @@ export default function DiscreteSlider({ options, value, onChange, color = "indi
 
     const colors = color === "amber" 
       ? ['#F59E0B', '#FBBF24', '#FCD34D'] 
-      : ['#6366F1', '#818CF8', '#A5B4FC'];
+      : ['#2563EB', '#3B82F6', '#93C5FD'];
 
     for (let i = 0; i < 8; i++) {
       const particle = document.createElement('div');
@@ -53,8 +53,8 @@ export default function DiscreteSlider({ options, value, onChange, color = "indi
 
   const percentage = options.length > 1 ? (selectedIndex / (options.length - 1)) * 100 : 0;
 
-  const colorCls = color === "amber" ? "bg-amber-500" : "bg-indigo-500";
-  const ringCls = color === "amber" ? "ring-amber-500/30" : "ring-indigo-500/30";
+  const colorCls = color === "amber" ? "bg-amber-500" : "bg-blue-600";
+  const ringCls = color === "amber" ? "ring-amber-500/30" : "ring-blue-600/30";
 
   return (
     <div className="relative w-full py-4 px-2" ref={containerRef}>

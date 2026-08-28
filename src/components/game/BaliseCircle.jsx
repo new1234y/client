@@ -5,7 +5,7 @@ import L from "leaflet";
 function baliseIcon(sizePx, color) {
   return L.divIcon({
     className: "balise-marker-icon",
-    html: `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:14px;background:linear-gradient(145deg,${color},#4c1d95);border:3px solid white;box-shadow:0 0 0 4px rgba(168,85,247,.25),0 8px 24px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:white;font:900 ${Math.max(14, sizePx * 0.42)}px/1 system-ui">⌖</div>`,
+    html: `<div style="width:${sizePx}px;height:${Math.round(sizePx*1.25)}px;display:flex;align-items:flex-end;justify-content:center"><svg width="${sizePx}" height="${Math.round(sizePx*1.25)}" viewBox="0 0 24 36"><rect x="9" y="10" width="6" height="18" rx="1.2" fill="${color}"/><polygon points="12,2 17,10 7,10" fill="${color}"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><rect x="6" y="28" width="12" height="4" rx="1" fill="${color}"/></svg></div>`,
     iconSize: [sizePx, sizePx],
     iconAnchor: [sizePx / 2, sizePx / 2],
   });

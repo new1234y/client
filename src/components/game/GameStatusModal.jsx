@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { formatCoins } from '../../lib/format';
 
+function zonePhaseLabel(zoneState, currentPhase, totalPhases) {
+  if (!zoneState) return null;
+  const phases = Math.max(1, totalPhases || 1);
+  const phase = Math.max(1, currentPhase || 1);
+  if (zoneState === "waiting") return "attente";
+  if (zoneState === "shrinking") return "réduction";
+  if (zoneState === "stopped" && phase >= phases) return "finale";
+  if (phase >= phases) return "finale";
+  return `phase ${phase}`;
+}
+
 export default function GameStatusModal({
   timeRemaining = '2:45',
   zoneTimeRemaining = null,
@@ -10,10 +21,13 @@ export default function GameStatusModal({
   playerType = 'player',
   shrinkZoneEnabled = true,
   timeLimitEnabled = false,
+  currentPhase = null,
+  totalPhases = null,
   onCoinsClick = null,
   onTimerClick = null,
   onProgressClick = null,
   onPlayerClick = null,
+  onSettingsClick = null,
   className = ''
 }) {
   const [displayProgress, setDisplayProgress] = useState(0);
@@ -24,9 +38,9 @@ export default function GameStatusModal({
   }, [progress]);
 
   return (
-    <div className={`fixed top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center w-full max-w-2xl px-2 ${className}`}>
+    <div className={`fixed top-[max(0.5rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex items-center justify-center w-full max-w-2xl px-2 ${className}`}>
 
-      <div className="absolute left-4 right-4 h-16 bg-white/95 backdrop-blur-xl rounded-[40px] shadow-lg ring-1 ring-slate-200" />
+      <div className="absolute left-4 right-4 h-16 bg-white/95 backdrop-blur-xl rounded-[40px] ring-1 ring-slate-200 dark:bg-slate-950/90 dark:ring-slate-700" />
 
       <div className="relative z-10 w-full flex items-center justify-between">
         {!shrinkZoneEnabled && !timeLimitEnabled ? (
@@ -34,7 +48,7 @@ export default function GameStatusModal({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onPlayerClick?.(); }}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
+              className={`flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-white ring-1 ring-slate-200 transition-transform hover:scale-105 dark:bg-slate-800 dark:ring-slate-700 ${playerType === "player" ? "text-amber-500" : "text-blue-600"}`}
             >
               {playerType === 'player' ? (
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,7 +67,7 @@ export default function GameStatusModal({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onPlayerClick?.(); }}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm text-amber-500 flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
+              className={`flex h-11 w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-white ring-1 ring-slate-200 transition-transform hover:scale-105 dark:bg-slate-800 dark:ring-slate-700 ${playerType === "player" ? "text-amber-500" : "text-blue-600"}`}
             >
               {playerType === 'player' ? (
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -83,7 +97,7 @@ export default function GameStatusModal({
                   </linearGradient>
                 </defs>
               </svg>
-              <span className="text-lg font-bold text-[#446b9e] tabular-nums">{formatCoins(coins)}</span>
+              <span className="text-lg font-bold tabular-nums text-[#446b9e] dark:text-blue-300">{formatCoins(coins)}</span>
             </button>
           </div>
         )}
@@ -91,14 +105,28 @@ export default function GameStatusModal({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onTimerClick?.(); }}
-          className="flex-shrink-0 flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl rounded-[2.25rem] px-8 py-3 shadow-lg ring-1 ring-slate-200 hover:scale-105 transition-transform cursor-pointer mx-2"
+          className="mx-2 flex flex-shrink-0 cursor-pointer flex-col items-center justify-center rounded-[2.25rem] bg-white/95 px-8 py-3 text-slate-950 shadow-lg ring-1 ring-slate-200 backdrop-blur-xl transition-transform hover:scale-105 dark:bg-slate-900/95 dark:text-white dark:ring-slate-700"
         >
-          <span className="text-[2rem] font-extrabold text-[#2563eb] tabular-nums tracking-tight leading-none mb-0.5">
-            {!shrinkZoneEnabled && !timeLimitEnabled ? '♾️' : timeRemaining}
-          </span>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-[#5c728e] whitespace-nowrap">
-            {!shrinkZoneEnabled && !timeLimitEnabled ? 'Sans Limite' : 'Temps Restant'}
-          </span>
+          {!shrinkZoneEnabled && !timeLimitEnabled ? (
+            <>
+              <span className="relative mb-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-blue-600">
+                <span className="absolute inset-1.5 rounded-full border border-white/70" />
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              </span>
+              <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Chase GPS
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[2rem] font-extrabold text-blue-600 tabular-nums tracking-tight leading-none mb-0.5">
+                {timeRemaining}
+              </span>
+              <span className="whitespace-nowrap text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                {zonePhaseLabel(zoneState, currentPhase, totalPhases) || "Temps restant"}
+              </span>
+            </>
+          )}
         </button>
 
         {!shrinkZoneEnabled && !timeLimitEnabled ? (
@@ -118,7 +146,7 @@ export default function GameStatusModal({
                 </linearGradient>
               </defs>
             </svg>
-            <span className="text-lg font-bold text-[#446b9e] tabular-nums">{formatCoins(coins)}</span>
+            <span className="text-lg font-bold tabular-nums text-[#446b9e] dark:text-blue-300">{formatCoins(coins)}</span>
           </button>
         ) : (
           <button
@@ -127,9 +155,9 @@ export default function GameStatusModal({
             className="flex-1 flex flex-col items-end justify-center pr-6 gap-1.5 cursor-pointer hover:scale-105 transition-transform"
           >
             <>
-              <span className="text-sm font-bold text-[#446b9e] tabular-nums leading-none">{displayProgress}%</span>
-              <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0]">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] transition-all duration-700 ease-out" style={{ width: `${displayProgress}%` }} />
+              <span className="text-sm font-bold leading-none tabular-nums text-[#446b9e] dark:text-blue-300">{displayProgress}%</span>
+              <div className="h-2.5 w-full max-w-[130px] overflow-hidden rounded-full bg-[#d2e0f0] dark:bg-slate-700">
+                <div className="h-full rounded-full bg-blue-600 transition-all duration-700 ease-out" style={{ width: `${displayProgress}%` }} />
               </div>
             </>
           </button>
@@ -142,12 +170,11 @@ export default function GameStatusModal({
 
 export function PlayerModal({ playerType, onClose, playerName = 'Joueur', playerStats = {} }) {
   const isPlayer = playerType === 'player';
-  const icon = isPlayer ? '🏃' : '🐱';
-  const roleLabel = isPlayer ? 'Joueur' : 'Chat';
+  const roleLabel = isPlayer ? 'Souris' : 'Chat';
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm touch-none"
+      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -169,7 +196,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+        className="sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:rounded-2xl sm:pb-4"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -177,10 +204,18 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{icon}</span>
+            <span className={`flex h-11 w-11 items-center justify-center rounded-full text-white ${isPlayer ? "bg-amber-500" : "bg-blue-600"}`}>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {isPlayer ? (
+                  <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>
+                ) : (
+                  <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></>
+                )}
+              </svg>
+            </span>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Profil {roleLabel}</h2>
-              <p className="text-sm text-slate-500">{playerName}</p>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white">Profil {roleLabel}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{playerName}</p>
             </div>
           </div>
           <button
@@ -228,8 +263,8 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
         <div className="mt-4 p-3 bg-blue-50 rounded-lg dark:bg-blue-900/20">
           <p className="text-xs text-blue-700 dark:text-blue-300">
             {isPlayer
-              ? '💡 En tant que joueur, votre objectif est de survivre aux réductions de zone et d\'échapper au chat.'
-              : '🐱 En tant que chat, votre objectif est de capturer tous les joueurs avant la fin du temps imparti.'}
+              ? 'En tant que Souris, votre objectif est de survivre aux réductions de zone et d\'échapper au Chat.'
+              : 'En tant que Chat, votre objectif est de capturer toutes les Souris avant la fin du temps imparti.'}
           </p>
         </div>
 

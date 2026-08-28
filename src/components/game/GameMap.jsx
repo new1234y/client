@@ -25,7 +25,8 @@ import {
   iconGhost,
   iconFakePosition,
 } from "../../lib/map/icons.js";
-import { BASEMAPS } from "../../lib/map/basemaps.js";
+import { resolveBasemap } from "../../lib/map/basemaps.js";
+import { getOsmApiKey } from "../../lib/map/osmKey.js";
 import { offsetMeters } from "../../lib/map/geoOffset.js";
 import AnimatedCircle from "./AnimatedCircle.jsx";
 import { Polyline } from "react-leaflet";
@@ -35,6 +36,9 @@ import BaliseCircle from "./BaliseCircle.jsx";
 import BaliseSheet from "./BaliseSheet.jsx";
 import DirectionIndicator from "./DirectionIndicator.jsx";
 import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
+import { getServerTime } from "../../lib/serverTime.js";
+import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "../../lib/map/mapboxKey.js";
+import MapboxMap from "./MapboxMap.jsx";
 
 function RecenterOnDemand({ center, zoom, tick }) {
   const map = useMap();
@@ -232,7 +236,7 @@ function ClusteredMarkers({
   );
 }
 
-export default function GameMap({
+function LeafletGameMap({
   gameState,
   role,
   mySessionId,
@@ -272,7 +276,8 @@ export default function GameMap({
   const gr =
     gameState?.effectiveGlobalRadiusM ??
     gameState?.settings?.globalRadiusM;
-  const bm = BASEMAPS[basemapId] || BASEMAPS.osm;
+  const osmKey = getOsmApiKey();
+  const bm = resolveBasemap(basemapId, osmKey);
 
   const centerTarget =
     me?.lat != null && me?.lng != null ? [me.lat, me.lng] : initialCenter;
@@ -286,7 +291,7 @@ export default function GameMap({
   const myJam = gameState?.myJamCircle;
   const balises = gameState?.balises || [];
   const myFakePosition = gameState?.me?.fakePosition;
-  const now = Date.now();
+  const now = getServerTime();
   const hasActiveFakePosition = myFakePosition && myFakePosition.until > now;
 
   const chatGeoMarkers = useMemo(() => {
@@ -319,7 +324,7 @@ export default function GameMap({
 
   const clusterItems = useMemo(() => {
     const items = [];
-    const selfInvisible = me?.invisUntil && me.invisUntil > Date.now();
+    const selfInvisible = me?.invisUntil && me.invisUntil > getServerTime();
     if (me?.lat != null && me?.lng != null) {
       items.push({
         key: `me-${mySessionId}`,
@@ -522,7 +527,7 @@ export default function GameMap({
           </div>
         )}
         <TileLayer
-          key={basemapId}
+          key={`${basemapId}-${osmKey ? "keyed" : "osm"}`}
           attribution={bm.attribution}
           url={bm.url}
           // If the basemap provides a native max zoom, pass it so Leaflet can use hi-res tiles when available
@@ -577,7 +582,7 @@ export default function GameMap({
       />
 
       {gc && gr != null && !(
-        me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > Date.now()
+        me?.outOfBoundsOverrideUntil && me.outOfBoundsOverrideUntil > getServerTime()
       ) && (
         <GlobalCircle
           center={{ lat: gc.lat, lng: gc.lng }}
@@ -823,4 +828,20 @@ export default function GameMap({
     )}
     </>
   );
+}
+
+
+export default function GameMap(props) {
+  const [useMapbox, setUseMapbox] = useState(() => hasMapboxToken());
+  useEffect(() => {
+    const sync = () => setUseMapbox(hasMapboxToken());
+    window.addEventListener(MAPBOX_TOKEN_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(MAPBOX_TOKEN_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+  if (useMapbox) return <MapboxMap {...props} />;
+  return <LeafletGameMap {...props} />;
 }

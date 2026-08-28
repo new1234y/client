@@ -6,6 +6,11 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  applyAccentClass,
+  applyReducedMotionClass,
+  getReducedMotion,
+} from "../lib/map/mapPrefs.js";
 
 const STORAGE_KEY = "chase-gps-theme";
 
@@ -28,7 +33,14 @@ export function ThemeProvider({ children }) {
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
     window.localStorage.setItem(STORAGE_KEY, theme);
+    applyAccentClass();
+    applyReducedMotionClass(getReducedMotion());
   }, [theme]);
+
+  useEffect(() => {
+    applyAccentClass();
+    applyReducedMotionClass(getReducedMotion());
+  }, []);
 
   const setTheme = useCallback((t) => {
     setThemeState(t === "light" ? "light" : "dark");

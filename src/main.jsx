@@ -13,7 +13,7 @@ function spawnClickParticles(e) {
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
 
-  const colors = ["#5B7FA5", "#E2C96D", "#C45454"];
+  const colors = ["#2563EB", "#F59E0B", "#94A3B8"];
   const shapes = ["square", "circle", "cushion"];
   const count = 5 + Math.floor(Math.random() * 4);
 

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { formatDurationMs } from "../../lib/format";
+import { remainingMs, useServerNow } from "../../hooks/useServerNow.js";
 
 export default function BaliseSheet({
   balise,
@@ -7,6 +8,7 @@ export default function BaliseSheet({
   onClose,
   onShowOnMap = null,
 }) {
+  const now = useServerNow();
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -16,18 +18,7 @@ export default function BaliseSheet({
 
   if (!balise) return null;
 
-  const [timeLeft, setTimeLeft] = useState(null);
-
-  useEffect(() => {
-    if (!balise.expiresAt) {
-      setTimeLeft(null);
-      return;
-    }
-    const tick = () => setTimeLeft(Math.max(0, balise.expiresAt - Date.now()));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [balise.expiresAt, balise.id]);
+  const timeLeft = remainingMs(balise.expiresAt, now);
 
   const isBeingCaptured = balise.beingCapturedBy !== null;
   const isMyCapture = balise.beingCapturedBy === mySessionId;
@@ -44,7 +35,7 @@ export default function BaliseSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[2500] flex items-end justify-center bg-black/60"
+      className="sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55"
       onClick={onClose}
       onTouchEnd={(e) => {
         e.preventDefault();
@@ -54,7 +45,7 @@ export default function BaliseSheet({
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg animate-slide-up rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900"
+        className="sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white"
         onClick={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
       >
@@ -64,8 +55,8 @@ export default function BaliseSheet({
 
         <div className="px-5 pb-4">
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-2xl dark:bg-violet-900/30">
-              ⌖
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">
+              <svg className="h-8 w-8" viewBox="0 0 24 36" fill="currentColor" aria-hidden="true"><rect x="9" y="10" width="6" height="18" rx="1.2"/><polygon points="12,2 17,10 7,10"/><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg>
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -88,13 +79,13 @@ export default function BaliseSheet({
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Diamètre</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider dark:text-slate-400">Diamètre</p>
               <p className="font-semibold text-slate-900 dark:text-white">
                 {Math.round(balise.radiusM * 2)} m
               </p>
             </div>
             <div className="bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Rayon</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wider dark:text-slate-400">Rayon</p>
               <p className="font-semibold text-slate-900 dark:text-white">
                 {Math.round(balise.radiusM)} m
               </p>
@@ -102,7 +93,7 @@ export default function BaliseSheet({
           </div>
 
           <div className="mt-3 bg-slate-100 rounded-lg p-3 dark:bg-slate-800">
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Disparition dans</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wider dark:text-slate-400">Disparition dans</p>
             <p className="font-semibold text-slate-900 dark:text-white">
               {timeLeft !== null ? formatDurationMs(timeLeft) : "--:--"}
             </p>

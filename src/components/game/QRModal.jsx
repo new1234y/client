@@ -5,26 +5,26 @@ export default function QRModal({ sessionId, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-2 backdrop-blur-sm"
+      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-5"
       role="dialog"
       aria-modal="true"
-      aria-label="Mon QR code"
+      aria-label="Votre QR de capture"
       onClick={onClose}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold text-slate-900 text-center">Scan QR code</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 text-center">
-          Scannez ce QR code pour m'attraper
+      <div className="sheet-panel w-full max-w-md rounded-t-[2rem] border border-slate-200 bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:rounded-[2rem]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-center text-xl font-black text-slate-950 dark:text-white">Votre QR de capture</h2>
+        <p className="mt-2 text-center text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Le Chat doit cadrer ce code pour valider la rencontre.
         </p>
         <div className="mt-6 flex justify-center">
-          <div className="rounded-2xl bg-white p-6 ring-1 ring-slate-200">
-            <QRCodeSVG value={sessionId} size={280} level="M" />
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-200">
+            <QRCodeSVG value={sessionId} size={260} level="M" />
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="mt-8 w-full rounded-2xl bg-slate-100 py-3.5 text-base font-semibold text-slate-900 transition hover:bg-slate-200"
+          className="mt-6 flex min-h-11 w-full items-center justify-center rounded-full border border-slate-200 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Fermer
         </button>
