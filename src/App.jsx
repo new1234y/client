@@ -34,6 +34,7 @@ import { playGhostNoiseSound } from "./lib/playGhostNoiseSound.js";
 import SettingsPage from "./components/SettingsPage.jsx";
 import HomePage from "./components/HomePage.jsx";
 import BrandMark from "./components/ui/BrandMark.jsx";
+import GlassHeader from "./components/ui/GlassHeader.jsx";
 import logger from "./lib/logger.js";
 import { getOsmApiKey } from "./lib/map/osmKey.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
@@ -2596,7 +2597,7 @@ if (stage === "lobby" && lobby) {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
       {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
-      <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+      <GlassHeader>
         <div className="flex h-16 items-center justify-between px-4 sm:px-5">
           <BrandMark />
           <div className="flex items-center gap-2">
@@ -2609,7 +2610,7 @@ if (stage === "lobby" && lobby) {
             <SettingsButton size="sm" />
           </div>
         </div>
-      </header>
+      </GlassHeader>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row relative">
         <main className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-48 pt-4 md:max-w-none">
           <div className="min-w-0">
@@ -2959,7 +2960,7 @@ if (stage === "role_reveal" && rolesReveal) {
         />
       )}
 
-      <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+      <GlassHeader>
         <div className="flex h-16 items-center justify-between px-4 sm:px-5">
           <BrandMark />
           <div className="flex items-center gap-2">
@@ -2973,7 +2974,7 @@ if (stage === "role_reveal" && rolesReveal) {
             <SettingsButton size="sm" />
           </div>
         </div>
-      </header>
+      </GlassHeader>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-4">
           <div className="min-w-0">

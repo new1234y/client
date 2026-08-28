@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import BrandMark from "./ui/BrandMark.jsx";
+import GlassHeader from "./ui/GlassHeader.jsx";
 
 const powers = [
   { name: "Invisibilité", code: "01", color: "blue", description: "Masquez temporairement votre position. Le Chat perd votre trace pendant quelques secondes : idéal pour changer de direction ou quitter une zone dangereuse.", stat: "Position masquée", duration: "20 s" },
@@ -154,13 +155,13 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
 
   return (
     <div className="min-h-full overflow-x-hidden bg-white font-sans text-slate-950 transition-colors dark:bg-slate-950 dark:text-white">
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+      <GlassHeader variant="fixed">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
           <a href="#top" aria-label="Chase GPS, accueil"><BrandMark /></a>
           <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-500 dark:text-slate-400 lg:flex" aria-label="Navigation principale"><a className="hover:text-blue-600" href="#roles">Rôles</a><a className="hover:text-blue-600" href="#zone">Zone</a><a className="hover:text-blue-600" href="#capture">Capture</a><a className="hover:text-blue-600" href="#powers">Pouvoirs</a></nav>
           <div className="flex items-center gap-2"><span className="hidden items-center gap-2 text-xs font-bold text-slate-500 sm:flex"><span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "animate-pulse bg-amber-500"}`}/>{connected ? "En ligne" : "Connexion"}</span><button type="button" onClick={onOpenSettings} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-label="Paramètres"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg></button><button type="button" onClick={handleCreate} disabled={Boolean(entryBusyKind)} className="rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 sm:px-5">{entryBusyKind === "create" ? "Création…" : "Créer une partie"}</button></div>
         </div>
-      </header>
+      </GlassHeader>
 
       <main id="top">
         <section className="landing-dots flex min-h-screen items-center pt-24">
