@@ -2691,15 +2691,6 @@ if (stage === "lobby" && lobby) {
             </div>
           )}
 
-          {!isHost && (
-            <button
-              type="button"
-              onClick={leaveGame}
-              className="mt-4 min-h-11 w-full rounded-full border border-slate-200 py-3 text-sm font-semibold text-slate-600 dark:border-slate-600 dark:text-slate-400"
-            >
-              Quitter la partie
-            </button>
-          )}
         </main>
       </div>
 
