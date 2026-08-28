@@ -68,6 +68,72 @@ function SectionIntro({ eyebrow, title, text }) {
   return <div className="max-w-xl"><p className="text-xs font-black uppercase tracking-[0.24em] text-blue-600 dark:text-blue-400">{eyebrow}</p><h2 className="mt-4 text-balance text-4xl font-black leading-tight tracking-[-0.035em] text-slate-950 dark:text-white sm:text-5xl lg:text-6xl">{title}</h2><p className="mt-5 text-pretty text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg">{text}</p></div>;
 }
 
+
+function CreatePartyDialog({ nickname, setNickname, nicknameError, setNicknameError, onCreate, onClose }) {
+  const [viewport, setViewport] = useState(null);
+  useEffect(() => {
+    const sync = () => {
+      const vv = window.visualViewport;
+      setViewport(
+        vv
+          ? { top: vv.offsetTop, left: vv.offsetLeft, width: vv.width, height: vv.height }
+          : { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight }
+      );
+    };
+    sync();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", sync);
+    vv?.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      vv?.removeEventListener("resize", sync);
+      vv?.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
+
+  const overlayStyle = viewport
+    ? { position: "fixed", top: viewport.top, left: viewport.left, width: viewport.width, height: viewport.height }
+    : { position: "fixed", inset: 0 };
+
+  return (
+    <div
+      className="sheet-overlay z-[5000] flex items-center justify-center overflow-hidden bg-slate-950/55 p-4 backdrop-blur-sm"
+      style={overlayStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-title"
+    >
+      <div className="sheet-panel min-h-0 w-full max-w-sm max-h-[calc(100%-2rem)] overflow-y-auto overscroll-contain rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <h2 id="create-title" className="text-xl font-black">Créer une partie</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Choisissez votre pseudo. Il sera mémorisé pour les prochaines parties.
+        </p>
+        <label htmlFor="create-name" className="mt-5 block text-sm font-bold">Pseudo</label>
+        <input
+          id="create-name"
+          autoFocus
+          className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3.5 font-semibold outline-none focus:border-blue-500 dark:bg-slate-950 ${nicknameError ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 dark:border-slate-700"}`}
+          placeholder="Votre pseudo"
+          value={nickname}
+          onChange={(e) => { setNickname(e.target.value); setNicknameError(null); }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.nativeEvent.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            onCreate();
+          }}
+          maxLength={24}
+        />
+        {nicknameError && <p className="mt-2 text-sm font-bold text-red-600">{nicknameError}</p>}
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">Retour</button>
+          <button type="button" onClick={onCreate} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Créer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage({ connected, nickname, setNickname, nicknameError, setNicknameError, roomCodeInput, setRoomCodeInput, entryBusyKind, errorBanner, onCreate, onJoin, onCancel, onOpenSettings, midJoinWait, onCancelMidJoin }) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [powerIndex, setPowerIndex] = useState(0);
@@ -127,7 +193,16 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
 
       <footer className="border-t border-slate-200 bg-white px-5 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950"><button type="button" onClick={onOpenSettings} className="font-bold text-slate-700 hover:text-blue-600 dark:text-slate-200">Réglages</button><span className="mx-3">·</span><span>Chase GPS — Jouez dehors.</span></footer>
 
-      {showCreateDialog && <div className="sheet-overlay fixed inset-0 z-[5000] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="create-title"><div className="sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900 sm:rounded-3xl"><h2 id="create-title" className="text-xl font-black">Créer une partie</h2><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Choisissez votre pseudo. Il sera mémorisé pour les prochaines parties.</p><label htmlFor="create-name" className="mt-5 block text-sm font-bold">Pseudo</label><input id="create-name" autoFocus className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3.5 font-semibold outline-none focus:border-blue-500 dark:bg-slate-950 ${nicknameError ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 dark:border-slate-700"}`} placeholder="Votre pseudo" value={nickname} onChange={(e)=>{setNickname(e.target.value);setNicknameError(null)}} onKeyDown={(e)=>{if(e.key!=="Enter"||e.nativeEvent.isComposing||e.keyCode===229)return;e.preventDefault();onCreate()}} maxLength={24}/>{nicknameError && <p className="mt-2 text-sm font-bold text-red-600">{nicknameError}</p>}<div className="mt-5 flex gap-3"><button type="button" onClick={()=>setShowCreateDialog(false)} className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold dark:border-slate-700">Retour</button><button type="button" onClick={onCreate} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">Créer</button></div></div></div>}
+      {showCreateDialog && (
+        <CreatePartyDialog
+          nickname={nickname}
+          setNickname={setNickname}
+          nicknameError={nicknameError}
+          setNicknameError={setNicknameError}
+          onCreate={onCreate}
+          onClose={() => setShowCreateDialog(false)}
+        />
+      )}
     </div>
   );
 }

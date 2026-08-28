@@ -10,14 +10,14 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
   }
 
   return (
-    <ul className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+    <ul className="grid grid-cols-1 gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))]">
       {list.map((player) => {
         const isHost = player.sessionId === hostSessionId;
         const isYou = player.sessionId === currentSessionId;
         return (
           <li
             key={player.sessionId}
-            className="flex min-h-11 items-center gap-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-900"
+            className="flex min-h-11 min-w-0 items-center gap-3 rounded-2xl bg-slate-100 p-3 dark:bg-slate-900"
           >
             <span
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
@@ -26,20 +26,19 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
             >
               {player.nickname?.charAt(0)?.toUpperCase() || "?"}
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold leading-tight text-slate-950 dark:text-white">
-                {player.nickname}
-              </p>
-              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {isHost ? "Hôte" : "Participant"}
-                {isYou ? " · vous" : ""}
-                {player.disconnected ? (
-                  <span className="text-amber-600"> · déconnecté</span>
-                ) : null}
-              </p>
-            </div>
+            <p className="min-w-0 flex-1 truncate whitespace-nowrap font-bold leading-tight text-slate-950 dark:text-white">
+              {player.nickname}
+              {isYou ? (
+                <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  vous
+                </span>
+              ) : null}
+              {player.disconnected ? (
+                <span className="ml-2 text-xs font-semibold text-amber-600">déconnecté</span>
+              ) : null}
+            </p>
             {isHost && (
-              <span className="hidden shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white min-[360px]:inline-flex">
+              <span className="shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">
                 Hôte
               </span>
             )}

@@ -2921,7 +2921,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       }`}>
                         {p.nickname?.charAt(0)?.toUpperCase() || '?'}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className={`truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold ${isGrayedOut ? 'text-slate-400' : 'text-slate-950 dark:text-white'}`}>
                           {p.nickname}
                           {p.sessionId === sessionId && (
