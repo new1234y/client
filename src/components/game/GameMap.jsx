@@ -38,6 +38,7 @@ import DirectionIndicator from "./DirectionIndicator.jsx";
 import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
 import { getServerTime } from "../../lib/serverTime.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "../../lib/map/mapboxKey.js";
+import { getMapGyro, setMapGyro, MAP_PREF_EVENTS } from "../../lib/map/mapPrefs.js";
 import MapboxMap from "./MapboxMap.jsx";
 
 function RecenterOnDemand({ center, zoom, tick }) {
@@ -258,9 +259,32 @@ function LeafletGameMap({
   const [mapError, setMapError] = useState(null);
   const [selectedBalise, setSelectedBalise] = useState(null);
   const mapRef = useRef(null);
-  const { heading, needsPermission, requestPermission } = useDeviceOrientation();
+  const { heading, requestPermission } = useDeviceOrientation();
   const defaultCenter = [46.8, 2.5];
   const me = gameState?.me;
+
+  useEffect(() => {
+    const onTap = async () => {
+      if (getMapGyro()) {
+        setMapGyro(false);
+        return;
+      }
+      const res = await requestPermission();
+      if (res?.granted) {
+        setMapGyro(true);
+        return;
+      }
+      if (res?.reason === "denied") {
+        setMapError(
+          "Autorisation refusée. Pour activer la boussole : Réglages → Safari → Mouvement et orientation, puis rechargez la page."
+        );
+        return;
+      }
+      setMapGyro(true);
+    };
+    window.addEventListener(MAP_PREF_EVENTS.compassTap, onTap);
+    return () => window.removeEventListener(MAP_PREF_EVENTS.compassTap, onTap);
+  }, [requestPermission]);
   const initialCenter = useMemo(() => {
     if (me?.lat != null && me?.lng != null) return [me.lat, me.lng];
     if (gameState?.gameCenter)
@@ -472,60 +496,6 @@ function LeafletGameMap({
         minZoom={2}
         attributionControl
       >
-        {/* If the device requires a user gesture to grant orientation permission (iOS),
-            show a clear overlay with explanation and a button the user can tap to enable orientation. */}
-        {needsPermission && (
-          <div className="absolute left-1/2 top-4 z-[2100] -translate-x-1/2 w-[min(92%,420px)]">
-            <div className="rounded-2xl bg-gradient-to-br from-white/95 to-blue-50/95 px-5 py-4 text-sm shadow-2xl dark:from-slate-900/95 dark:to-slate-800/95 dark:text-slate-100 border border-blue-200/50 dark:border-slate-700/50">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 mt-1">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="text-base font-bold text-slate-900 dark:text-white">Activer la boussole</div>
-                  <div className="mt-2 text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Pour une expérience optimale, le jeu a besoin d'accéder à la boussole de votre téléphone. Cela permet d'afficher votre direction en temps réel sur la carte.
-                  </div>
-                  <div className="mt-3 flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const res = await requestPermission();
-                          if (!res.granted) {
-                            setMapError(
-                              "Autorisation refusée. Pour activer la boussole : Réglages → Safari → Mouvement et orientation, puis rechargez la page."
-                            );
-                          }
-                        } catch (err) {
-                          setMapError("Erreur lors de la demande d'autorisation. Vérifiez que vous êtes sur Safari et que la page est servie en HTTPS.");
-                        }
-                      }}
-                      className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98]"
-                    >
-                      Activer la boussole
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMapError(
-                          "Pour activer la boussole manuellement : Réglages → Safari → Mouvement et orientation, activez-le, puis rechargez la page."
-                        );
-                      }}
-                      className="w-full rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300 transition hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Passer pour le moment
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         <TileLayer
           key={`${basemapId}-${osmKey ? "keyed" : "osm"}`}
           attribution={bm.attribution}

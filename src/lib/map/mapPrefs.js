@@ -53,6 +53,8 @@ export const MAP_PREF_EVENTS = {
   d3: "chase-gps-map-3d",
   gyro: "chase-gps-map-gyro",
   compass: "chase-gps-compass",
+  compassTap: "chase-gps-compass-tap",
+  bearing: "chase-gps-map-bearing",
   accent: "chase-gps-accent",
   motion: "chase-gps-reduced-motion",
 };

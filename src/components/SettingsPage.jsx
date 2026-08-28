@@ -12,14 +12,12 @@ import {
   applyAccentClass,
   applyReducedMotionClass,
   getAccent,
-  getCompassMode,
   getHighContrast,
   getMap3dMode,
   getMapGyro,
   getMapStyleId,
   getReducedMotion,
   setAccent,
-  setCompassMode,
   setHighContrast,
   setMap3dMode,
   setMapGyro,
@@ -100,7 +98,6 @@ export default function SettingsPage({
   const [styleId, setStyleState] = useState(() => getMapStyleId(theme === "dark" ? "dark" : "light"));
   const [mode3d, setMode3d] = useState(() => getMap3dMode());
   const [gyro, setGyroState] = useState(() => getMapGyro());
-  const [compass, setCompass] = useState(() => getCompassMode());
   const [reduceMotion, setReduce] = useState(() => getReducedMotion());
   const [saved, setSaved] = useState("");
   const storedNick = nicknameProp ?? readNickname();
@@ -157,11 +154,6 @@ export default function SettingsPage({
   const handleGyro = (on) => {
     setGyroState(on);
     setMapGyro(on);
-  };
-
-  const handleCompass = (mode) => {
-    setCompass(mode);
-    setCompassMode(mode);
   };
 
   const handleMotion = (on) => {
@@ -331,7 +323,7 @@ export default function SettingsPage({
         <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
           <span>
             <span className="block text-sm font-bold">Gyroscopique</span>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Oriente la carte selon le téléphone</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Oriente la carte selon le téléphone. Même action que le bouton boussole sur la carte.</span>
           </span>
           <input
             type="checkbox"
@@ -340,18 +332,6 @@ export default function SettingsPage({
             className="h-5 w-5 accent-blue-600"
           />
         </label>
-
-        <div>
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Boussole</p>
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-            <button type="button" onClick={() => handleCompass("north")} className={chipCls(compass === "north")}>
-              Nord en haut
-            </button>
-            <button type="button" onClick={() => handleCompass("heading")} className={chipCls(compass === "heading")}>
-              Cap du téléphone
-            </button>
-          </div>
-        </div>
       </Section>
 
       {inGame && (

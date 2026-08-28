@@ -3,9 +3,9 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getMapboxToken } from "../../lib/map/mapboxKey.js";
 import {
-  getCompassMode,
   getMap3dMode,
   getMapGyro,
+  setMapGyro,
   MAP_PREF_EVENTS,
   resolveMapboxStyleUrl,
 } from "../../lib/map/mapPrefs.js";
@@ -30,6 +30,33 @@ function feature(geometry, properties = {}) {
 function emptyFc() {
   return { type: "FeatureCollection", features: [] };
 }
+
+function shortestArcDelta(fromDeg, toDeg) {
+  const from = ((Number(fromDeg) % 360) + 360) % 360;
+  const to = ((Number(toDeg) % 360) + 360) % 360;
+  let diff = to - from;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff;
+}
+
+function toSignedBearing(deg) {
+  let x = ((Number(deg) % 360) + 360) % 360;
+  if (x > 180) x -= 360;
+  return x;
+}
+
+function publishMapBearing(deg) {
+  try {
+    window.dispatchEvent(new CustomEvent(MAP_PREF_EVENTS.bearing, { detail: deg }));
+  } catch {
+    // ignore
+  }
+}
+
+const GYRO_DEAD_ZONE_DEG = 12;
+const GYRO_EASE_MS = 1000;
+const NORTH_EASE_MS = 900;
 
 function pinEl({ bg, border = "#fff", size = 34, html, label, extraShadow = "" }) {
   const el = document.createElement("div");
@@ -252,14 +279,18 @@ export default function MapboxMap({
   const [selectedBalise, setSelectedBalise] = useState(null);
   const [mode3d, setMode3d] = useState(() => getMap3dMode());
   const [gyroOn, setGyroOn] = useState(() => getMapGyro());
-  const [compassMode, setCompassModeState] = useState(() => getCompassMode());
   const [mapReady, setMapReady] = useState(false);
-  const [bearingDeg, setBearingDeg] = useState(0);
+  const easingRef = useRef(false);
+  const easeGenRef = useRef(0);
+  const easeTimerRef = useRef(0);
+  const gyroOnRef = useRef(gyroOn);
+  const headingRef = useRef(null);
 
-  const gyroWanted = gyroOn || compassMode === "heading";
   const enable3d = mode3d !== "2d";
   const lock3d = mode3d === "3d_lock";
-  const { heading, needsPermission, requestPermission } = useDeviceOrientation();
+  const { heading, requestPermission } = useDeviceOrientation();
+  gyroOnRef.current = gyroOn;
+  headingRef.current = heading;
 
   const me = gameState?.me;
   const defaultCenter = [2.5, 46.8];
@@ -274,17 +305,16 @@ export default function MapboxMap({
   useEffect(() => {
     const sync = () => {
       setMode3d(getMap3dMode());
-      setGyroOn(getMapGyro());
-      setCompassModeState(getCompassMode());
+      const nextGyro = getMapGyro();
+      gyroOnRef.current = nextGyro;
+      setGyroOn(nextGyro);
     };
     window.addEventListener(MAP_PREF_EVENTS.d3, sync);
     window.addEventListener(MAP_PREF_EVENTS.gyro, sync);
-    window.addEventListener(MAP_PREF_EVENTS.compass, sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener(MAP_PREF_EVENTS.d3, sync);
       window.removeEventListener(MAP_PREF_EVENTS.gyro, sync);
-      window.removeEventListener(MAP_PREF_EVENTS.compass, sync);
       window.removeEventListener("storage", sync);
     };
   }, []);
@@ -333,12 +363,22 @@ export default function MapboxMap({
     map.on("click", onClick);
     const onRotate = () => {
       try {
+        bearingRef.current = map.getBearing();
+      } catch {
+        // ignore
+      }
+    };
+    const onRotateEnd = () => {
+      try {
         const b = map.getBearing();
         bearingRef.current = b;
-        setBearingDeg(b);
-      } catch {}
+        publishMapBearing(toSignedBearing(b));
+      } catch {
+        // ignore
+      }
     };
     map.on("rotate", onRotate);
+    map.on("rotateend", onRotateEnd);
 
     const ro = typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => {
@@ -392,33 +432,92 @@ export default function MapboxMap({
       map.dragRotate.disable();
       map.touchPitch?.disable?.();
     }
-    if (lock3d && compassMode === "north") {
-      map.easeTo({ bearing: 0, pitch: 60, duration: 300, essential: true });
-    }
-  }, [enable3d, lock3d, gyroWanted, mapReady, compassMode]);
+  }, [enable3d, lock3d, mapReady]);
 
-  useEffect(() => {
-    if (!gyroWanted || heading == null) return;
-    if (compassMode === "north" && !gyroOn) return;
+  const easeMapBearing = useCallback((bearing, duration, { force = false } = {}) => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const prev = bearingRef.current;
-    let diff = heading - prev;
-    while (diff > 180) diff -= 360;
-    while (diff < -180) diff += 360;
-    const next = (prev + diff * 0.18 + 360) % 360;
-    bearingRef.current = next;
-    map.setBearing(next);
-    setBearingDeg(next);
-  }, [heading, gyroWanted, gyroOn, compassMode]);
+    if (easingRef.current && !force) return;
+    const gen = ++easeGenRef.current;
+    easingRef.current = true;
+    if (easeTimerRef.current) {
+      window.clearTimeout(easeTimerRef.current);
+      easeTimerRef.current = 0;
+    }
+    if (force) {
+      try {
+        map.stop();
+      } catch {
+        // ignore
+      }
+    }
+    const finish = () => {
+      if (gen !== easeGenRef.current) return;
+      if (!easingRef.current) return;
+      easingRef.current = false;
+      try {
+        const b = map.getBearing();
+        bearingRef.current = b;
+        publishMapBearing(toSignedBearing(b));
+      } catch {
+        // ignore
+      }
+      const h = headingRef.current;
+      if (gyroOnRef.current && h != null) {
+        let current = bearingRef.current;
+        try {
+          current = map.getBearing();
+        } catch {
+          // keep ref
+        }
+        if (Math.abs(shortestArcDelta(current, h)) >= GYRO_DEAD_ZONE_DEG) {
+          easeMapBearing(h, GYRO_EASE_MS);
+        }
+      }
+    };
+    const onEnd = () => finish();
+    map.once("moveend", onEnd);
+    bearingRef.current = bearing;
+    publishMapBearing(toSignedBearing(bearing));
+    map.easeTo({
+      bearing,
+      duration,
+      essential: true,
+    });
+    easeTimerRef.current = window.setTimeout(() => {
+      if (gen !== easeGenRef.current) return;
+      try {
+        map.off("moveend", onEnd);
+      } catch {
+        // ignore
+      }
+      finish();
+    }, duration + 120);
+  }, []);
+
+  useEffect(() => {
+    if (!gyroOn || heading == null) return;
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    if (easingRef.current) return;
+    let current = bearingRef.current;
+    try {
+      current = map.getBearing();
+    } catch {
+      // keep ref
+    }
+    const delta = shortestArcDelta(current, heading);
+    if (Math.abs(delta) < GYRO_DEAD_ZONE_DEG) return;
+    easeMapBearing(heading, GYRO_EASE_MS);
+  }, [heading, gyroOn, mapReady, easeMapBearing]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !recenterTick) return;
     if (me?.lat != null && me?.lng != null) {
-      map.easeTo({ center: [me.lng, me.lat], zoom: 17, duration: 600, essential: true, bearing: gyroWanted ? map.getBearing() : 0 });
+      map.easeTo({ center: [me.lng, me.lat], zoom: 17, duration: 600, essential: true, bearing: map.getBearing() });
     }
-  }, [recenterTick, me?.lat, me?.lng, gyroWanted]);
+  }, [recenterTick, me?.lat, me?.lng]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -798,9 +897,35 @@ export default function MapboxMap({
     enable3d,
   ]);
 
-  if (!gameState) return null;
+  useEffect(() => {
+    const onTap = async () => {
+      const map = mapRef.current;
+      if (getMapGyro()) {
+        gyroOnRef.current = false;
+        setMapGyro(false);
+        setGyroOn(false);
+        if (map && readyRef.current) {
+          easeMapBearing(0, NORTH_EASE_MS, { force: true });
+        } else {
+          bearingRef.current = 0;
+          publishMapBearing(0);
+        }
+        return;
+      }
+      const res = await requestPermission();
+      if (res?.reason === "denied") {
+        setMapError("Autorisation boussole refusée. Réglages → Safari → Mouvement et orientation.");
+        return;
+      }
+      gyroOnRef.current = true;
+      setMapGyro(true);
+      setGyroOn(true);
+    };
+    window.addEventListener(MAP_PREF_EVENTS.compassTap, onTap);
+    return () => window.removeEventListener(MAP_PREF_EVENTS.compassTap, onTap);
+  }, [requestPermission, easeMapBearing]);
 
-  const showGyroPrompt = gyroWanted && needsPermission;
+  if (!gameState) return null;
 
   return (
     <>
@@ -813,74 +938,11 @@ export default function MapboxMap({
         </div>
       )}
 
-      {showGyroPrompt && (
-        <div className="absolute left-1/2 top-4 z-[2100] w-[min(92%,420px)] -translate-x-1/2">
-          <div className="rounded-2xl border border-blue-200/50 bg-white/95 px-5 py-4 text-sm text-slate-950 shadow-2xl dark:border-slate-700 dark:bg-slate-900/95 dark:text-white">
-            <div className="text-base font-bold">Activer le gyroscope</div>
-            <p className="mt-2 text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
-              Pour orienter la carte dans le sens de votre téléphone, autorisez l’accès à la boussole.
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  const res = await requestPermission();
-                  if (!res?.granted) {
-                    setMapError("Autorisation boussole refusée. Réglages → Safari → Mouvement et orientation.");
-                  }
-                }}
-                className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white"
-              >
-                Autoriser
-              </button>
-              <button
-                type="button"
-                onClick={() => setGyroOn(false)}
-                className="w-full rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                Passer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div
         ref={containerRef}
         className="map-full-screen h-full w-full"
         style={{ height: "100%", width: "100%" }}
       />
-
-      <button
-        type="button"
-        onClick={() => {
-          const map = mapRef.current;
-          if (!map) return;
-          const next = compassMode === "heading" && heading != null ? heading : 0;
-          bearingRef.current = next;
-          map.easeTo({
-            bearing: next,
-            pitch: enable3d ? 60 : 0,
-            duration: 450,
-            essential: true,
-          });
-          setBearingDeg(next);
-        }}
-        className="absolute right-3 top-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] z-[1000] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-slate-800 shadow-md ring-1 ring-slate-200 dark:bg-slate-900/95 dark:text-white dark:ring-slate-700"
-        title="Recaler le nord"
-        aria-label="Recaler le nord"
-      >
-        <svg
-          className="h-6 w-6"
-          viewBox="0 0 24 24"
-          fill="none"
-          style={{ transform: `rotate(${-((bearingDeg || 0))}deg)` }}
-        >
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
-          <path d="M12 5v6" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M12 13v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-      </button>
 
       {selectedBalise && (
         <BaliseSheet

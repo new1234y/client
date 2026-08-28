@@ -1,7 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BASEMAPS } from "../../lib/map/basemaps.js";
-import { MAPBOX_STYLES } from "../../lib/map/mapPrefs.js";
+import { getMapGyro, MAPBOX_STYLES, MAP_PREF_EVENTS } from "../../lib/map/mapPrefs.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "../../lib/map/mapboxKey.js";
+
+function shortestArcDelta(fromDeg, toDeg) {
+  const from = ((Number(fromDeg) % 360) + 360) % 360;
+  const to = ((Number(toDeg) % 360) + 360) % 360;
+  let diff = to - from;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff;
+}
 
 const icons = {
   layers: (
@@ -28,6 +37,13 @@ const icons = {
   check: (
     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  ),
+  compassNeedle: (
+    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 5v6" stroke="#ef4444" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M12 13v6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   ),
 };
@@ -80,14 +96,31 @@ export default function MapControls({
 }) {
   const [showLayers, setShowLayers] = useState(false);
   const [mapbox, setMapbox] = useState(() => hasMapboxToken());
+  const [gyroOn, setGyroOn] = useState(() => getMapGyro());
+  const [bearing, setBearing] = useState(0);
+  const needleRef = useRef(0);
 
   useEffect(() => {
-    const sync = () => setMapbox(hasMapboxToken());
+    const sync = () => {
+      setMapbox(hasMapboxToken());
+      setGyroOn(getMapGyro());
+    };
+    const onBearing = (e) => {
+      const next = Number(e?.detail);
+      if (!Number.isFinite(next)) return;
+      const delta = shortestArcDelta(needleRef.current, next);
+      needleRef.current += delta;
+      setBearing(needleRef.current);
+    };
     window.addEventListener(MAPBOX_TOKEN_EVENT, sync);
+    window.addEventListener(MAP_PREF_EVENTS.gyro, sync);
     window.addEventListener("storage", sync);
+    window.addEventListener(MAP_PREF_EVENTS.bearing, onBearing);
     return () => {
       window.removeEventListener(MAPBOX_TOKEN_EVENT, sync);
+      window.removeEventListener(MAP_PREF_EVENTS.gyro, sync);
       window.removeEventListener("storage", sync);
+      window.removeEventListener(MAP_PREF_EVENTS.bearing, onBearing);
     };
   }, []);
 
@@ -133,6 +166,32 @@ export default function MapControls({
       )}
 
       <div className="pointer-events-auto flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(new Event(MAP_PREF_EVENTS.compassTap));
+          }}
+          className={`flex h-11 w-11 items-center justify-center rounded-full ring-1 transition-colors ${
+            gyroOn
+              ? "bg-blue-600 text-white ring-blue-600"
+              : "bg-white/95 text-slate-700 ring-slate-200 active:bg-slate-100 dark:bg-slate-900/95 dark:text-slate-200 dark:ring-slate-700 dark:active:bg-slate-800"
+          }`}
+          title={gyroOn ? "Désactiver le gyroscope (nord en haut)" : "Activer le suivi gyroscopique"}
+          aria-label={gyroOn ? "Désactiver le gyroscope" : "Activer le gyroscope"}
+          aria-pressed={gyroOn}
+        >
+          <span
+            className="inline-flex"
+            style={{
+              transform: `rotate(${-((bearing || 0))}deg)`,
+              transition: "transform 0.85s ease-out",
+              willChange: "transform",
+            }}
+          >
+            {icons.compassNeedle}
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={onRecenter}
