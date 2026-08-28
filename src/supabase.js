@@ -17,9 +17,10 @@ if (supabaseKey && supabaseKey.length > 200) {
   console.warn('SECURITY: Possible service role key detected in frontend. Use anon key instead.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 export async function getGameByCode(code) {
+  if (!supabase) return null;
   try {
     console.log('[getGameByCode] Fetching game with code:', code);
     const { data, error } = await supabase
@@ -48,6 +49,7 @@ export async function getGameByCode(code) {
 }
 
 export async function getGameHistory(limit = 10) {
+  if (!supabase) return [];
   try {
     const { data, error } = await supabase
       .from('game_history')
