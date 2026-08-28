@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useAnimatedClose from '../../hooks/useAnimatedClose.js';
 import { formatCoins } from '../../lib/format';
 
 function zonePhaseLabel(zoneState, currentPhase, totalPhases) {
@@ -169,19 +170,22 @@ export default function GameStatusModal({
 }
 
 export function PlayerModal({ playerType, onClose, playerName = 'Joueur', playerStats = {} }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   const isPlayer = playerType === 'player';
   const roleLabel = isPlayer ? 'Souris' : 'Chat';
+  const leave = leaving ? " is-leaving" : "";
 
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4"
+      className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4${leave}`}
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -196,7 +200,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
       }}
     >
       <div
-        className="sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:rounded-2xl sm:pb-4"
+        className={`sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:rounded-2xl sm:pb-4${leave}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -222,7 +226,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              onClose();
+              requestClose();
             }}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
@@ -272,7 +276,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
           type="button"
           onClick={(e) => {
             e.preventDefault();
-            onClose();
+            requestClose();
           }}
           className="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none"
         >

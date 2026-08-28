@@ -573,16 +573,30 @@ html.high-contrast select {
 }
 
 
-/* Sheets: slide-up + fade overlay */
+/* Sheets: slide-up + fade overlay (enter + leave) */
 .sheet-overlay {
   animation: sheet-fade-in 240ms ease;
 }
 .sheet-panel {
   animation: slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+.sheet-overlay.is-leaving {
+  animation: sheet-fade-out 280ms ease forwards;
+}
+.sheet-panel.is-leaving {
+  animation: sheet-slide-down 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 @keyframes sheet-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+@keyframes sheet-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes sheet-slide-down {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100%); opacity: 0; }
 }
 
 .seg-thumb {

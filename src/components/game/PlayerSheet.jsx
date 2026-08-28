@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import { formatCoins } from "../../lib/format";
 
 function roleBadgeText(p) {
@@ -18,6 +19,7 @@ export default function PlayerSheet({
   role = null,
   sessionId = null,
 }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -26,6 +28,7 @@ export default function PlayerSheet({
   }, []);
 
   if (!player) return null;
+  const leave = leaving ? " is-leaving" : "";
 
   const roleColor =
     player.role === "cat"
@@ -40,19 +43,20 @@ export default function PlayerSheet({
   const handleShowOnMap = () => {
     if (canShowOnMap && onShowOnMap) {
       onShowOnMap(mapFocus);
-      onClose();
+      requestClose();
     }
   };
 
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55"
-      onClick={onClose}
+      className={`sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55${leave}`}
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white"
+        className={`sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white${leave}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-center py-3">
@@ -212,7 +216,7 @@ export default function PlayerSheet({
         <div className="px-5">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="w-full rounded-xl bg-slate-100 py-3.5 text-base font-semibold text-slate-700 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
           >
             Fermer

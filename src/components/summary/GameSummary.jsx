@@ -9,6 +9,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import SliderWithParticles from "../ui/SliderWithParticles.jsx";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import {
   MapContainer,
   TileLayer,
@@ -30,6 +31,60 @@ import {
   effectiveGlobalRadiusAtTime,
   effectiveZoneCenterAtTime,
 } from "../../lib/recapZone.js";
+
+
+function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
+  return (
+    <div
+      className={`sheet-overlay fixed inset-0 z-[12000] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm${leave}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
+    >
+      <div
+        className={`sheet-panel w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl dark:bg-slate-900${leave}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Partager le récap</h3>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Lien public (lecture seule). Les données restent sur ce serveur tant qu&apos;il tourne.
+        </p>
+        {publicRecapUrl ? (
+          <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <div className="rounded-[8px] bg-white p-2 ring-2 ring-[#2563EB]/20 dark:bg-slate-800">
+              <QRCodeSVG value={publicRecapUrl} size={160} level="M" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="break-all font-mono text-xs text-[#2563EB]">{publicRecapUrl}</p>
+              <button
+                type="button"
+                onClick={onCopy}
+                className="mt-3 w-full rounded-[8px] bg-[#2563EB] py-2.5 text-sm font-semibold text-white sm:w-auto sm:px-5"
+              >
+                {copied ? "Copié" : "Copier le lien"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
+            Lien indisponible (vérifiez que le serveur expose <span className="font-mono">/api/recap</span> et le proxy Vite).
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={requestClose}
+          className="mt-6 w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold dark:border-slate-600"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function formatClock(t) {
   return new Date(t).toLocaleTimeString("fr-FR", {
@@ -1185,48 +1240,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     <>
       {recapView}
 
-      {/* ═══ SHARE MODAL ═══ */}
       {shareOpen && (
-        <div
-          className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl dark:bg-slate-900">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Partager le récap</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Lien public (lecture seule). Les données restent sur ce serveur tant qu&apos;il tourne.
-            </p>
-            {publicRecapUrl ? (
-              <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                <div className="rounded-[8px] bg-white p-2 ring-2 ring-[#2563EB]/20 dark:bg-slate-800">
-                  <QRCodeSVG value={publicRecapUrl} size={160} level="M" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="break-all font-mono text-xs text-[#2563EB]">{publicRecapUrl}</p>
-                  <button
-                    type="button"
-                    onClick={copyRecap}
-                    className="mt-3 w-full rounded-[8px] bg-[#2563EB] py-2.5 text-sm font-semibold text-white sm:w-auto sm:px-5"
-                  >
-                    {copied ? "Copié" : "Copier le lien"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-amber-700 dark:text-amber-300">
-                Lien indisponible (vérifiez que le serveur expose <span className="font-mono">/api/recap</span> et le proxy Vite).
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => setShareOpen(false)}
-              className="mt-6 w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold dark:border-slate-600"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
+        <RecapShareModal
+          publicRecapUrl={publicRecapUrl}
+          copied={copied}
+          onCopy={copyRecap}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </>
   );

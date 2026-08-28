@@ -1,7 +1,10 @@
 import { QRCodeSVG } from "qrcode.react";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 
 export default function ShareQRModal({ sessionId, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   if (!sessionId) return null;
+  const leave = leaving ? " is-leaving" : "";
 
   const handleCopyLink = async () => {
     const url = `${window.location.origin}/?code=${sessionId}`;
@@ -39,13 +42,14 @@ export default function ShareQRModal({ sessionId, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/60 p-5 backdrop-blur-sm"
+      className={`sheet-overlay fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/60 p-5 backdrop-blur-sm${leave}`}
       role="dialog"
       aria-modal="true"
       aria-label="Inviter à cette salle"
-      onClick={onClose}
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
     >
-      <div className="w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet-panel w-full max-w-md rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900${leave}`} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-black text-slate-950 dark:text-white">Inviter à cette salle</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Copier le lien ou le code ne vous déconnecte pas : vous restez dans la salle.
@@ -90,7 +94,7 @@ export default function ShareQRModal({ sessionId, onClose }) {
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
           className="mt-6 flex min-h-11 w-full items-center justify-center rounded-full border border-slate-200 py-3 text-sm font-bold text-slate-700 dark:border-slate-600 dark:text-slate-200"
         >
           Fermer

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import { formatDurationMs } from "../../lib/format";
 import { remainingMs, useServerNow } from "../../hooks/useServerNow.js";
 
@@ -9,6 +10,7 @@ export default function BaliseSheet({
   onShowOnMap = null,
 }) {
   const now = useServerNow();
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -17,6 +19,7 @@ export default function BaliseSheet({
   }, []);
 
   if (!balise) return null;
+  const leave = leaving ? " is-leaving" : "";
 
   const timeLeft = remainingMs(balise.expiresAt, now);
 
@@ -29,23 +32,24 @@ export default function BaliseSheet({
   const handleShowOnMap = () => {
     if (onShowOnMap && balise.lat != null && balise.lng != null) {
       onShowOnMap({ lat: balise.lat, lng: balise.lng });
-      onClose();
+      requestClose();
     }
   };
 
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55"
-      onClick={onClose}
+      className={`sheet-overlay fixed inset-0 z-[2500] flex items-end justify-center bg-black/55${leave}`}
+      onClick={requestClose}
       onTouchEnd={(e) => {
         e.preventDefault();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white"
+        className={`sheet-panel w-full max-w-lg rounded-t-3xl bg-white pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white${leave}`}
         onClick={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
       >
@@ -62,18 +66,19 @@ export default function BaliseSheet({
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                 Balise
               </h2>
-              <p className="text-sm font-medium text-violet-600 dark:text-violet-400">
-                {isBeingCaptured
-                  ? isMyCapture
-                    ? "En cours de capture par vous"
-                    : "En cours de capture"
-                  : "Disponible"}
+              <p className={`text-sm font-medium ${
+                balise.capturedBy
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : isBeingCaptured
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-violet-600 dark:text-violet-400"
+              }`}>
+                {balise.capturedBy
+                  ? "Capturée"
+                  : isBeingCaptured
+                    ? (isMyCapture ? "En cours de capture par vous" : "En cours de capture")
+                    : "Disponible"}
               </p>
-              {balise.capturedBy && (
-                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  Capturée
-                </p>
-              )}
             </div>
           </div>
 
@@ -107,24 +112,24 @@ export default function BaliseSheet({
             )}
           </div>
 
-          {isBeingCaptured && (
-            <div className="mt-3 bg-orange-50 rounded-lg p-3 dark:bg-orange-900/20">
+          {isBeingCaptured && !balise.capturedBy && (
+            <div className="mt-3 bg-blue-50 rounded-lg p-3 dark:bg-blue-900/20">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wider">
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">
                   Progression de capture
                 </p>
-                <p className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
                   {Math.round(capturePercent)}%
                 </p>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-800">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-800">
                 <div
-                  className="h-full rounded-full bg-orange-500 transition-all duration-300"
+                  className="h-full rounded-full bg-blue-500 transition-all duration-300"
                   style={{ width: `${capturePercent}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-orange-600 dark:text-orange-400">
-                {isMyCapture ? "Continuez à rester dans la zone" : "Un joueur est en train de capturer cette balise"}
+              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                {isMyCapture ? "Continuez à rester dans la zone" : "Une personne est déjà en train de la capturer"}
               </p>
             </div>
           )}
@@ -153,12 +158,12 @@ export default function BaliseSheet({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onClose();
+              requestClose();
             }}
             onTouchEnd={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              onClose();
+              requestClose();
             }}
             className="w-full rounded-xl bg-slate-100 py-3.5 text-base font-semibold text-slate-700 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
           >

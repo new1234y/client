@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { useGeolocation } from "./hooks/useGeolocation.js";
+import useAnimatedClose from "./hooks/useAnimatedClose.js";
 import { useTheme } from "./context/ThemeContext.jsx";
 import GameMap from "./components/game/GameMap.jsx";
 import GameSummary from "./components/summary/GameSummary.jsx";
@@ -204,8 +205,14 @@ function getRecapIdFromPath() {
   }
 }
 
-function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, lastError, reason }) {
-  if (!isReconnecting) return null;
+function ReconnectModal(props) {
+  if (!props.isReconnecting) return null;
+  return <ReconnectModalBody {...props} />;
+}
+
+function ReconnectModalBody({ reconnectAttempt, onCancel, onRetry, lastError, reason }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onCancel);
+  const leave = leaving ? " is-leaving" : "";
 
   let title = "Reconnexion";
   let description = "La connexion a été perdue.";
@@ -226,12 +233,13 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
 
   return (
     <div
-      className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      className={`sheet-overlay fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm${leave}`}
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      onAnimationEnd={onExitAnimationEnd}
     >
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white">
+      <div className={`sheet-panel w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white${leave}`}>
         {showSpinner ? (
           <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
         ) : (
@@ -272,7 +280,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
               {onCancel && (
                 <button
                   type="button"
-                  onClick={onCancel}
+                  onClick={requestClose}
                   className="min-h-11 w-full rounded-full border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 >
                   Abandonner
@@ -294,7 +302,7 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
               {onCancel && (
                 <button
                   type="button"
-                  onClick={onCancel}
+                  onClick={requestClose}
                   className="min-h-11 w-full rounded-full border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 >
                   {reason === "kicked" ? "Ok" : "Quitter"}
@@ -303,6 +311,56 @@ function ReconnectModal({ isReconnecting, reconnectAttempt, onCancel, onRetry, l
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EntryPromptSheet({ onClose, children }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
+  return (
+    <div
+      className={`sheet-overlay fixed inset-0 z-[4000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm${leave}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
+    >
+      <div
+        className={`sheet-panel w-full max-w-sm rounded-3xl bg-white p-6 text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white${leave}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {typeof children === "function" ? children(requestClose) : children}
+      </div>
+    </div>
+  );
+}
+
+function SessionTakenOverScreen({ onHome }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onHome);
+  const leave = leaving ? " is-leaving" : "";
+  return (
+    <div
+      className={`sheet-overlay fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm${leave}`}
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
+    >
+      <div
+        className={`sheet-panel w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white${leave}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-lg font-black tracking-tight">Session terminée</p>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Cette session continue sur une autre page. Celle-ci est terminée.
+        </p>
+        <button
+          type="button"
+          className="mt-6 min-h-11 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+          onClick={requestClose}
+        >
+          Accueil
+        </button>
       </div>
     </div>
   );
@@ -1798,16 +1856,17 @@ export default function App() {
     }
   }, []);
 
-  const onCreate = useCallback(async () => {
-    if (!socket || !nickname.trim()) {
-      setNicknameError("Choisissez un pseudo.");
+  const onCreate = useCallback(async (nickOverride, initialSettings) => {
+    const trimmedNickname = (typeof nickOverride === "string" ? nickOverride : nickname).trim();
+    if (!socket || !trimmedNickname) {
+      setNicknameError("Choisis un pseudo.");
       return;
     }
+    setNickname(trimmedNickname);
     unlockAudioAndVibration();
     setErrorBanner(null);
     const reqId = ++entryReqRef.current;
     setEntryBusyKind("create");
-    const trimmedNickname = nickname.trim();
     saveLastNickname(trimmedNickname);
     try {
       await ensureSocketReady(socket);
@@ -1835,6 +1894,13 @@ export default function App() {
       setIsHost(true);
       setLobby(res.lobby);
       setStage("lobby");
+      if (initialSettings && typeof initialSettings === "object") {
+        socket.emit("update_settings", initialSettings, (r2) => {
+          if (reqId !== entryReqRef.current) return;
+          if (!r2?.ok) setErrorBanner(r2?.error || "Mise a jour refusee.");
+          else if (r2.lobby) setLobby(r2.lobby);
+        });
+      }
     });
   }, [socket, nickname, claimSessionOwnership]);
 
@@ -1853,16 +1919,17 @@ export default function App() {
     });
   }, []);
 
-  const onJoin = useCallback(async () => {
-    if (!socket || !nickname.trim() || !roomCodeInput.trim()) {
-      if (!nickname.trim()) setNicknameError("Choisissez un pseudo.");
+  const onJoin = useCallback(async (nickOverride) => {
+    const trimmedNickname = (typeof nickOverride === "string" ? nickOverride : nickname).trim();
+    if (!socket || !trimmedNickname || !roomCodeInput.trim()) {
+      if (!trimmedNickname) setNicknameError("Choisis un pseudo.");
       else setErrorBanner("Code de partie requis.");
       return;
     }
+    setNickname(trimmedNickname);
     unlockAudioAndVibration();
     setErrorBanner(null);
     setNicknameError(null);
-    const trimmedNickname = nickname.trim();
     lastNicknameRef.current = trimmedNickname;
     saveLastNickname(trimmedNickname);
     const reqId = ++entryReqRef.current;
@@ -2413,28 +2480,16 @@ export default function App() {
 
   if (sessionTakenOver) {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-        <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white">
-          <p className="text-lg font-black tracking-tight">Session terminée</p>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            Cette session continue sur une autre page. Celle-ci est terminée.
-          </p>
-          <button
-            type="button"
-            className="mt-6 min-h-11 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
-            onClick={() => {
-              setSessionTakenOver(false);
-              resetToEntry(false);
-              const s = socketRef.current;
-              if (s && !s.connected) {
-                try { s.connect(); } catch {}
-              }
-            }}
-          >
-            Accueil
-          </button>
-        </div>
-      </div>
+      <SessionTakenOverScreen
+        onHome={() => {
+          setSessionTakenOver(false);
+          resetToEntry(false);
+          const s = socketRef.current;
+          if (s && !s.connected) {
+            try { s.connect(); } catch {}
+          }
+        }}
+      />
     );
   }
 
@@ -2493,8 +2548,19 @@ export default function App() {
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
         {rejoinCandidate && connected && !isReconnecting && !resumeCandidate && (
-          <div className="fixed inset-0 z-[4000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white">
+          <EntryPromptSheet
+            onClose={() => {
+              try {
+                localStorage.removeItem(LS_LAST_ROOM_KEY);
+                localStorage.removeItem(LS_LAST_SESSION_KEY);
+              } catch (e) {
+                logger.warn("localStorage non disponible:", e);
+              }
+              setRejoinCandidate(null);
+            }}
+          >
+            {(requestClose) => (
+            <>
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -2549,22 +2615,15 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    try {
-                      localStorage.removeItem(LS_LAST_ROOM_KEY);
-                      localStorage.removeItem(LS_LAST_SESSION_KEY);
-                    } catch (e) {
-                      logger.warn("localStorage non disponible:", e);
-                    }
-                    setRejoinCandidate(null);
-                  }}
+                  onClick={requestClose}
                   className="w-full rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   Non, ignorer
                 </button>
               </div>
-            </div>
-          </div>
+            </>
+            )}
+          </EntryPromptSheet>
         )}
         <div className="stage-enter min-h-full"><HomePage
           connected={connected}

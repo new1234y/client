@@ -1,8 +1,10 @@
 import { QRCodeSVG } from "qrcode.react";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import Button from "../ui/Button.jsx";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 
 export default function SharePartyModal({ code, title, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   const joinUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${window.location.pathname}?code=${encodeURIComponent(code || "")}`
@@ -23,16 +25,18 @@ export default function SharePartyModal({ code, title, onClose }) {
   }, [joinUrl, code, title]);
 
   if (!code) return null;
+  const leave = leaving ? " is-leaving" : "";
 
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-5"
+      className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-5${leave}`}
       role="dialog"
       aria-modal="true"
       aria-label="Partager la partie"
-      onClick={onClose}
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
     >
-      <div className="sheet-panel w-full max-w-md rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+      <div className={`sheet-panel w-full max-w-md rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-900 sm:rounded-3xl${leave}`} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-center text-xl font-bold text-slate-950 dark:text-white">
           Scanner le QR code
         </h2>
@@ -86,7 +90,7 @@ export default function SharePartyModal({ code, title, onClose }) {
         <Button
           variant="secondary"
           className="mt-6 w-full"
-          onClick={onClose}
+          onClick={requestClose}
         >
           Fermer
         </Button>

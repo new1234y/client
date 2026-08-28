@@ -1,4 +1,5 @@
 import { formatCoins } from '../../lib/format';
+import useAnimatedClose from '../../hooks/useAnimatedClose.js';
 
 export default function CoinsBadge({ coins, coinHistory = [], className = "", onOpen = null }) {
   if (coins == null) return null;
@@ -27,16 +28,19 @@ export default function CoinsBadge({ coins, coinHistory = [], className = "", on
 }
 
 export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4"
+      className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm touch-none sm:items-center sm:p-4${leave}`}
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -51,7 +55,7 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
       }}
     >
       <div
-        className="sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:rounded-2xl"
+        className={`sheet-panel w-full max-w-sm rounded-t-3xl bg-white p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:rounded-2xl${leave}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -69,7 +73,7 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              onClose();
+              requestClose();
             }}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
@@ -106,7 +110,7 @@ export function CoinsHistoryModal({ coins, onClose, coinHistory = [] }) {
           type="button"
           onClick={(e) => {
             e.preventDefault();
-            onClose();
+            requestClose();
           }}
           className="mt-4 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 dark:shadow-none"
         >

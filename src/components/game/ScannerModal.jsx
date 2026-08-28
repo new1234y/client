@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { haptic } from "../../lib/haptic.js";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 
 /** Serialize camera start/stop so Strict Mode remounts and fast reopen cannot overlap. */
 let cameraQueue = Promise.resolve();
@@ -197,6 +198,7 @@ async function startScanner({ cancelled, readerId, videoEl, onDecoded, onError, 
 }
 
 export default function ScannerModal({ onScan, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   const reactId = useId().replace(/:/g, "");
   const readerId = `qr-reader-${reactId || "x"}`;
   const [err, setErr] = useState(null);
@@ -208,6 +210,7 @@ export default function ScannerModal({ onScan, onClose }) {
   const onCloseRef = useRef(onClose);
   onScanRef.current = onScan;
   onCloseRef.current = onClose;
+  const leave = leaving ? " is-leaving" : "";
 
   const stopThen = useCallback((after) => {
     scanned.current = true;
@@ -221,8 +224,9 @@ export default function ScannerModal({ onScan, onClose }) {
   }, []);
 
   const handleClose = useCallback(() => {
-    stopThen(() => onCloseRef.current?.());
-  }, [stopThen]);
+    stopThen();
+    requestClose();
+  }, [stopThen, requestClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -291,7 +295,8 @@ export default function ScannerModal({ onScan, onClose }) {
 
   return (
     <div
-      className="sheet-overlay fixed inset-0 z-[2000] flex flex-col bg-black"
+      className={`sheet-overlay fixed inset-0 z-[2000] flex flex-col bg-black${leave}`}
+      onAnimationEnd={onExitAnimationEnd}
       role="dialog"
       aria-modal="true"
       aria-label="Scanner le QR"

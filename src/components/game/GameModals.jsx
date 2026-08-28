@@ -1,8 +1,11 @@
 import { formatDurationMs } from "../../lib/format";
 import Button from "../ui/Button.jsx";
 import { remainingMs, remainingSeconds, useServerNow } from "../../hooks/useServerNow.js";
+import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 
 export function RoleModal({ role, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
   const roleInfo = {
     cat: {
       icon: "chat",
@@ -39,14 +42,15 @@ export function RoleModal({ role, onClose }) {
 
   return (
     <div
-className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
+className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2${leave}`}
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -61,7 +65,7 @@ className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg
       }}
     >
       <div
-className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
+className={`sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl${leave}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -86,7 +90,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              onClose();
+              requestClose();
             }}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
@@ -115,7 +119,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
           className="mt-6 w-full"
           onClick={(e) => {
             e.preventDefault();
-            onClose();
+            requestClose();
           }}
         >
           Fermer
@@ -126,6 +130,8 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
 }
 
 export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius, nextRadius, gameStartedAt, timeLimitEndsAt, shrinkZoneEnabled, timeLimitEnabled, onClose }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
   const now = useServerNow();
   const phases = (() => {
     if (!gameStartedAt || !timeLimitEndsAt || !totalPhases || !shrinkZoneEnabled) return [];
@@ -170,14 +176,15 @@ export function ZoneModal({ phaseState, totalPhases, currentPhase, currentRadius
 
   return (
     <div
-className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
+className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2${leave}`}
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -192,7 +199,7 @@ className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg
       }}
     >
       <div
-className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
+className={`sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl${leave}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -206,7 +213,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              onClose();
+              requestClose();
             }}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
@@ -317,7 +324,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
           className="mt-4 w-full"
           onClick={(e) => {
             e.preventDefault();
-            onClose();
+            requestClose();
           }}
         >
           Fermer
@@ -328,6 +335,8 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
 }
 
 export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameType, onClose, gameMode = null, nextBaliseAt = null, jamLevel = null }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  const leave = leaving ? " is-leaving" : "";
   const now = useServerNow();
   const timeLeft = remainingSeconds(timeLimitEndsAt, now);
   const nextBaliseTimeLeft = remainingMs(nextBaliseAt, now);
@@ -372,14 +381,15 @@ export function GameModal({ gameStartedAt, timeLimitEndsAt, totalProgress, gameT
 
   return (
     <div
-className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2"
+className={`sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-sm touch-none sm:items-start sm:p-2 sm:pt-2${leave}`}
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        requestClose();
       }}
+      onAnimationEnd={onExitAnimationEnd}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -394,7 +404,7 @@ className="sheet-overlay fixed inset-0 z-[2000] flex items-end justify-center bg
       }}
     >
       <div
-className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl"
+className={`sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-950 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:text-white dark:ring-slate-700 sm:mt-1 sm:rounded-2xl${leave}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
@@ -409,7 +419,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              onClose();
+              requestClose();
             }}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
@@ -496,7 +506,7 @@ className="sheet-panel mt-0 w-full max-w-sm rounded-t-3xl bg-white p-4 pb-[max(1
           className="mt-6 w-full"
           onClick={(e) => {
             e.preventDefault();
-            onClose();
+            requestClose();
           }}
         >
           Fermer
