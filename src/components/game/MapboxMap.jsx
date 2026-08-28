@@ -196,7 +196,7 @@ function applyTerrain(map, enable, lock = false) {
         });
       }
       map.setTerrain({ source: "mapbox-dem", exaggeration: 1.15 });
-      map.easeTo({ pitch: 60, duration: 500, essential: true, ...(lock ? { bearing: map.getBearing() } : {}) });
+      map.easeTo({ pitch: 60, duration: 700, essential: true, ...(lock ? { bearing: map.getBearing() } : {}) });
       if (!map.getLayer("3d-buildings") && map.getSource("composite")) {
         const layers = map.getStyle()?.layers || [];
         const labelLayerId = layers.find(
@@ -243,7 +243,7 @@ function applyTerrain(map, enable, lock = false) {
       } catch {
         // ignore
       }
-      map.easeTo({ pitch: 0, duration: 400, essential: true });
+      map.easeTo({ pitch: 0, duration: 700, essential: true });
     }
   } catch {
     // style may not support extrusion

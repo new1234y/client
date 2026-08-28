@@ -3,25 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import BrandMark from "./ui/BrandMark.jsx";
 import AdminPanel from "./game/AdminPanel.jsx";
-import { getOsmApiKey, setOsmApiKey } from "../lib/map/osmKey.js";
-import { getMapboxToken, setMapboxToken } from "../lib/map/mapboxKey.js";
 import {
   ACCENTS,
-  MAPBOX_STYLES,
-  MAP_3D_MODES,
   applyAccentClass,
   applyReducedMotionClass,
   getAccent,
   getHighContrast,
-  getMap3dMode,
-  getMapGyro,
-  getMapStyleId,
   getReducedMotion,
   setAccent,
   setHighContrast,
-  setMap3dMode,
-  setMapGyro,
-  setMapStyleId,
   setReducedMotion,
 } from "../lib/map/mapPrefs.js";
 
@@ -74,14 +64,6 @@ function Section({ title, hint, children }) {
   );
 }
 
-function chipCls(active) {
-  return `min-h-11 rounded-xl border px-3 py-2 text-sm font-bold transition ${
-    active
-      ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
-      : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-  }`;
-}
-
 export default function SettingsPage({
   embedded = false,
   inGame = false,
@@ -93,13 +75,7 @@ export default function SettingsPage({
   const navigate = useNavigate();
   const [highContrast, setHc] = useState(() => getHighContrast());
   const [accent, setAccentState] = useState(() => getAccent());
-  const [osmKey, setOsmKey] = useState(() => getOsmApiKey());
-  const [mapboxKey, setMapboxKey] = useState(() => getMapboxToken());
-  const [styleId, setStyleState] = useState(() => getMapStyleId(theme === "dark" ? "dark" : "light"));
-  const [mode3d, setMode3d] = useState(() => getMap3dMode());
-  const [gyro, setGyroState] = useState(() => getMapGyro());
   const [reduceMotion, setReduce] = useState(() => getReducedMotion());
-  const [saved, setSaved] = useState("");
   const storedNick = nicknameProp ?? readNickname();
   const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
   const showAdmin = Boolean(inGame && isKarim && admin);
@@ -108,11 +84,6 @@ export default function SettingsPage({
   useEffect(() => {
     applyAccentClass(accent);
   }, [accent]);
-
-  const flash = (msg) => {
-    setSaved(msg);
-    window.setTimeout(() => setSaved(""), 1800);
-  };
 
   const handleAppearance = (next) => {
     if (next === "contrast") {
@@ -131,29 +102,6 @@ export default function SettingsPage({
     setAccentState(next);
     setAccent(next);
     applyAccentClass(next);
-  };
-
-  const handleSaveKeys = () => {
-    setMapboxToken(mapboxKey);
-    setOsmApiKey(osmKey);
-    setMapboxKey(getMapboxToken());
-    setOsmKey(getOsmApiKey());
-    flash("Clés enregistrées");
-  };
-
-  const handleStyle = (id) => {
-    setStyleState(id);
-    setMapStyleId(id);
-  };
-
-  const handle3d = (id) => {
-    setMode3d(id);
-    setMap3dMode(id);
-  };
-
-  const handleGyro = (on) => {
-    setGyroState(on);
-    setMapGyro(on);
   };
 
   const handleMotion = (on) => {
@@ -231,104 +179,6 @@ export default function SettingsPage({
             type="checkbox"
             checked={reduceMotion}
             onChange={(e) => handleMotion(e.target.checked)}
-            className="h-5 w-5 accent-blue-600"
-          />
-        </label>
-      </Section>
-
-      <Section title="Carte" hint="Jeton Mapbox recommandé. Sans jeton : OpenStreetMap public.">
-        <div>
-          <label htmlFor="mapbox-token" className="block text-xs font-bold text-slate-500 dark:text-slate-400">
-            Jeton Mapbox
-          </label>
-          <input
-            id="mapbox-token"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={mapboxKey}
-            onChange={(e) => {
-              setMapboxKey(e.target.value);
-              setSaved("");
-            }}
-            className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            placeholder="pk.…"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="osm-api-key" className="block text-xs font-bold text-slate-500 dark:text-slate-400">
-            Clé OSM / Carto <span className="font-semibold">(repli)</span>
-          </label>
-          <input
-            id="osm-api-key"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={osmKey}
-            onChange={(e) => {
-              setOsmKey(e.target.value);
-              setSaved("");
-            }}
-            className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            placeholder="Optionnel"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSaveKeys}
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700"
-          >
-            Enregistrer
-          </button>
-          {saved && (
-            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{saved}</span>
-          )}
-        </div>
-
-        <div>
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Style</p>
-          <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {Object.entries(MAPBOX_STYLES).map(([id, s]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => handleStyle(id)}
-                className={chipCls(styleId === id)}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Relief</p>
-          <div className="mt-1.5 grid gap-1.5">
-            {Object.values(MAP_3D_MODES).map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => handle3d(m.id)}
-                className={`${chipCls(mode3d === m.id)} text-left`}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
-          <span>
-            <span className="block text-sm font-bold">Gyroscopique</span>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Oriente la carte selon le téléphone. Même action que le bouton boussole sur la carte.</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={gyro}
-            onChange={(e) => handleGyro(e.target.checked)}
             className="h-5 w-5 accent-blue-600"
           />
         </label>

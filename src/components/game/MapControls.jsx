@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BASEMAPS } from "../../lib/map/basemaps.js";
-import { getMapGyro, MAPBOX_STYLES, MAP_PREF_EVENTS } from "../../lib/map/mapPrefs.js";
+import { getMapGyro, getMap3dMode, setMap3dMode, MAPBOX_STYLES, MAP_PREF_EVENTS } from "../../lib/map/mapPrefs.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "../../lib/map/mapboxKey.js";
 
 function shortestArcDelta(fromDeg, toDeg) {
@@ -97,6 +97,7 @@ export default function MapControls({
   const [showLayers, setShowLayers] = useState(false);
   const [mapbox, setMapbox] = useState(() => hasMapboxToken());
   const [gyroOn, setGyroOn] = useState(() => getMapGyro());
+  const [mode3d, setMode3d] = useState(() => getMap3dMode());
   const [bearing, setBearing] = useState(0);
   const needleRef = useRef(0);
 
@@ -104,6 +105,7 @@ export default function MapControls({
     const sync = () => {
       setMapbox(hasMapboxToken());
       setGyroOn(getMapGyro());
+      setMode3d(getMap3dMode());
     };
     const onBearing = (e) => {
       const next = Number(e?.detail);
@@ -114,11 +116,13 @@ export default function MapControls({
     };
     window.addEventListener(MAPBOX_TOKEN_EVENT, sync);
     window.addEventListener(MAP_PREF_EVENTS.gyro, sync);
+    window.addEventListener(MAP_PREF_EVENTS.d3, sync);
     window.addEventListener("storage", sync);
     window.addEventListener(MAP_PREF_EVENTS.bearing, onBearing);
     return () => {
       window.removeEventListener(MAPBOX_TOKEN_EVENT, sync);
       window.removeEventListener(MAP_PREF_EVENTS.gyro, sync);
+      window.removeEventListener(MAP_PREF_EVENTS.d3, sync);
       window.removeEventListener("storage", sync);
       window.removeEventListener(MAP_PREF_EVENTS.bearing, onBearing);
     };
@@ -213,6 +217,23 @@ export default function MapControls({
         >
           {icons.layers}
         </button>
+
+        {mapbox && (
+          <button
+            type="button"
+            onClick={() => setMap3dMode(mode3d !== "2d" ? "2d" : "3d_free")}
+            className={`flex h-11 w-11 items-center justify-center rounded-full ring-1 transition-colors ${
+              mode3d !== "2d"
+                ? "bg-blue-600 text-white ring-blue-600"
+                : "bg-white/95 text-slate-700 ring-slate-200 active:bg-slate-100 dark:bg-slate-900/95 dark:text-slate-200 dark:ring-slate-700 dark:active:bg-slate-800"
+            }`}
+            title={mode3d !== "2d" ? "2D" : "3D"}
+            aria-label={mode3d !== "2d" ? "Passer en 2D" : "Activer le 3D"}
+            aria-pressed={mode3d !== "2d"}
+          >
+            {mapIcons["3d"]}
+          </button>
+        )}
 
         <div className="flex flex-col overflow-hidden rounded-[1.25rem] bg-white/95 ring-1 ring-slate-200 dark:bg-slate-900/95 dark:ring-slate-700">
           <button
