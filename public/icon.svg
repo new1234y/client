@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- BrandMark: h-9 w-9 blue-600 circle, inset-1.5 white/70 ring, h-1.5 white dot -->
-  <circle cx="256" cy="256" r="256" fill="#2563eb"/>
-  <circle cx="256" cy="256" r="163.556" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="14.222"/>
-  <circle cx="256" cy="256" r="42.667" fill="#ffffff"/>
+  <!-- BrandMark circle with ~14% padding so square crops keep breathing room -->
+  <rect width="512" height="512" fill="#ffffff"/>
+  <circle cx="256" cy="256" r="184.32" fill="#2563eb"/>
+  <circle cx="256" cy="256" r="122.88" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="10.24"/>
+  <circle cx="256" cy="256" r="30.72" fill="#ffffff"/>
 </svg>
