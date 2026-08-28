@@ -111,6 +111,11 @@ function baliseHtml(color, mode3d) {
   return `<div style="position:relative;width:28px;height:36px;display:flex;align-items:flex-end;justify-content:center">${pulse}<svg width="22" height="32" viewBox="0 0 24 36" aria-hidden="true"><rect x="9" y="10" width="6" height="18" rx="1.2" fill="${color}"/><polygon points="12,2 17,10 7,10" fill="${color}"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><rect x="6" y="28" width="12" height="4" rx="1" fill="${color}"/></svg></div>`;
 }
 
+/** Invisible click target so 3D towers stay tappable without the 2D rocket pin. */
+function baliseHotspotHtml(size = 48) {
+  return `<div style="width:${size}px;height:${size}px;opacity:0" aria-hidden="true"></div>`;
+}
+
 function ensureSources(map) {
   const specs = [
     ["src-zone", emptyFc()],
@@ -334,6 +339,21 @@ export default function MapboxMap({
         p.onBaliseLureSelect(e.lngLat.lat, e.lngLat.lng);
         return;
       }
+      if (!p.enable3d) return;
+      const list = p.gameState?.balises || [];
+      if (!list.length) return;
+      let best = null;
+      let bestD = 88;
+      for (const b of list) {
+        if (!Number.isFinite(b.lat) || !Number.isFinite(b.lng)) continue;
+        const pt = map.project([b.lng, b.lat]);
+        const d = Math.hypot(pt.x - e.point.x, pt.y - e.point.y);
+        if (d < bestD) {
+          bestD = d;
+          best = b;
+        }
+      }
+      if (best) setSelectedBalise(best);
     };
     map.on("click", onClick);
     const onRotate = () => {
@@ -559,6 +579,7 @@ export default function MapboxMap({
     highlightSessionId,
     chatGeoMarkers,
     baliseLureTarget,
+    enable3d,
   };
 
   useEffect(() => {
@@ -777,14 +798,25 @@ export default function MapboxMap({
       const capturing = b.beingCapturedBy != null;
       const mine = b.beingCapturedBy === mySessionId;
       const color = capturing ? (mine ? "#22c55e" : "#f97316") : "#a855f7";
-      pins.push({
-        key: `balise-${b.id}`,
-        lng: b.lng,
-        lat: b.lat,
-        size: 28,
-        html: baliseHtml(color, mode3d),
-        balise: b,
-      });
+      if (enable3d) {
+        pins.push({
+          key: `balise-${b.id}`,
+          lng: b.lng,
+          lat: b.lat,
+          size: 48,
+          html: baliseHotspotHtml(48),
+          balise: b,
+        });
+      } else {
+        pins.push({
+          key: `balise-${b.id}`,
+          lng: b.lng,
+          lat: b.lat,
+          size: 28,
+          html: baliseHtml(color, mode3d),
+          balise: b,
+        });
+      }
     }
     for (const m of chatGeoMarkers.locations) {
       pins.push({
@@ -824,6 +856,16 @@ export default function MapboxMap({
 
     const seen = new Set();
     const existing = markersRef.current;
+    const prev3d = existing._enable3d;
+    existing._enable3d = enable3d;
+    if (enable3d && prev3d === false) {
+      for (const [key, marker] of [...existing]) {
+        if (String(key).startsWith("balise-")) {
+          marker.remove();
+          existing.delete(key);
+        }
+      }
+    }
     for (const p of pins) {
       seen.add(p.key);
       let marker = existing.get(p.key);
@@ -848,6 +890,8 @@ export default function MapboxMap({
         marker.setLngLat([p.lng, p.lat]);
         if (marker._chaseEl && marker._chaseEl.innerHTML !== p.html) {
           marker._chaseEl.innerHTML = p.html;
+          marker._chaseEl.style.width = `${p.size}px`;
+          marker._chaseEl.style.height = `${p.size}px`;
         }
         marker._chaseData = p;
       }

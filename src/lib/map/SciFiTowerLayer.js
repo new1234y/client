@@ -13,6 +13,9 @@ export const SCIFI_TOWER_LAYER_ID = "sci-fi-towers";
 
 const IDLE = "#a855f7";
 const ROT_X = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+/** Uniform extra scale so the ~24 m tower reads on the GPS map (~52 m / ~11 m). */
+const EXTRA_SCALE = 2.2;
+const LOCAL_SCALE = new THREE.Matrix4().makeScale(EXTRA_SCALE, EXTRA_SCALE, EXTRA_SCALE);
 
 const SEG = 64;
 const BASE_H = 1.42;
@@ -272,14 +275,15 @@ function elevationOf(map, lng, lat) {
   }
 }
 
-/** Official Mapbox+Three model transform: T(mc) * scale(s,-s,s) * rotateX(PI/2). */
+/** Official Mapbox+Three model transform: T(mc) * scale(s,-s,s) * rotateX(PI/2) * extraScale. */
 function makeModelL(out, lng, lat, alt) {
   const mc = mapboxgl.MercatorCoordinate.fromLngLat({ lng, lat }, alt);
   const s = mc.meterInMercatorCoordinateUnits();
   return out
     .makeTranslation(mc.x, mc.y, mc.z)
     .scale(new THREE.Vector3(s, -s, s))
-    .multiply(ROT_X);
+    .multiply(ROT_X)
+    .multiply(LOCAL_SCALE);
 }
 
 const FALLBACK_SRC = "src-balise-tower";
@@ -309,7 +313,11 @@ function fallbackFeatures(towers) {
       { r: 1.54, base: 15.52, height: 15.66 },
       { r: 1.58, base: 18.0, height: 20.8 },
       { r: 0.12, base: 20.7, height: 23.8 },
-    ];
+    ].map((ring) => ({
+      r: ring.r * EXTRA_SCALE,
+      base: ring.base * EXTRA_SCALE,
+      height: ring.height * EXTRA_SCALE,
+    }));
     for (const ring of rings) {
       feats.push({
         type: "Feature",
