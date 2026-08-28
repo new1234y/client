@@ -2410,29 +2410,31 @@ if (stage === "lobby" && lobby) {
     <div className="stage-enter flex min-h-full flex-col bg-white text-slate-950 landing-dots dark:bg-slate-950 dark:text-white">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
+      <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-5">
+          <BrandMark />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              onClick={() => setShowShareParty(true)}
+            >
+              Partager
+            </Button>
+            <SettingsButton size="sm" />
+          </div>
+        </div>
+      </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row relative">
-        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-48 pt-[max(1rem,env(safe-area-inset-top))] md:max-w-none">
-          <header className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <BrandMark className="mb-4" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Code de salle</p>
-              <p className="mt-1 break-all font-mono text-4xl font-black tracking-[0.18em] text-blue-600 sm:text-5xl">
-                {lobby.code}
-              </p>
-              <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
-                {isHost ? "Vous êtes l’hôte" : "En attente de l’hôte"}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="primary"
-                onClick={() => setShowShareParty(true)}
-              >
-                Partager
-              </Button>
-              <SettingsButton size="sm" />
-            </div>
-          </header>
+        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-48 pt-4 md:max-w-none">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Code de salle</p>
+            <p className="mt-1 break-all font-mono text-4xl font-black tracking-[0.18em] text-blue-600 sm:text-5xl">
+              {lobby.code}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
+              {isHost ? "Vous êtes l’hôte" : "En attente de l’hôte"}
+            </p>
+          </div>
 
           {showShareParty && lobby?.code && (
             <SharePartyModal
@@ -2779,33 +2781,35 @@ if (stage === "role_reveal" && rolesReveal) {
         />
       )}
 
+      <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-5">
+          <BrandMark />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowShareParty(true)}
+              className="inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+            >
+              Partager
+            </button>
+            <SettingsButton size="sm" />
+          </div>
+        </div>
+      </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          <header className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <BrandMark className="mb-4" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Avant la chasse</p>
-              <p className="mt-1 break-all font-mono text-3xl font-black tracking-[0.18em] text-blue-600">
-                {rolesReveal.code}
-              </p>
-              <h1 className="mt-2 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-                Attribution des rôles
-              </h1>
-              <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
-                Touchez la carte pour révéler votre rôle.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowShareParty(true)}
-                className="inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-              >
-                Partager
-              </button>
-              <SettingsButton size="sm" />
-            </div>
-          </header>
+        <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-4">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Avant la chasse</p>
+            <p className="mt-1 break-all font-mono text-3xl font-black tracking-[0.18em] text-blue-600">
+              {rolesReveal.code}
+            </p>
+            <h1 className="mt-2 text-xl font-black tracking-tight text-slate-950 dark:text-white">
+              Attribution des rôles
+            </h1>
+            <p className="mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
+              Touchez la carte pour révéler votre rôle.
+            </p>
+          </div>
 
           {errorBanner && (
             <div className="rounded-xl bg-red-100 p-3 text-sm text-red-900 dark:bg-red-950/80 dark:text-red-100">
