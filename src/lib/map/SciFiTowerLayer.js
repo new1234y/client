@@ -24,8 +24,11 @@ const SHAFT_R_TOP = 0.58;
 const SHAFT_R_BOT = 0.68;
 const SHAFT_R_MID = (SHAFT_R_TOP + SHAFT_R_BOT) / 2;
 const SHAFT_Y = BASE_H + SHAFT_H / 2;
-const SAUCER_Y = 4.2;
-const RING_YS = [8.2, 11.9, 15.6];
+const RIB_N = 6;
+const RIB_H = 15.4;
+const RIB_R = 0.034;
+const RIB_DIST = SHAFT_R_MID + 0.12;
+const RING_YS = [7.35, 12.65, 17.48];
 const RING_R = 1.48;
 const RING_TUBE = 0.055;
 const STRUT_LEN = RING_R - RING_TUBE - SHAFT_R_MID;
@@ -35,6 +38,23 @@ const CAP_H = 2.74;
 const SPIRE_H = 2.55;
 const TIP_H = 0.42;
 const TOWER_H = CAP_Y + CAP_H + SPIRE_H + TIP_H;
+
+/** Native-size stacked saucers (no mesh.scale on lathes). */
+const SAUCERS = [
+  { y: 4.2, rOut: 2.22, rIn: 0.74, topH: 0.4, botH: 0.38, rimT: 0.062, accentT: 0.03, collarH: 0.22 },
+  { y: 10.05, rOut: 1.72, rIn: 0.66, topH: 0.26, botH: 0.24, rimT: 0.048, accentT: 0.024, collarH: 0.18 },
+  { y: 15.32, rOut: 1.95, rIn: 0.62, topH: 0.3, botH: 0.28, rimT: 0.052, accentT: 0.026, collarH: 0.18 },
+];
+
+/** Darker floor bands: unique cylinders, slightly proud of the tapered shaft. */
+const WINDOW_BANDS = [
+  { y: 2.52, h: 0.4, r: 0.705 },
+  { y: 5.82, h: 0.4, r: 0.688 },
+  { y: 8.58, h: 0.4, r: 0.672 },
+  { y: 11.42, h: 0.4, r: 0.655 },
+  { y: 13.92, h: 0.4, r: 0.642 },
+  { y: 16.48, h: 0.4, r: 0.628 },
+];
 
 let shared = null;
 
@@ -50,6 +70,44 @@ function lathe(pts, seg = SEG) {
   );
   geo.computeVertexNormals();
   return markShared(geo);
+}
+
+function saucerTopPts(rIn, rOut, h) {
+  const s = rOut - rIn;
+  return [
+    [rIn, 0.075],
+    [rIn + s * 0.15, h * 0.55],
+    [rIn + s * 0.4, h],
+    [rIn + s * 0.74, h * 0.46],
+    [rOut - 0.06, 0.085],
+    [rOut, 0.068],
+  ];
+}
+
+function saucerBotPts(rIn, rOut, h) {
+  const s = rOut - rIn;
+  return [
+    [rIn, -0.075],
+    [rIn + s * 0.15, -h * 0.7],
+    [rIn + s * 0.4, -h],
+    [rIn + s * 0.74, -h * 0.4],
+    [rOut - 0.06, -0.085],
+    [rOut, -0.068],
+  ];
+}
+
+function makeSaucerGeos(spec) {
+  return {
+    top: lathe(saucerTopPts(spec.rIn, spec.rOut, spec.topH)),
+    bot: lathe(saucerBotPts(spec.rIn, spec.rOut, spec.botH)),
+    rim: markShared(new THREE.TorusGeometry(spec.rOut, spec.rimT, 16, SEG)),
+    accent: markShared(new THREE.TorusGeometry(spec.rOut * 0.88, spec.accentT, 12, SEG)),
+    collar: markShared(
+      new THREE.CylinderGeometry(spec.rIn + 0.14, spec.rIn + 0.1, spec.collarH, 48)
+    ),
+    accentY: -(spec.botH * 0.42 + 0.02),
+    collarY: spec.topH * 0.55 + spec.collarH * 0.35,
+  };
 }
 
 function getShared() {
@@ -70,23 +128,13 @@ function getShared() {
     shaft: markShared(
       new THREE.CylinderGeometry(SHAFT_R_TOP, SHAFT_R_BOT, SHAFT_H, SEG, 1, false)
     ),
-    // One thick UFO saucer with a hole around the shaft (no coplanar stacks).
-    saucer: lathe([
-      [0.74, -0.2],
-      [1.05, -0.36],
-      [1.5, -0.32],
-      [1.95, -0.16],
-      [2.16, -0.04],
-      [2.22, 0.0],
-      [2.16, 0.06],
-      [1.95, 0.18],
-      [1.5, 0.34],
-      [1.05, 0.4],
-      [0.74, 0.24],
-      [0.74, -0.2],
-    ]),
+    windowBands: WINDOW_BANDS.map((b) =>
+      markShared(new THREE.CylinderGeometry(b.r, b.r, b.h, SEG, 1, false))
+    ),
+    rib: markShared(new THREE.CylinderGeometry(RIB_R, RIB_R, RIB_H, 16)),
+    saucers: SAUCERS.map(makeSaucerGeos),
     ring: markShared(new THREE.TorusGeometry(RING_R, RING_TUBE, 16, SEG)),
-    strut: markShared(new THREE.CylinderGeometry(0.026, 0.026, STRUT_LEN, 10)),
+    strut: markShared(new THREE.CylinderGeometry(0.026, 0.026, STRUT_LEN, 12)),
     // Bulky rounded control bulb, wider than the shaft.
     cap: lathe([
       [0.64, 0.08],
@@ -100,8 +148,8 @@ function getShared() {
       [0.22, 2.7],
       [0.0, CAP_H],
     ]),
-    spire: markShared(new THREE.CylinderGeometry(0.045, 0.07, SPIRE_H, 16)),
-    tip: markShared(new THREE.ConeGeometry(0.09, TIP_H, 16)),
+    spire: markShared(new THREE.CylinderGeometry(0.045, 0.07, SPIRE_H, 24)),
+    tip: markShared(new THREE.ConeGeometry(0.09, TIP_H, 24)),
   };
   return shared;
 }
@@ -129,8 +177,21 @@ export function createSciFiTower(color = IDLE) {
 
   const silver = metal(0xc5ccd6, { roughness: 0.34, metalness: 0.72 });
   const chrome = metal(0xe4e9ef, { roughness: 0.2, metalness: 0.88 });
+  const darkMetal = metal(0x3a4556, { roughness: 0.44, metalness: 0.76 });
   const copper = makeTint(metal(0xb87333, { roughness: 0.38, metalness: 0.78 }), "copper");
   tint.push(copper);
+
+  const glass = makeTint(
+    new THREE.MeshStandardMaterial({
+      color: 0x1a2333,
+      emissive: 0xa855f7,
+      emissiveIntensity: 0.28,
+      roughness: 0.22,
+      metalness: 0.48,
+    }),
+    "glass"
+  );
+  tint.push(glass);
 
   const glow = makeTint(
     new THREE.MeshStandardMaterial({
@@ -147,13 +208,44 @@ export function createSciFiTower(color = IDLE) {
   const base = new THREE.Mesh(g.base, chrome);
   root.add(base);
 
-  const shaft = new THREE.Mesh(g.shaft, silver);
+  const shaft = new THREE.Mesh(g.shaft, darkMetal);
   shaft.position.y = SHAFT_Y;
   root.add(shaft);
 
-  const saucer = new THREE.Mesh(g.saucer, copper);
-  saucer.position.y = SAUCER_Y;
-  root.add(saucer);
+  for (let i = 0; i < g.windowBands.length; i++) {
+    const band = new THREE.Mesh(g.windowBands[i], glass);
+    band.position.y = WINDOW_BANDS[i].y;
+    root.add(band);
+  }
+
+  for (let i = 0; i < RIB_N; i++) {
+    const ang = (i / RIB_N) * Math.PI * 2;
+    const rib = new THREE.Mesh(g.rib, silver);
+    rib.position.set(Math.cos(ang) * RIB_DIST, SHAFT_Y, Math.sin(ang) * RIB_DIST);
+    root.add(rib);
+  }
+
+  for (let i = 0; i < g.saucers.length; i++) {
+    const spec = SAUCERS[i];
+    const sg = g.saucers[i];
+    const top = new THREE.Mesh(sg.top, i === 0 ? chrome : silver);
+    top.position.y = spec.y;
+    root.add(top);
+    const bot = new THREE.Mesh(sg.bot, copper);
+    bot.position.y = spec.y;
+    root.add(bot);
+    const rim = new THREE.Mesh(sg.rim, chrome);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = spec.y;
+    root.add(rim);
+    const accent = new THREE.Mesh(sg.accent, glow);
+    accent.rotation.x = Math.PI / 2;
+    accent.position.y = spec.y + sg.accentY;
+    root.add(accent);
+    const collar = new THREE.Mesh(sg.collar, silver);
+    collar.position.y = spec.y + sg.collarY;
+    root.add(collar);
+  }
 
   const up = new THREE.Vector3(0, 1, 0);
   const radial = new THREE.Vector3();
@@ -207,6 +299,9 @@ export function tintSciFiTower(group, hex) {
       mat.emissiveIntensity = 0.55;
     } else if (slot === "copper") {
       mat.color.copy(copperCol);
+    } else if (slot === "glass") {
+      mat.emissive.copy(c);
+      mat.emissiveIntensity = 0.28;
     }
     mat.needsUpdate = true;
   }
