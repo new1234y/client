@@ -188,7 +188,31 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
 
         <section className="relative overflow-hidden bg-blue-600 text-white"><div className="landing-dots-dark mx-auto flex min-h-[75vh] max-w-7xl flex-col items-center justify-center px-5 py-24 text-center sm:px-8"><Reveal><p className="text-xs font-black uppercase tracking-[.25em] text-blue-200">À vous de jouer</p><h2 className="mx-auto mt-5 max-w-4xl text-balance text-5xl font-black leading-none tracking-[-.045em] sm:text-7xl">La prochaine poursuite commence ici.</h2><p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-blue-100">Créez une salle en quelques secondes ou rejoignez votre groupe avec le code partagé.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><button type="button" onClick={handleCreate} className="rounded-full bg-white px-7 py-4 font-black text-blue-700 hover:bg-blue-50">Créer une partie</button><a href="#top" className="rounded-full border border-blue-300 px-7 py-4 font-black text-white hover:bg-blue-500">Saisir un code</a></div></Reveal></div></section>
 
-        {midJoinWait && <section className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border border-blue-200 bg-white p-5 text-center shadow-2xl dark:border-blue-800 dark:bg-slate-900"><p className="font-bold">En attente · salle <span className="font-mono text-blue-600">{midJoinWait.code}</span></p><p className="mt-1 text-sm text-slate-500">L'hôte doit accepter votre demande.</p><button type="button" onClick={onCancelMidJoin} className="mt-3 text-sm font-bold text-blue-600 underline">Annuler</button></section>}
+        {midJoinWait && (() => {
+          const status = midJoinWait.status || "waiting";
+          const title =
+            status === "denied" ? "Demande refusée" :
+            status === "accepted" ? "Demande acceptée" :
+            status === "host_disconnected" ? "Hôte déconnecté" :
+            "En attente de l'hôte";
+          const body =
+            midJoinWait.message ||
+            (status === "denied" ? "L'hôte a refusé votre demande." :
+            status === "accepted" ? "Vous allez rejoindre la partie." :
+            status === "host_disconnected" ? "L'hôte s'est déconnecté. En attente de sa reconnexion…" :
+            "L'hôte doit accepter votre demande.");
+          const tone =
+            status === "denied" ? "border-red-200 dark:border-red-800" :
+            status === "host_disconnected" ? "border-amber-200 dark:border-amber-800" :
+            "border-blue-200 dark:border-blue-800";
+          return (
+            <section className={`fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border bg-white p-5 text-center shadow-2xl dark:bg-slate-900 ${tone}`}>
+              <p className="font-bold">{title} · salle <span className="font-mono text-blue-600">{midJoinWait.code}</span></p>
+              <p className="mt-1 text-sm text-slate-500">{body}</p>
+              <button type="button" onClick={onCancelMidJoin} className="mt-3 text-sm font-bold text-blue-600 underline">{status === "waiting" || status === "host_disconnected" ? "Annuler" : "Fermer"}</button>
+            </section>
+          );
+        })()}
       </main>
 
       <footer className="border-t border-slate-200 bg-white px-5 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950"><button type="button" onClick={onOpenSettings} className="font-bold text-slate-700 hover:text-blue-600 dark:text-slate-200">Réglages</button><span className="mx-3">·</span><span>Chase GPS — Jouez dehors.</span></footer>

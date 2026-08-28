@@ -170,11 +170,13 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel, visible = true
       }
     }
 
-    // For other notifications (join_request, balise_lure), use a longer duration
-    // These have clickable buttons and should stay longer
-    const hasButtonEffect = effects.some(e => 
-      e.kind === 'join_request' || e.kind === 'balise_lure'
-    );
+    // Join requests stay until Accept/Deny — never auto-hide.
+    if (effects.some(e => e.kind === 'join_request')) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    // For other notifications (balise_lure), use a longer duration
+    const hasButtonEffect = effects.some(e => e.kind === 'balise_lure');
     if (hasButtonEffect) {
       return 10000; // 10 seconds for button notifications
     }

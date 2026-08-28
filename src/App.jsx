@@ -52,6 +52,8 @@ const LS_NICKNAME_KEY = "chase_gps_nickname";
 const LS_LAST_NICKNAME_KEY = "chase_gps_last_nickname";
 const LS_LAST_ROOM_KEY = "chase_gps_last_room";
 const LS_LAST_SESSION_KEY = "chase_gps_last_session";
+const LS_SESSION_OWNER_KEY = "chase_gps_session_owner";
+const SESSION_OWNER_CHANNEL = "chase_gps_session_owner";
 
 function saveSession(sessionId, roomCode, nickname) {
   logger.log('[saveSession] Called with:', { sessionId, roomCode, nickname });
@@ -411,6 +413,42 @@ function SettingsButton({ size = "md" }) {
   );
 }
 
+function JoinRequestOverlay({ queue, onRespond }) {
+  if (!queue?.length) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-[6000] pt-[env(safe-area-inset-top)]">
+      <div className="pointer-events-auto mx-auto w-full max-w-lg space-y-2 p-3">
+        {queue.map((j) => (
+          <div
+            key={j.requestId}
+            className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-white/95 p-3 shadow-2xl ring-1 ring-amber-100 backdrop-blur-xl dark:border-amber-900 dark:bg-slate-900/95 dark:ring-amber-900 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-sm font-medium text-amber-950 dark:text-amber-100">
+              <span className="font-bold">{j.nickname}</span> souhaite rejoindre la partie
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="min-h-11 flex-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 sm:flex-none"
+                onClick={() => onRespond(j.requestId, true)}
+              >
+                Accepter
+              </button>
+              <button
+                type="button"
+                className="min-h-11 flex-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:flex-none"
+                onClick={() => onRespond(j.requestId, false)}
+              >
+                Refuser
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const { theme } = useTheme();
   const { notifications, addNotification, removeNotification } = useNotifications();
@@ -603,6 +641,7 @@ export default function App() {
   const [reconnectError, setReconnectError] = useState(null);
   const [reconnectReason, setReconnectReason] = useState(null);
   const [midJoinWait, setMidJoinWait] = useState(null);
+  const [sessionTakenOver, setSessionTakenOver] = useState(false);
   const [joinRequestQueue, setJoinRequestQueue] = useState([]);
   const [partyChatMessages, setPartyChatMessages] = useState([]);
   const [captureCooldownUntil, setCaptureCooldownUntil] = useState(null);
@@ -627,6 +666,13 @@ export default function App() {
   const lastNicknameRef = useRef("");
   const sessionIdRef = useRef(null);
   const isHostRef = useRef(false);
+  const sessionTakenOverRef = useRef(false);
+  const tabIdRef = useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `tab-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+  const sessionOwnerChannelRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const entryReqRef = useRef(0);
   const onJoinRef = useRef(null);
@@ -670,7 +716,6 @@ export default function App() {
   const [baliseLureSelecting, setBaliseLureSelecting] = useState(false);
   const [baliseLureTarget, setBaliseLureTarget] = useState(null);
   const [ghostUiNow, setGhostUiNow] = useState(() => Date.now());
-  const [joinRequestEffect, setJoinRequestEffect] = useState(null);
   const lastPingRef = useRef(Date.now());
   const serverTimeOffsetRef = useRef(0); // Offset between server time and local time
   
@@ -759,6 +804,86 @@ export default function App() {
   stageRef.current = stage;
   sessionIdRef.current = sessionId;
   isHostRef.current = isHost;
+
+  const claimSessionOwnership = useCallback((sid) => {
+    if (!sid || sessionTakenOverRef.current) return;
+    const payload = { sessionId: sid, tabId: tabIdRef.current, at: Date.now() };
+    try {
+      localStorage.setItem(LS_SESSION_OWNER_KEY, JSON.stringify(payload));
+    } catch {}
+    try {
+      sessionOwnerChannelRef.current?.postMessage({ type: "claim", ...payload });
+    } catch {}
+  }, []);
+
+  const applySessionTakenOver = useCallback(() => {
+    if (sessionTakenOverRef.current) return;
+    sessionTakenOverRef.current = true;
+    stageRef.current = "entry";
+    setStage("entry");
+    setSessionTakenOver(true);
+    setIsReconnecting(false);
+    setReconnectReason(null);
+    setLobby(null);
+    setRolesReveal(null);
+    setGameState(null);
+    setRole(null);
+    setMidJoinWait(null);
+    setJoinRequestQueue([]);
+    setSessionId(null);
+    setIsHost(false);
+    if (reconnectRetryRef.current) {
+      clearTimeout(reconnectRetryRef.current);
+      reconnectRetryRef.current = null;
+    }
+    const s = socketRef.current;
+    if (s) {
+      try { s.disconnect(); } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const onForeignClaim = (otherTabId, otherSessionId) => {
+      if (!otherTabId || otherTabId === tabIdRef.current) return;
+      if (sessionTakenOverRef.current) return;
+      const saved = loadSession();
+      const liveSid = sessionIdRef.current || saved?.sessionId;
+      if (otherSessionId && liveSid && otherSessionId !== liveSid) return;
+      if (!liveSid && stageRef.current === "entry") return;
+      applySessionTakenOver();
+    };
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel(SESSION_OWNER_CHANNEL);
+      sessionOwnerChannelRef.current = bc;
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type === "claim") {
+          onForeignClaim(ev.data.tabId, ev.data.sessionId);
+        }
+      };
+    } catch {
+      sessionOwnerChannelRef.current = null;
+    }
+
+    const onStorage = (e) => {
+      if (e.key !== LS_SESSION_OWNER_KEY || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        onForeignClaim(data.tabId, data.sessionId);
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+
+    const saved = loadSession();
+    if (saved?.sessionId) claimSessionOwnership(saved.sessionId);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      try { bc?.close(); } catch {}
+      sessionOwnerChannelRef.current = null;
+    };
+  }, [applySessionTakenOver, claimSessionOwnership]);
 
   // Tick pour les overlays liés au bruit (timer barre de progression)
   useEffect(() => {
@@ -871,7 +996,8 @@ export default function App() {
   }, [theme, stage]);
 
   const geoEnabled =
-    stage === "lobby" || stage === "role_reveal" || stage === "game";
+    !sessionTakenOver &&
+    (stage === "lobby" || stage === "role_reveal" || stage === "game");
 
   // Determine whether the player is currently outside the effective global zone
   // so we can ask the geolocation hook to be more aggressive when outside.
@@ -940,6 +1066,11 @@ export default function App() {
 
   // Reconnection logic - ensures socket is connected then restores session with perfect fallback
   const attemptReconnect = useCallback((s, attempt = 1, useBackup = false) => {
+    if (sessionTakenOverRef.current) {
+      logger.log('[attemptReconnect] Session taken over, skip');
+      setIsReconnecting(false);
+      return;
+    }
     let saved = useBackup ? loadSessionBackup() : loadSession();
     
     // If main session failed and we haven't tried backup yet, try it
@@ -1000,6 +1131,8 @@ export default function App() {
 
             // Restore the session with the correct keys
             saveSession(res.sessionId, saved.roomCode, saved.nickname);
+            claimSessionOwnership(res.sessionId);
+            sessionTakenOverRef.current = false;
 
             if (res.phase === "lobby" && res.lobby) {
               setLobby(res.lobby);
@@ -1088,7 +1221,7 @@ export default function App() {
 
     logger.log('[attemptReconnect] Socket connected, attempting restore');
     tryRestore();
-  }, [resetToEntry]);
+  }, [resetToEntry, claimSessionOwnership]);
 
   // Auto-switch to join mode if URL has code
   useEffect(() => {
@@ -1126,12 +1259,14 @@ export default function App() {
     s.on("connect", () => {
       setConnected(true);
       lastPingRef.current = getServerTime();
+      if (sessionTakenOverRef.current) return;
       let saved = loadSession();
       if (!saved) {
         // Try backup keys if main keys not found
         saved = loadSessionBackup();
       }
       if (saved) {
+        claimSessionOwnership(saved.sessionId);
         setIsReconnecting(true);
         setReconnectReason("lost_connection");
         setReconnectError(null);
@@ -1141,6 +1276,7 @@ export default function App() {
 
     s.on("disconnect", () => {
       setConnected(false);
+      if (sessionTakenOverRef.current) return;
       if (stageRef.current === "entry") {
         // On home screen, clear main session but keep backup for crash recovery
         clearSession();
@@ -1438,33 +1574,45 @@ export default function App() {
     });
 
     s.on("join_request_pending", (data) => {
-      setJoinRequestQueue((q) => [
-        ...q,
-        {
-          requestId: data.requestId,
-          nickname: data.nickname,
-          code: data.code,
-        },
-      ]);
-      // Use new game notification modal instead of old notification
-      setJoinRequestEffect({
-        kind: "join_request",
-        requestId: data.requestId,
-        nickname: data.nickname,
-        onAccept: () => respondJoinRequest(data.requestId, true),
-        onDeny: () => respondJoinRequest(data.requestId, false),
+      const sid = sessionIdRef.current;
+      const hostBySession = Boolean(data?.hostSessionId && sid && data.hostSessionId === sid);
+      if (!isHostRef.current && !hostBySession && sid) return;
+      setJoinRequestQueue((q) => {
+        if (!data?.requestId || q.some((x) => x.requestId === data.requestId)) return q;
+        return [...q, { requestId: data.requestId, nickname: data.nickname, code: data.code }];
       });
     });
 
     s.on("join_request_denied", (data) => {
-      setMidJoinWait(null);
+      setMidJoinWait((w) =>
+        w ? { ...w, status: "denied", message: data?.message || "Votre demande a été refusée." } : null
+      );
       addNotification(data?.message || "Demande refusée par l'hôte.", "warning");
+    });
+
+    s.on("join_request_host_disconnected", (data) => {
+      setMidJoinWait((w) =>
+        w ? { ...w, status: "host_disconnected", message: data?.message || "L'hôte s'est déconnecté. En attente de sa reconnexion…" } : null
+      );
+    });
+
+    s.on("join_request_host_reconnected", (data) => {
+      setMidJoinWait((w) =>
+        w ? { ...w, status: "waiting", message: data?.message || "L'hôte est de retour. En attente de sa décision." } : w
+      );
+    });
+
+    s.on("session_replaced", (data) => {
+      logger.log('[session_replaced]', data);
+      applySessionTakenOver();
     });
 
     s.on("join_request_accepted", (payload) => {
       const nick = lastNicknameRef.current || nickname.trim() || "Joueur";
       // Save session immediately to localStorage (even if connection fails later)
       saveSession(payload.sessionId, payload.code, nick);
+      claimSessionOwnership(payload.sessionId);
+      sessionTakenOverRef.current = false;
       setSessionId(payload.sessionId);
       setIsHost(Boolean(payload.isHost));
       setMidJoinWait(null);
@@ -1486,7 +1634,7 @@ export default function App() {
       } else {
         setStage("lobby");
       }
-      s.emit("refresh_state");
+      if (!sessionTakenOverRef.current) s.emit("refresh_state");
     });
 
     s.on("room_destroyed", () => {
@@ -1505,6 +1653,7 @@ export default function App() {
       } catch {
         /* retry on next visibility */
       }
+      if (sessionTakenOverRef.current) return;
       if (s.connected) {
         s.emit("refresh_state");
       } else if (
@@ -1521,6 +1670,7 @@ export default function App() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const heartbeatCheck = setInterval(() => {
+      if (sessionTakenOverRef.current) return;
       if (s.connected && getServerTime() - lastPingRef.current > 180000) {
         s.emit("refresh_state");
       }
@@ -1536,7 +1686,7 @@ export default function App() {
       s.removeAllListeners();
       s.close();
     };
-  }, [resetToEntry, attemptReconnect, addNotification]);
+  }, [resetToEntry, attemptReconnect, addNotification, applySessionTakenOver, claimSessionOwnership]);
 
   useEffect(() => {
     if (gameTab === "admin") setGameTab("settings");
@@ -1555,6 +1705,7 @@ export default function App() {
   }, [gameTab]);
 
   useEffect(() => {
+    if (sessionTakenOverRef.current) return;
     if (!socket || !position) {
       logger.log('[Position emit] Skipped:', { hasSocket: !!socket, hasPosition: !!position });
       return;
@@ -1674,6 +1825,8 @@ export default function App() {
       }
       // Save session immediately to localStorage (even if connection fails later)
       saveSession(res.sessionId, res.code, trimmedNickname);
+      claimSessionOwnership(res.sessionId);
+      sessionTakenOverRef.current = false;
       if (window.history.replaceState) {
         window.history.replaceState({}, "", window.location.pathname);
       }
@@ -1682,24 +1835,22 @@ export default function App() {
       setLobby(res.lobby);
       setStage("lobby");
     });
-  }, [socket, nickname]);
+  }, [socket, nickname, claimSessionOwnership]);
 
-  const respondJoinRequest = useCallback(
-    (requestId, accept) => {
-      logger.log('[respondJoinRequest] Called with:', { requestId, accept });
-      if (!socket) {
-        logger.log('[respondJoinRequest] No socket');
-        return;
-      }
-      socket.emit("respond_join_request", { requestId, accept }, (res) => {
-        logger.log('[respondJoinRequest] Response:', res);
-        if (!res?.ok) setErrorBanner(res?.error || "Action impossible.");
-        setJoinRequestQueue((q) => q.filter((x) => x.requestId !== requestId));
-        setJoinRequestEffect(null);
-      });
-    },
-    [socket]
-  );
+  const respondJoinRequest = useCallback((requestId, accept) => {
+    logger.log('[respondJoinRequest] Called with:', { requestId, accept });
+    const live = socketRef.current;
+    if (!live) {
+      logger.log('[respondJoinRequest] No socket');
+      return;
+    }
+    live.emit("respond_join_request", { requestId, accept }, (res) => {
+      logger.log('[respondJoinRequest] Response:', res);
+      if (!res?.ok) setErrorBanner(res?.error || "Action impossible.");
+      else setErrorBanner(null);
+      setJoinRequestQueue((q) => q.filter((x) => x.requestId !== requestId));
+    });
+  }, []);
 
   const onJoin = useCallback(async () => {
     if (!socket || !nickname.trim() || !roomCodeInput.trim()) {
@@ -1742,6 +1893,8 @@ export default function App() {
         if (res?.ok) {
           // Save session immediately to localStorage (even if connection fails later)
           saveSession(res.sessionId, res.code, trimmedNickname);
+          claimSessionOwnership(res.sessionId);
+          sessionTakenOverRef.current = false;
           if (window.history.replaceState) {
             window.history.replaceState({}, "", window.location.pathname);
           }
@@ -1755,15 +1908,18 @@ export default function App() {
           socket.emit(
             "request_join_midgame",
             {
-              code: roomCodeInput.trim(),
+              code: codeUpper,
               nickname: trimmedNickname,
             },
             (r2) => {
               if (r2?.ok) {
-                setMidJoinWait({ code: roomCodeInput.trim() });
+                setMidJoinWait({ code: codeUpper, status: "waiting" });
                 setErrorBanner(null);
+                setNicknameError(null);
               } else if (r2?.useNormalJoin) {
                 setErrorBanner(r2?.error || "Rejoignez depuis l'écran d'accueil.");
+              } else if (r2?.error && (String(r2.error).toLowerCase().includes("pseudo") || String(r2.error).toLowerCase().includes("déjà") || String(r2.error).toLowerCase().includes("nom"))) {
+                setNicknameError(r2.error);
               } else {
                 setErrorBanner(r2?.error || "Demande impossible.");
               }
@@ -1778,7 +1934,7 @@ export default function App() {
         }
       }
     );
-  }, [socket, nickname, roomCodeInput, addNotification]);
+  }, [socket, nickname, roomCodeInput, addNotification, claimSessionOwnership]);
 
   // Keep onJoinRef in sync with onJoin
   useEffect(() => {
@@ -2254,6 +2410,33 @@ export default function App() {
     />
   );
 
+  if (sessionTakenOver) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-950 shadow-2xl dark:bg-slate-900 dark:text-white">
+          <p className="text-lg font-black tracking-tight">Session terminée</p>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            Cette session continue sur une autre page. Celle-ci est terminée.
+          </p>
+          <button
+            type="button"
+            className="mt-6 min-h-11 w-full rounded-full bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+            onClick={() => {
+              setSessionTakenOver(false);
+              resetToEntry(false);
+              const s = socketRef.current;
+              if (s && !s.connected) {
+                try { s.connect(); } catch {}
+              }
+            }}
+          >
+            Accueil
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (location.pathname === "/settings") {
     return <SettingsPage />;
   }
@@ -2335,6 +2518,8 @@ export default function App() {
                       setEntryBusyKind(null);
                       if (res?.ok) {
                         saveSession(res.sessionId, res.code, trimmedNickname);
+                        claimSessionOwnership(res.sessionId);
+                        sessionTakenOverRef.current = false;
                         if (window.history.replaceState) window.history.replaceState({}, "", window.location.pathname);
                         setSessionId(res.sessionId);
                         setIsHost(res.isHost);
@@ -2410,6 +2595,7 @@ if (stage === "lobby" && lobby) {
     <div className="stage-enter flex min-h-full flex-col bg-white text-slate-950 landing-dots dark:bg-slate-950 dark:text-white">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
+      {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
       <header className="sticky top-0 z-50 shrink-0 border-b border-slate-200/70 bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
         <div className="flex h-16 items-center justify-between px-4 sm:px-5">
           <BrandMark />
@@ -2763,6 +2949,7 @@ if (stage === "role_reveal" && rolesReveal) {
     <div className="stage-enter flex min-h-full flex-col bg-white text-slate-950 landing-dots dark:bg-slate-950 dark:text-white">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
+      {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
 
       {showShareParty && rolesReveal.code && (
         <SharePartyModal
@@ -3070,10 +3257,6 @@ if (stage === "role_reveal" && rolesReveal) {
     const hudPowerEffects = [];
     let hudPowerUiNow = getServerTime();
     
-    if (joinRequestEffect) {
-      hudPowerEffects.push(joinRequestEffect);
-      hudPowerUiNow = Date.now();
-    }
     if (baliseLureSelecting) {
       hudPowerEffects.push({ kind: "balise_lure" });
     }
@@ -3245,6 +3428,7 @@ if (stage === "role_reveal" && rolesReveal) {
       <div className="stage-enter flex h-full min-h-0 flex-col bg-white pt-[env(safe-area-inset-top)] text-slate-950 dark:bg-slate-950 dark:text-white">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
+        {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
 
         {isReconnecting && !showReconnectModal && (
           <div className="z-[1200] shrink-0 border-b border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 dark:text-slate-200">
@@ -3260,37 +3444,6 @@ if (stage === "role_reveal" && rolesReveal) {
                 </button>
               )}
             </div>
-          </div>
-        )}
-
-        {isHost && joinRequestQueue.length > 0 && (
-          <div className="z-[1200] shrink-0 space-y-2 border-b border-amber-200 bg-amber-50/95 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/80">
-            {joinRequestQueue.map((j) => (
-              <div
-                key={j.requestId}
-                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <p className="text-xs font-medium text-amber-950 dark:text-amber-100">
-                  <span className="font-bold">{j.nickname}</span> demande à rejoindre
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="rounded-[8px] bg-[#5B7FA5] px-3 py-1.5 text-xs font-bold text-white"
-                    onClick={() => respondJoinRequest(j.requestId, true)}
-                  >
-                    Accepter
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-[8px] bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-slate-100"
-                    onClick={() => respondJoinRequest(j.requestId, false)}
-                  >
-                    Refuser
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         )}
 
