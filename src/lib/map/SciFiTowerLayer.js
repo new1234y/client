@@ -14,17 +14,24 @@ export const SCIFI_TOWER_LAYER_ID = "sci-fi-towers";
 const IDLE = "#a855f7";
 const ROT_X = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), Math.PI / 2);
 
-const DISCS = [
-  { y: 3.55, r: 2.48, strutRot: 0.0 },
-  { y: 7.35, r: 2.08, strutRot: 0.35 },
-  { y: 11.2, r: 2.38, strutRot: 0.12 },
-  { y: 15.05, r: 2.02, strutRot: 0.48 },
-  { y: 18.7, r: 2.62, strutRot: 0.22 },
-];
-
-const SHAFT_H = 18.5;
-const SHAFT_Y = 0.55 + SHAFT_H / 2;
-const TOWER_H = 24.6;
+const SEG = 64;
+const BASE_H = 1.42;
+const SHAFT_H = 16.6;
+const SHAFT_R_TOP = 0.58;
+const SHAFT_R_BOT = 0.68;
+const SHAFT_R_MID = (SHAFT_R_TOP + SHAFT_R_BOT) / 2;
+const SHAFT_Y = BASE_H + SHAFT_H / 2;
+const SAUCER_Y = 4.2;
+const RING_YS = [8.2, 11.9, 15.6];
+const RING_R = 1.48;
+const RING_TUBE = 0.055;
+const STRUT_LEN = RING_R - RING_TUBE - SHAFT_R_MID;
+const STRUT_MID = SHAFT_R_MID + STRUT_LEN / 2;
+const CAP_Y = BASE_H + SHAFT_H;
+const CAP_H = 2.74;
+const SPIRE_H = 2.55;
+const TIP_H = 0.42;
+const TOWER_H = CAP_Y + CAP_H + SPIRE_H + TIP_H;
 
 let shared = null;
 
@@ -33,127 +40,65 @@ function markShared(geo) {
   return geo;
 }
 
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function makeWindowTextures() {
-  const w = 512;
-  const h = 1024;
-  const albedoC = document.createElement("canvas");
-  albedoC.width = w;
-  albedoC.height = h;
-  const emitC = document.createElement("canvas");
-  emitC.width = w;
-  emitC.height = h;
-  const a = albedoC.getContext("2d");
-  const e = emitC.getContext("2d");
-  const rng = mulberry32(0x5c1f17);
-
-  a.fillStyle = "#121826";
-  a.fillRect(0, 0, w, h);
-  e.fillStyle = "#000000";
-  e.fillRect(0, 0, w, h);
-
-  const floors = 26;
-  const cols = 10;
-  const padX = 22;
-  const padY = 28;
-  const gapX = 7;
-  const gapY = 11;
-  const winW = (w - padX * 2 - gapX * (cols - 1)) / cols;
-  const floorH = (h - padY * 2) / floors;
-
-  for (let fl = 0; fl < floors; fl++) {
-    const y0 = padY + fl * floorH;
-    a.fillStyle = "#1b2436";
-    a.fillRect(0, y0 + floorH - 3, w, 3);
-    for (let c = 0; c < cols; c++) {
-      const x = padX + c * (winW + gapX);
-      const y = y0 + 4;
-      const lit = rng() > 0.32;
-      const warm = rng();
-      if (lit) {
-        const g = 170 + Math.floor(warm * 70);
-        const b = 200 + Math.floor(warm * 55);
-        a.fillStyle = `rgb(${g - 20},${g},${b})`;
-        e.fillStyle = `rgb(${200 + warm * 55},${210 + warm * 45},${255})`;
-      } else {
-        a.fillStyle = rng() > 0.7 ? "#2a3348" : "#0a0e16";
-        e.fillStyle = "#000000";
-      }
-      a.fillRect(x, y, winW, floorH - gapY);
-      e.fillRect(x, y, winW, floorH - gapY);
-    }
-  }
-
-  const albedo = new THREE.CanvasTexture(albedoC);
-  albedo.wrapS = THREE.RepeatWrapping;
-  albedo.wrapT = THREE.ClampToEdgeWrapping;
-  albedo.anisotropy = 4;
-  albedo.colorSpace = THREE.SRGBColorSpace;
-  albedo.userData.shared = true;
-  albedo.needsUpdate = true;
-
-  const emissive = new THREE.CanvasTexture(emitC);
-  emissive.wrapS = THREE.RepeatWrapping;
-  emissive.wrapT = THREE.ClampToEdgeWrapping;
-  emissive.anisotropy = 4;
-  emissive.userData.shared = true;
-  emissive.needsUpdate = true;
-
-  return { albedo, emissive };
-}
-
-function lathe(pts, seg = 48) {
-  return markShared(new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg));
+function lathe(pts, seg = SEG) {
+  const geo = new THREE.LatheGeometry(
+    pts.map(([x, y]) => new THREE.Vector2(x, y)),
+    seg
+  );
+  geo.computeVertexNormals();
+  return markShared(geo);
 }
 
 function getShared() {
   if (shared) return shared;
-  const windows = makeWindowTextures();
   shared = {
-    windows,
-    plinthLo: markShared(new THREE.CylinderGeometry(2.05, 2.18, 0.28, 32)),
-    plinthHi: markShared(new THREE.CylinderGeometry(1.72, 1.9, 0.32, 32)),
-    plinthRing: markShared(new THREE.TorusGeometry(1.95, 0.07, 8, 40)),
-    shaft: markShared(new THREE.CylinderGeometry(1.02, 1.16, SHAFT_H, 32, 1, false)),
-    rib: markShared(new THREE.BoxGeometry(0.08, SHAFT_H, 0.14)),
-    collar: markShared(new THREE.CylinderGeometry(1.22, 1.18, 0.28, 24)),
-    saucerTop: lathe([
-      [0, 0.03],
-      [0.32, 0.1],
-      [0.68, 0.13],
-      [0.92, 0.07],
-      [1, 0],
+    // Wide shallow dome plinth tapering into the shaft.
+    base: lathe([
+      [0.0, 0.0],
+      [2.38, 0.0],
+      [2.45, 0.06],
+      [2.32, 0.22],
+      [1.95, 0.48],
+      [1.45, 0.78],
+      [0.95, 1.12],
+      [0.76, 1.32],
+      [0.72, 1.52],
     ]),
-    saucerBot: lathe([
-      [0, -0.02],
-      [0.38, -0.11],
-      [0.76, -0.15],
-      [0.95, -0.07],
-      [1, 0],
+    shaft: markShared(
+      new THREE.CylinderGeometry(SHAFT_R_TOP, SHAFT_R_BOT, SHAFT_H, SEG, 1, false)
+    ),
+    // One thick UFO saucer with a hole around the shaft (no coplanar stacks).
+    saucer: lathe([
+      [0.74, -0.2],
+      [1.05, -0.36],
+      [1.5, -0.32],
+      [1.95, -0.16],
+      [2.16, -0.04],
+      [2.22, 0.0],
+      [2.16, 0.06],
+      [1.95, 0.18],
+      [1.5, 0.34],
+      [1.05, 0.4],
+      [0.74, 0.24],
+      [0.74, -0.2],
     ]),
-    rim: markShared(new THREE.TorusGeometry(1, 0.055, 10, 48)),
-    ringLight: markShared(new THREE.TorusGeometry(1, 0.03, 8, 40)),
-    hub: markShared(new THREE.CylinderGeometry(1.2, 1.2, 0.18, 20)),
-    strut: markShared(new THREE.BoxGeometry(1, 0.07, 0.07)),
-    dome: markShared(new THREE.SphereGeometry(1.58, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2)),
-    domeCore: markShared(new THREE.SphereGeometry(0.72, 20, 12)),
-    domeRing: markShared(new THREE.TorusGeometry(1.5, 0.09, 10, 40)),
-    neck: markShared(new THREE.CylinderGeometry(0.95, 1.12, 0.55, 24)),
-    antenna: markShared(new THREE.CylinderGeometry(0.045, 0.085, 3.55, 10)),
-    antennaRing: markShared(new THREE.TorusGeometry(0.16, 0.028, 8, 20)),
-    antennaBall: markShared(new THREE.SphereGeometry(0.16, 14, 12)),
-    antennaCone: markShared(new THREE.ConeGeometry(0.11, 0.42, 10)),
-    fin: markShared(new THREE.BoxGeometry(0.06, 1.35, 0.55)),
+    ring: markShared(new THREE.TorusGeometry(RING_R, RING_TUBE, 16, SEG)),
+    strut: markShared(new THREE.CylinderGeometry(0.026, 0.026, STRUT_LEN, 10)),
+    // Bulky rounded control bulb, wider than the shaft.
+    cap: lathe([
+      [0.64, 0.08],
+      [0.9, 0.22],
+      [1.28, 0.52],
+      [1.52, 0.95],
+      [1.58, 1.4],
+      [1.48, 1.88],
+      [1.18, 2.28],
+      [0.7, 2.55],
+      [0.22, 2.7],
+      [0.0, CAP_H],
+    ]),
+    spire: markShared(new THREE.CylinderGeometry(0.045, 0.07, SPIRE_H, 16)),
+    tip: markShared(new THREE.ConeGeometry(0.09, TIP_H, 16)),
   };
   return shared;
 }
@@ -161,9 +106,8 @@ function getShared() {
 function metal(color, extra = {}) {
   return new THREE.MeshStandardMaterial({
     color,
-    metalness: extra.metalness ?? 0.42,
-    roughness: extra.roughness ?? 0.4,
-    envMapIntensity: 0.35,
+    metalness: extra.metalness ?? 0.72,
+    roughness: extra.roughness ?? 0.32,
     ...extra,
   });
 }
@@ -180,149 +124,64 @@ export function createSciFiTower(color = IDLE) {
   root.frustumCulled = false;
   const tint = [];
 
-  const silver = metal(0xc9d1dc, { roughness: 0.34, metalness: 0.48 });
-  const silverDark = metal(0x6b7280, { roughness: 0.46, metalness: 0.38 });
-  const chrome = metal(0xe5e7eb, { roughness: 0.26, metalness: 0.58 });
-  const copper = makeTint(metal(0xc2410c, { roughness: 0.36, metalness: 0.72 }), "copper");
+  const silver = metal(0xc5ccd6, { roughness: 0.34, metalness: 0.72 });
+  const chrome = metal(0xe4e9ef, { roughness: 0.2, metalness: 0.88 });
+  const copper = makeTint(metal(0xb87333, { roughness: 0.38, metalness: 0.78 }), "copper");
   tint.push(copper);
-
-  const glass = makeTint(
-    new THREE.MeshStandardMaterial({
-      map: g.windows.albedo,
-      color: 0x94a3b8,
-      roughness: 0.16,
-      metalness: 0.38,
-      emissive: 0xa855f7,
-      emissiveMap: g.windows.emissive,
-      emissiveIntensity: 0.48,
-    }),
-    "glass"
-  );
-  tint.push(glass);
 
   const glow = makeTint(
     new THREE.MeshStandardMaterial({
       color: 0xa855f7,
       emissive: 0xa855f7,
-      emissiveIntensity: 0.95,
-      roughness: 0.35,
-      metalness: 0.2,
+      emissiveIntensity: 0.55,
+      roughness: 0.28,
+      metalness: 0.42,
     }),
     "glow"
   );
   tint.push(glow);
 
-  const domeMat = makeTint(metal(0xd1d5db, { roughness: 0.18, metalness: 0.9, emissive: 0x111111, emissiveIntensity: 0.35 }), "dome");
-  tint.push(domeMat);
+  const base = new THREE.Mesh(g.base, chrome);
+  root.add(base);
 
-  const plinthLo = new THREE.Mesh(g.plinthLo, silverDark);
-  plinthLo.position.y = 0.14;
-  root.add(plinthLo);
-  const plinthHi = new THREE.Mesh(g.plinthHi, silver);
-  plinthHi.position.y = 0.42;
-  root.add(plinthHi);
-  const plinthRing = new THREE.Mesh(g.plinthRing, chrome);
-  plinthRing.rotation.x = Math.PI / 2;
-  plinthRing.position.y = 0.3;
-  root.add(plinthRing);
-
-  const shaft = new THREE.Mesh(g.shaft, glass);
+  const shaft = new THREE.Mesh(g.shaft, silver);
   shaft.position.y = SHAFT_Y;
   root.add(shaft);
 
-  for (let i = 0; i < 8; i++) {
-    const rib = new THREE.Mesh(g.rib, silverDark);
-    const ang = (i / 8) * Math.PI * 2;
-    rib.position.set(Math.cos(ang) * 1.12, SHAFT_Y, Math.sin(ang) * 1.12);
-    rib.rotation.y = -ang;
-    root.add(rib);
-  }
+  const saucer = new THREE.Mesh(g.saucer, copper);
+  saucer.position.y = SAUCER_Y;
+  root.add(saucer);
 
-  for (let i = 0; i < 4; i++) {
-    const fin = new THREE.Mesh(g.fin, silverDark);
-    const ang = (i / 4) * Math.PI * 2 + Math.PI / 8;
-    fin.position.set(Math.cos(ang) * 1.45, 1.05, Math.sin(ang) * 1.45);
-    fin.rotation.y = -ang;
-    root.add(fin);
-  }
-
-  DISCS.forEach((d, idx) => {
-    const top = new THREE.Mesh(g.saucerTop, idx === DISCS.length - 1 ? chrome : silver);
-    top.position.y = d.y;
-    top.scale.set(d.r, 1, d.r);
-    root.add(top);
-
-    const bot = new THREE.Mesh(g.saucerBot, copper);
-    bot.position.y = d.y;
-    bot.scale.set(d.r, 1, d.r);
-    root.add(bot);
-
-    const rim = new THREE.Mesh(g.rim, chrome);
-    rim.rotation.x = Math.PI / 2;
-    rim.position.y = d.y;
-    rim.scale.set(d.r, d.r, 1);
-    root.add(rim);
-
-    const ring = new THREE.Mesh(g.ringLight, glow);
+  const up = new THREE.Vector3(0, 1, 0);
+  const radial = new THREE.Vector3();
+  for (let i = 0; i < RING_YS.length; i++) {
+    const y = RING_YS[i];
+    const ring = new THREE.Mesh(g.ring, glow);
     ring.rotation.x = Math.PI / 2;
-    ring.position.y = d.y - 0.04;
-    ring.scale.set(d.r * 0.92, d.r * 0.92, 1);
+    ring.position.y = y;
     root.add(ring);
 
-    const hub = new THREE.Mesh(g.hub, silverDark);
-    hub.position.y = d.y;
-    root.add(hub);
-
-    const collar = new THREE.Mesh(g.collar, silver);
-    collar.position.y = d.y + 0.22;
-    root.add(collar);
-
-    for (let k = 0; k < 4; k++) {
-      const ang = (k / 4) * Math.PI * 2 + d.strutRot;
-      const strut = new THREE.Mesh(g.strut, silverDark);
-      const len = Math.max(0.6, d.r - 1.15);
-      strut.scale.x = len;
-      strut.position.set(Math.cos(ang) * (1.15 + len / 2), d.y - 0.16, Math.sin(ang) * (1.15 + len / 2));
-      strut.rotation.y = -ang;
+    for (let k = 0; k < 3; k++) {
+      const ang = (k / 3) * Math.PI * 2;
+      const strut = new THREE.Mesh(g.strut, silver);
+      radial.set(Math.cos(ang), 0, Math.sin(ang));
+      strut.position.set(radial.x * STRUT_MID, y, radial.z * STRUT_MID);
+      strut.quaternion.setFromUnitVectors(up, radial);
       root.add(strut);
     }
-  });
-
-  const neck = new THREE.Mesh(g.neck, silver);
-  neck.position.y = 19.15;
-  root.add(neck);
-
-  const dome = new THREE.Mesh(g.dome, domeMat);
-  dome.position.y = 19.42;
-  root.add(dome);
-
-  const domeCore = new THREE.Mesh(g.domeCore, glow);
-  domeCore.position.y = 20.05;
-  root.add(domeCore);
-
-  const domeRing = new THREE.Mesh(g.domeRing, chrome);
-  domeRing.rotation.x = Math.PI / 2;
-  domeRing.position.y = 19.44;
-  root.add(domeRing);
-
-  const mast = new THREE.Mesh(g.antenna, silver);
-  mast.position.y = 22.55;
-  root.add(mast);
-
-  const ball = new THREE.Mesh(g.antennaBall, glow);
-  ball.position.y = 20.95;
-  root.add(ball);
-
-  for (const yy of [21.7, 22.55]) {
-    const ar = new THREE.Mesh(g.antennaRing, chrome);
-    ar.rotation.x = Math.PI / 2;
-    ar.position.y = yy;
-    root.add(ar);
   }
 
-  const cone = new THREE.Mesh(g.antennaCone, glow);
-  cone.position.y = 24.5;
-  root.add(cone);
+  const cap = new THREE.Mesh(g.cap, chrome);
+  cap.position.y = CAP_Y;
+  root.add(cap);
+
+  const spire = new THREE.Mesh(g.spire, silver);
+  spire.position.y = CAP_Y + CAP_H + SPIRE_H / 2;
+  root.add(spire);
+
+  const tip = new THREE.Mesh(g.tip, glow);
+  tip.position.y = CAP_Y + CAP_H + SPIRE_H + TIP_H / 2;
+  root.add(tip);
 
   root.userData.tint = tint;
   root.userData.heightM = TOWER_H;
@@ -335,23 +194,16 @@ export function createSciFiTower(color = IDLE) {
 
 export function tintSciFiTower(group, hex) {
   const c = new THREE.Color(hex || IDLE);
-  const glassCol = c.clone().lerp(new THREE.Color(0x64748b), 0.42);
-  const copperCol = new THREE.Color(0xc2410c).lerp(c, 0.16);
+  const copperCol = new THREE.Color(0xb87333).lerp(c, 0.18);
   const mats = group?.userData?.tint || [];
   for (const mat of mats) {
     const slot = mat.userData.slot;
-    if (slot === "glass") {
-      mat.color.copy(glassCol);
-      mat.emissive.copy(c);
-      mat.emissiveIntensity = 0.5;
-    } else if (slot === "glow") {
+    if (slot === "glow") {
       mat.color.copy(c);
       mat.emissive.copy(c);
-      mat.emissiveIntensity = 0.95;
+      mat.emissiveIntensity = 0.55;
     } else if (slot === "copper") {
       mat.color.copy(copperCol);
-    } else if (slot === "dome") {
-      mat.emissive.copy(c).multiplyScalar(0.22);
     }
     mat.needsUpdate = true;
   }
@@ -449,16 +301,14 @@ function fallbackFeatures(towers) {
     const color = t.color || IDLE;
     const { lat, lng } = t;
     const rings = [
-      { r: 2.35, base: 0, height: 18.6 },
-      { r: 2.55, base: 3.25, height: 3.95 },
-      { r: 2.15, base: 7.05, height: 7.75 },
-      { r: 2.45, base: 10.9, height: 11.65 },
-      { r: 2.1, base: 14.75, height: 15.45 },
-      { r: 2.7, base: 18.35, height: 19.2 },
-      { r: 1.65, base: 19.2, height: 20.55 },
-      { r: 1.15, base: 20.55, height: 21.45 },
-      { r: 0.65, base: 21.45, height: 22.15 },
-      { r: 0.16, base: 22.15, height: 24.6 },
+      { r: 2.42, base: 0, height: 1.4 },
+      { r: 0.68, base: 1.35, height: 18.05 },
+      { r: 2.22, base: 3.78, height: 4.62 },
+      { r: 1.54, base: 8.12, height: 8.26 },
+      { r: 1.54, base: 11.82, height: 11.96 },
+      { r: 1.54, base: 15.52, height: 15.66 },
+      { r: 1.58, base: 18.0, height: 20.8 },
+      { r: 0.12, base: 20.7, height: 23.8 },
     ];
     for (const ring of rings) {
       feats.push({
