@@ -27,10 +27,10 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
               {player.nickname?.charAt(0)?.toUpperCase() || "?"}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="break-words font-bold leading-tight text-slate-950 dark:text-white">
+              <p className="truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold leading-tight text-slate-950 dark:text-white">
                 {player.nickname}
               </p>
-              <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">
                 {isHost ? "Hôte" : "Participant"}
                 {isYou ? " · vous" : ""}
                 {player.disconnected ? (
@@ -39,7 +39,7 @@ export default function CircularLobby({ players, hostSessionId, currentSessionId
               </p>
             </div>
             {isHost && (
-              <span className="shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">
+              <span className="hidden shrink-0 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white min-[360px]:inline-flex">
                 Hôte
               </span>
             )}

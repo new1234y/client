@@ -27,7 +27,6 @@ import MapHud from "./components/game/MapHud.jsx";
 import CoinsBadge, { CoinsHistoryModal } from "./components/game/CoinsBadge.jsx";
 import { PlayerModal } from "./components/game/GameStatusModal.jsx";
 import SocialPanel from "./components/game/SocialPanel.jsx";
-import AdminPanel from "./components/game/AdminPanel.jsx";
 import { RoleModal, ZoneModal, GameModal } from "./components/game/GameModals.jsx";
 import { ensureSocketReady } from "./lib/backend.js";
 import { resolvePlayerMapFocus } from "./lib/resolvePlayerMapFocus.js";
@@ -1538,8 +1537,8 @@ export default function App() {
   }, [resetToEntry, attemptReconnect, addNotification]);
 
   useEffect(() => {
-    if (!isHost && gameTab === "admin") setGameTab("map");
-  }, [isHost, gameTab]);
+    if (gameTab === "admin") setGameTab("settings");
+  }, [gameTab]);
 
   useEffect(() => {
     if (gameTab === "party") setGameTab("map");
@@ -2403,7 +2402,7 @@ if (stage === "lobby" && lobby) {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {reconnectModal}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row relative">
-        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-48 md:max-w-none">
+        <main className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-48 pt-[max(1rem,env(safe-area-inset-top))] md:max-w-none">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <BrandMark className="mb-4" />
@@ -2772,7 +2771,7 @@ if (stage === "role_reveal" && rolesReveal) {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <main className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <main className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <BrandMark className="mb-4" />
@@ -2910,7 +2909,7 @@ if (stage === "role_reveal" && rolesReveal) {
                         {p.nickname?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       <div className="min-w-0">
-                        <p className={`break-words font-bold ${isGrayedOut ? 'text-slate-400' : 'text-slate-950 dark:text-white'}`}>
+                        <p className={`truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold ${isGrayedOut ? 'text-slate-400' : 'text-slate-950 dark:text-white'}`}>
                           {p.nickname}
                           {p.sessionId === sessionId && (
                             <span className="ml-2 text-xs font-semibold text-blue-600">vous</span>
@@ -3215,32 +3214,6 @@ if (stage === "role_reveal" && rolesReveal) {
       return perTarget * count;
     })();
 
-    const renderAdminPanel = () => (
-      <AdminPanel
-        roomCode={currentRoomCode}
-        rosterList={rosterList}
-        sessionId={sessionId}
-        onEndGame={() => {
-          if (window.confirm("Terminer la partie pour tout le monde et afficher le récapitulatif ?")) {
-            adminEndGame();
-          }
-        }}
-        onAddTime={adminAddTime}
-        onAdjustCoins={(targetSessionId, delta, nickname) => {
-          socket?.emit("admin_adjust_coins", { targetSessionId, delta }, (res) => {
-            if (res?.ok) {
-              if (targetSessionId === sessionId) pushCoin(delta, "Admin");
-            } else {
-              addNotification(res?.error || "Action refusee", "error");
-            }
-          });
-        }}
-        onSetRole={adminSetRole}
-        onKick={adminKick}
-        onLeave={leaveGame}
-      />
-    );
-
     const tabBtn = (id, label, disabled = false, variant = "top") => {
       const active = gameTab === id && !disabled;
       const base =
@@ -3265,7 +3238,7 @@ if (stage === "role_reveal" && rolesReveal) {
     };
 
     return (
-      <div className="stage-enter flex h-full min-h-0 flex-col bg-white text-slate-950 dark:bg-slate-950 dark:text-white">
+      <div className="stage-enter flex h-full min-h-0 flex-col bg-white pt-[env(safe-area-inset-top)] text-slate-950 dark:bg-slate-950 dark:text-white">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {reconnectModal}
 
@@ -3356,7 +3329,7 @@ if (stage === "role_reveal" && rolesReveal) {
               </div>
 
               <div className={"absolute inset-0 overflow-auto tab-pane " + (gameTab === "powers" ? "tab-pane-active" : "tab-pane-right")}>
-                <div className="h-full overflow-auto p-4 pb-24">
+                <div className="h-full overflow-auto px-4 pb-24 pt-4">
                   <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-[28px] leading-tight font-medium text-slate-900 tracking-tight dark:text-white">Super pouvoirs</h2>
                   </div>
@@ -3914,8 +3887,37 @@ if (stage === "role_reveal" && rolesReveal) {
                 </div>
               </div>
 
-              <div className={"absolute inset-0 tab-pane " + (gameTab === "admin" ? "tab-pane-active" : "tab-pane-right")}>
-                {isHost ? renderAdminPanel() : null}
+              <div className={"absolute inset-0 tab-pane " + (gameTab === "settings" ? "tab-pane-active" : "tab-pane-right")}>
+                <SettingsPage
+                  embedded
+                  inGame
+                  nickname={me?.nickname || nickname}
+                  onLeaveGame={leaveGame}
+                  admin={(me?.nickname || nickname || "").trim().toLowerCase() === "karim"
+                    ? {
+                        roomCode: currentRoomCode,
+                        rosterList,
+                        sessionId,
+                        onEndGame: () => {
+                          if (window.confirm("Terminer la partie pour tout le monde et afficher le récapitulatif ?")) {
+                            adminEndGame();
+                          }
+                        },
+                        onAddTime: adminAddTime,
+                        onAdjustCoins: (targetSessionId, delta) => {
+                          socket?.emit("admin_adjust_coins", { targetSessionId, delta }, (res) => {
+                            if (res?.ok) {
+                              if (targetSessionId === sessionId) pushCoin(delta, "Admin");
+                            } else {
+                              addNotification(res?.error || "Action refusee", "error");
+                            }
+                          });
+                        },
+                        onSetRole: adminSetRole,
+                        onKick: adminKick,
+                      }
+                    : null}
+                />
               </div>
 
               {gameTab === "map" && catLocked && isCat && (
@@ -3975,7 +3977,7 @@ if (stage === "role_reveal" && rolesReveal) {
               {(gameTab === "map" || gameTab === "social") && (
                 <>
                   {/* HUD mobile en haut */}
-                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-[800] md:hidden">
+                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-[800] pt-1 md:hidden">
                     <MapHud
                       variant="mobile"
                       role={role}
@@ -4059,34 +4061,19 @@ if (stage === "role_reveal" && rolesReveal) {
               )}
 
               <CoinFeed socket={socket} sessionId={sessionIdRef.current} />
-              <div className="pointer-events-auto absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-[850] flex items-center gap-2">
-                <SettingsButton size="sm" />
-              </div>
             </div>
 
             <BottomNav
               activeTab={gameTab}
               onTabChange={setGameTab}
-              chatOpen={gameTab === "social"}
-              showPowers={true}
               disablePowers={catLocked && isCat}
               canShowMap={true}
-              onChatToggle={() => {}}
-              showAdmin={isHost}
               centerAction={isCat && !catLocked ? "scan" : isPrey || capturedPrey ? "qr" : null}
               onCenterAction={() => {
                 setErrorBanner(null);
                 if (isCat && !catLocked) setShowScan(true);
                 else if (isPrey || capturedPrey) setShowQr(true);
               }}
-              onMore={() => {
-                if (isHost) {
-                  setGameTab("admin");
-                } else {
-                  setShowShareParty(true);
-                }
-              }}
-              onQuit={!isHost ? leaveGame : undefined}
             />
 
             {/* Overlay d'immobilisation — fond léger, détail dans le HUD */}
@@ -4099,7 +4086,7 @@ if (stage === "role_reveal" && rolesReveal) {
               {tabBtn("map", "Carte", false)}
               {tabBtn("social", "Social")}
               {tabBtn("powers", "Super", catLocked && isCat)}
-              {isHost && tabBtn("admin", "Admin")}
+              {tabBtn("settings", "Réglages")}
             </div>
 
             {/* Desktop footer actions */}

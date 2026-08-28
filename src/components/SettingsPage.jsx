@@ -2,6 +2,7 @@ import { useTheme } from "../context/ThemeContext.jsx";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import BrandMark from "./ui/BrandMark.jsx";
+import AdminPanel from "./game/AdminPanel.jsx";
 import { getOsmApiKey, setOsmApiKey } from "../lib/map/osmKey.js";
 import { getMapboxToken, setMapboxToken } from "../lib/map/mapboxKey.js";
 import {
@@ -63,7 +64,33 @@ function readNickname() {
   }
 }
 
-export default function SettingsPage() {
+function Section({ title, hint, children }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950">
+      <h2 className="text-sm font-black tracking-tight">{title}</h2>
+      {hint ? (
+        <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">{hint}</p>
+      ) : null}
+      <div className="mt-3 space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function chipCls(active) {
+  return `min-h-11 rounded-xl border px-3 py-2 text-sm font-bold transition ${
+    active
+      ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
+      : "border-slate-200 bg-white text-slate-800 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+  }`;
+}
+
+export default function SettingsPage({
+  embedded = false,
+  inGame = false,
+  nickname: nicknameProp,
+  onLeaveGame,
+  admin = null,
+}) {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const [highContrast, setHc] = useState(() => getHighContrast());
@@ -76,7 +103,9 @@ export default function SettingsPage() {
   const [compass, setCompass] = useState(() => getCompassMode());
   const [reduceMotion, setReduce] = useState(() => getReducedMotion());
   const [saved, setSaved] = useState("");
-  const nickname = readNickname();
+  const storedNick = nicknameProp ?? readNickname();
+  const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
+  const showAdmin = Boolean(inGame && isKarim && admin);
   const appearance = highContrast ? "contrast" : theme === "dark" ? "dark" : "light";
 
   useEffect(() => {
@@ -146,114 +175,78 @@ export default function SettingsPage() {
     else navigate("/");
   };
 
-  return (
-    <div className="min-h-screen bg-white font-sans text-slate-950 landing-dots dark:bg-slate-950 dark:text-white">
-      <div className="mx-auto max-w-2xl px-5 pb-10 pt-[max(2rem,env(safe-area-inset-top))]">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <BrandMark />
-            <h1 className="mt-4 text-3xl font-black tracking-tight">Paramètres</h1>
-          </div>
-          <button
-            type="button"
-            onClick={goBack}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            Retour
-          </button>
+  const body = (
+    <>
+      <Section title="Compte" hint="Pseudo enregistré sur cet appareil.">
+        <div className="rounded-xl bg-slate-100 px-3 py-2.5 dark:bg-slate-900">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pseudo</p>
+          <p className="mt-0.5 truncate font-black text-slate-950 dark:text-white">{storedNick || "—"}</p>
+        </div>
+      </Section>
+
+      <Section title="Apparence" hint="Thème, accent et mouvement.">
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: "light", label: "Clair", icon: "sun" },
+            { id: "dark", label: "Sombre", icon: "moon" },
+            { id: "contrast", label: "Contraste", icon: "contrast" },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => handleAppearance(opt.id)}
+              className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-center ${
+                appearance === opt.id
+                  ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
+                  : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+              }`}
+            >
+              <span className="text-slate-700 dark:text-slate-200">
+                <ThemeIcon name={opt.icon} />
+              </span>
+              <span className="text-xs font-black">{opt.label}</span>
+            </button>
+          ))}
         </div>
 
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-          <h2 className="text-lg font-black">Apparence</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Clair, sombre, ou contraste élevé.
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => handleAppearance("light")}
-              className={`flex min-h-11 items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                appearance === "light"
-                  ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
-                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-              }`}
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                <ThemeIcon name="sun" />
-              </span>
-              <span>
-                <span className="block font-black">Clair</span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Par défaut</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleAppearance("dark")}
-              className={`flex min-h-11 items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                appearance === "dark"
-                  ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
-                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-              }`}
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-900 text-white dark:border-slate-600">
-                <ThemeIcon name="moon" />
-              </span>
-              <span>
-                <span className="block font-black">Sombre</span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Moins de fatigue</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleAppearance("contrast")}
-              className={`flex min-h-11 items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
-                appearance === "contrast"
-                  ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
-                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-              }`}
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
-                <ThemeIcon name="contrast" />
-              </span>
-              <span>
-                <span className="block font-black">Contraste élevé</span>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {appearance === "contrast" ? "Activé" : "Optionnel"}
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <p className="mt-5 text-sm font-bold">Couleur d’accent</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+        <div>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Accent</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {Object.values(ACCENTS).map((a) => (
               <button
                 key={a.id}
                 type="button"
                 onClick={() => handleAccent(a.id)}
-                className={`inline-flex min-h-11 items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-bold ${
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${
                   accent === a.id
                     ? "border-blue-600 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40"
                     : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
                 }`}
               >
-                <span className="h-4 w-4 rounded-full ring-2 ring-white dark:ring-slate-800" style={{ background: a.swatch }} />
+                <span className="h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-800" style={{ background: a.swatch }} />
                 {a.name}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-          <h2 className="text-lg font-black">Carte</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-            Jeton Mapbox recommandé. Sans jeton, la carte utilise OpenStreetMap public — jamais de filigrane Carto.
-          </p>
+        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+          <span>
+            <span className="block text-sm font-bold">Réduire les animations</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Suit aussi le réglage système</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={reduceMotion}
+            onChange={(e) => handleMotion(e.target.checked)}
+            className="h-5 w-5 accent-blue-600"
+          />
+        </label>
+      </Section>
 
-          <label htmlFor="mapbox-token" className="mt-4 block text-sm font-bold">
+      <Section title="Carte" hint="Jeton Mapbox recommandé. Sans jeton : OpenStreetMap public.">
+        <div>
+          <label htmlFor="mapbox-token" className="block text-xs font-bold text-slate-500 dark:text-slate-400">
             Jeton Mapbox
           </label>
           <input
@@ -266,12 +259,14 @@ export default function SettingsPage() {
               setMapboxKey(e.target.value);
               setSaved("");
             }}
-            className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             placeholder="pk.…"
           />
+        </div>
 
-          <label htmlFor="osm-api-key" className="mt-4 block text-sm font-bold">
-            Clé OSM / Carto <span className="font-semibold text-slate-500 dark:text-slate-400">(repli)</span>
+        <div>
+          <label htmlFor="osm-api-key" className="block text-xs font-bold text-slate-500 dark:text-slate-400">
+            Clé OSM / Carto <span className="font-semibold">(repli)</span>
           </label>
           <input
             id="osm-api-key"
@@ -283,133 +278,139 @@ export default function SettingsPage() {
               setOsmKey(e.target.value);
               setSaved("");
             }}
-            className="mt-2 min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            placeholder="Optionnel si Mapbox est renseigné"
+            className="mt-1 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            placeholder="Optionnel"
           />
+        </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSaveKeys}
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
-            >
-              Enregistrer
-            </button>
-            {saved && (
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{saved}</span>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSaveKeys}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            Enregistrer
+          </button>
+          {saved && (
+            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{saved}</span>
+          )}
+        </div>
 
-          <p className="mt-6 text-sm font-bold">Style</p>
-          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Suit le thème de l’interface tant que vous n’en choisissez pas un.
-          </p>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Style</p>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {Object.entries(MAPBOX_STYLES).map(([id, s]) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleStyle(id)}
-                className={`min-h-11 rounded-2xl border-2 px-3 py-2.5 text-sm font-bold ${
-                  styleId === id
-                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
-                    : "border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                }`}
+                className={chipCls(styleId === id)}
               >
                 {s.name}
               </button>
             ))}
           </div>
+        </div>
 
-          <p className="mt-6 text-sm font-bold">Relief</p>
-          <div className="mt-2 grid gap-2">
+        <div>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Relief</p>
+          <div className="mt-1.5 grid gap-1.5">
             {Object.values(MAP_3D_MODES).map((m) => (
               <button
                 key={m.id}
                 type="button"
                 onClick={() => handle3d(m.id)}
-                className={`min-h-11 rounded-2xl border-2 px-4 py-3 text-left text-sm font-bold ${
-                  mode3d === m.id
-                    ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
-                    : "border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                }`}
+                className={`${chipCls(mode3d === m.id)} text-left`}
               >
                 {m.name}
-                <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {m.id === "2d" && "Vue à plat, sans relief"}
-                  {m.id === "3d_free" && "Bâtiments et terrain — vous pouvez incliner et tourner"}
-                  {m.id === "3d_lock" && "Même rendu 3D, inclinaison et cap verrouillés"}
-                </span>
               </button>
             ))}
           </div>
+        </div>
 
-          <label className="mt-5 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
-            <span>
-              <span className="block font-bold">Gyroscopique</span>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Oriente la carte selon le téléphone</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={gyro}
-              onChange={(e) => handleGyro(e.target.checked)}
-              className="h-5 w-5 accent-blue-600"
-            />
-          </label>
+        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900">
+          <span>
+            <span className="block text-sm font-bold">Gyroscopique</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Oriente la carte selon le téléphone</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={gyro}
+            onChange={(e) => handleGyro(e.target.checked)}
+            className="h-5 w-5 accent-blue-600"
+          />
+        </label>
 
-          <p className="mt-5 text-sm font-bold">Boussole</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleCompass("north")}
-              className={`min-h-11 rounded-2xl border-2 px-3 py-2.5 text-sm font-bold ${
-                compass === "north"
-                  ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
-                  : "border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              }`}
-            >
+        <div>
+          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Boussole</p>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            <button type="button" onClick={() => handleCompass("north")} className={chipCls(compass === "north")}>
               Nord en haut
             </button>
-            <button
-              type="button"
-              onClick={() => handleCompass("heading")}
-              className={`min-h-11 rounded-2xl border-2 px-3 py-2.5 text-sm font-bold ${
-                compass === "heading"
-                  ? "border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200"
-                  : "border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-              }`}
-            >
+            <button type="button" onClick={() => handleCompass("heading")} className={chipCls(compass === "heading")}>
               Cap du téléphone
             </button>
           </div>
         </div>
+      </Section>
 
-        <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-          <h2 className="text-lg font-black">Mouvement</h2>
-          <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
-            <span>
-              <span className="block font-bold">Réduire les animations</span>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Respecte aussi le réglage système « réduire les mouvements »
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={reduceMotion}
-              onChange={(e) => handleMotion(e.target.checked)}
-              className="h-5 w-5 accent-blue-600"
+      {inGame && (
+        <Section title="Partie">
+          {showAdmin && (
+            <AdminPanel
+              embedded
+              roomCode={admin.roomCode}
+              rosterList={admin.rosterList}
+              sessionId={admin.sessionId}
+              onEndGame={admin.onEndGame}
+              onAddTime={admin.onAddTime}
+              onAdjustCoins={admin.onAdjustCoins}
+              onSetRole={admin.onSetRole}
+              onKick={admin.onKick}
             />
-          </label>
-        </div>
+          )}
+          {onLeaveGame && (
+            <button
+              type="button"
+              onClick={onLeaveGame}
+              className="min-h-11 w-full rounded-full border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70"
+            >
+              Quitter la partie
+            </button>
+          )}
+        </Section>
+      )}
+    </>
+  );
 
-        <div className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-950">
-          <h2 className="text-lg font-black">Compte</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Pseudo enregistré sur cet appareil.</p>
-          <div className="mt-4 rounded-2xl bg-slate-100 px-4 py-3 dark:bg-slate-900">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pseudo</p>
-            <p className="mt-1 font-black text-slate-950 dark:text-white">{nickname || "—"}</p>
-          </div>
+  if (embedded) {
+    return (
+      <div className="h-full overflow-auto bg-white px-4 pb-28 pt-4 text-slate-950 [scrollbar-width:none] dark:bg-slate-950 dark:text-white [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto max-w-lg space-y-3">
+          <h1 className="text-xl font-black tracking-tight">Paramètres</h1>
+          {body}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white font-sans text-slate-950 landing-dots dark:bg-slate-950 dark:text-white">
+      <div className="mx-auto max-w-2xl space-y-3 px-5 pb-10 pt-[max(2rem,env(safe-area-inset-top))]">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <BrandMark />
+            <h1 className="mt-4 text-3xl font-black tracking-tight">Paramètres</h1>
+          </div>
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Retour
+          </button>
+        </div>
+        {body}
       </div>
     </div>
   );

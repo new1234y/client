@@ -11,9 +11,13 @@ export default function AdminPanel({
   onSetRole,
   onKick,
   onLeave,
+  embedded = false,
 }) {
   return (
-    <div className="h-full overflow-auto bg-white p-4 pb-28 text-slate-950 [scrollbar-width:none] dark:bg-slate-950 dark:text-white [&::-webkit-scrollbar]:hidden">
+    <div className={embedded
+      ? "text-slate-950 dark:text-white"
+      : "h-full overflow-auto bg-white p-4 pb-28 text-slate-950 [scrollbar-width:none] dark:bg-slate-950 dark:text-white [&::-webkit-scrollbar]:hidden"
+    }>
       <div className="mx-auto max-w-lg space-y-4">
         <div className="rounded-[2rem] border border-slate-200 bg-white p-5 text-center dark:border-slate-700 dark:bg-slate-900">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Admin · Hôte</p>
@@ -66,8 +70,8 @@ export default function AdminPanel({
                 className="overflow-hidden rounded-3xl bg-white shadow-md ring-1 ring-slate-100 dark:bg-slate-800 dark:ring-slate-700"
               >
                 <div className={`px-4 py-3 text-white ${isCat ? "bg-blue-600" : "bg-amber-500"}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="min-w-0 truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold">
                       {p.nickname}
                       {p.sessionId === sessionId && " (vous)"}
                     </span>
@@ -144,13 +148,15 @@ export default function AdminPanel({
           })}
         </ul>
 
-        <Button
-          variant="secondary"
-          className="w-full"
-          onClick={onLeave}
-        >
-          Quitter (hôte)
-        </Button>
+        {onLeave && (
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={onLeave}
+          >
+            Quitter (hôte)
+          </Button>
+        )}
       </div>
     </div>
   );

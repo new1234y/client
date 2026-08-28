@@ -336,7 +336,7 @@ function SummaryPodiumView({
   return (
     <div className="relative flex h-screen flex-col bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 overflow-hidden">
       <ConfettiField seed={summary?.code} />
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-2 py-2 sm:px-4 sm:py-4">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-4 sm:pb-4">
         {/* Main ranking area - 75% of screen */}
         <main className="flex-1 flex flex-col justify-center min-h-0 overflow-auto">
           {gameMode === "infection" ? (
@@ -912,7 +912,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     ) : (
       <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-[#FFF5D7]/30 via-white to-[#FDECF4]/30 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
         {/* Stats band */}
-        <div className="shrink-0 border-b border-amber-100/80 bg-white/90 px-2 py-1 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="shrink-0 border-b border-amber-100/80 bg-white/90 px-2 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Récap · {summary.code}</p>

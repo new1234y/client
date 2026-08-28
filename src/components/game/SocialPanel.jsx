@@ -62,8 +62,8 @@ export default function SocialPanel({
                       {p.nickname.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="break-words font-bold text-slate-950 dark:text-white">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate whitespace-nowrap overflow-hidden text-ellipsis font-bold text-slate-950 dark:text-white">
                           {p.nickname}
                           {p.sessionId === sessionId && (
                             <span className="ml-1 text-xs font-semibold text-blue-600">(vous)</span>

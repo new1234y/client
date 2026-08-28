@@ -68,8 +68,8 @@ export default function PlayerSheet({
                 <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
               )}
             </div>
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate whitespace-nowrap overflow-hidden text-ellipsis text-xl font-bold text-slate-900 dark:text-white">
                 {player.nickname}
               </h2>
               <p className={`text-sm font-medium ${roleColor}`}>{roleBadgeText(player)}</p>
