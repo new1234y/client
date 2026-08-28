@@ -13,6 +13,7 @@ import { offsetMeters } from "../../lib/map/geoOffset.js";
 import { getServerTime } from "../../lib/serverTime.js";
 import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
 import BaliseSheet from "./BaliseSheet.jsx";
+import { ensureSciFiTowerLayer, syncSciFiTowers } from "../../lib/map/SciFiTowerLayer.js";
 
 function circlePolygon(lat, lng, radiusM, points = 64) {
   const coords = [];
@@ -110,21 +111,6 @@ function baliseHtml(color, mode3d) {
   return `<div style="position:relative;width:28px;height:36px;display:flex;align-items:flex-end;justify-content:center">${pulse}<svg width="22" height="32" viewBox="0 0 24 36" aria-hidden="true"><rect x="9" y="10" width="6" height="18" rx="1.2" fill="${color}"/><polygon points="12,2 17,10 7,10" fill="${color}"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><rect x="6" y="28" width="12" height="4" rx="1" fill="${color}"/></svg></div>`;
 }
 
-function towerPolygon(lat, lng, halfM = 3.2) {
-  const d = halfM / 111320;
-  const dx = d / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
-  return {
-    type: "Polygon",
-    coordinates: [[
-      [lng - dx, lat - d],
-      [lng + dx, lat - d],
-      [lng + dx, lat + d],
-      [lng - dx, lat + d],
-      [lng - dx, lat - d],
-    ]],
-  };
-}
-
 function ensureSources(map) {
   const specs = [
     ["src-zone", emptyFc()],
@@ -132,7 +118,6 @@ function ensureSources(map) {
     ["src-jam", emptyFc()],
     ["src-prey", emptyFc()],
     ["src-balise", emptyFc()],
-    ["src-balise-tower", emptyFc()],
     ["src-highlight", emptyFc()],
     ["src-route", emptyFc()],
     ["src-lure", emptyFc()],
@@ -166,19 +151,13 @@ function ensureSources(map) {
   addLine("prey-line", "src-prey", ["get", "color"], 3);
   addFill("balise-fill", "src-balise", ["get", "fill"], 0.22);
   addLine("balise-line", "src-balise", ["get", "color"], 3);
-  if (!map.getLayer("balise-tower")) {
-    map.addLayer({
-      id: "balise-tower",
-      type: "fill-extrusion",
-      source: "src-balise-tower",
-      paint: {
-        "fill-extrusion-color": ["get", "color"],
-        "fill-extrusion-height": ["get", "height"],
-        "fill-extrusion-base": 0,
-        "fill-extrusion-opacity": 0.92,
-      },
-    });
+  try {
+    if (map.getLayer("balise-tower")) map.removeLayer("balise-tower");
+    if (map.getSource("src-balise-tower")) map.removeSource("src-balise-tower");
+  } catch {
+    // leftover cube extrusion from older builds
   }
+  ensureSciFiTowerLayer(map);
   addFill("highlight-fill", "src-highlight", "#fbbf24", 0.25);
   addLine("route-line", "src-route", "#10b981", 2, [2, 2]);
   addFill("lure-fill", "src-lure", "#c4b5fd", 0.45);
@@ -333,6 +312,7 @@ export default function MapboxMap({
       zoom: initialZoom,
       attributionControl: false,
       pitch: enable3d ? 60 : 0,
+      antialias: true,
       maxZoom: 22,
       minZoom: 2,
       dragRotate: enable3d && !lock3d,
@@ -345,6 +325,7 @@ export default function MapboxMap({
       readyRef.current = true;
       ensureSources(map);
       applyTerrain(map, enable3d, lock3d);
+      ensureSciFiTowerLayer(map);
       setMapReady(true);
       map.resize();
     };
@@ -416,6 +397,7 @@ export default function MapboxMap({
     map.once("style.load", () => {
       ensureSources(map);
       applyTerrain(map, getMap3dMode() !== "2d", getMap3dMode() === "3d_lock");
+      ensureSciFiTowerLayer(map);
       readyRef.current = true;
       setMapReady(true);
     });
@@ -425,6 +407,7 @@ export default function MapboxMap({
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     applyTerrain(map, enable3d, lock3d);
+    ensureSciFiTowerLayer(map);
     if (enable3d && !lock3d) {
       map.dragRotate.enable();
       map.touchPitch?.enable?.();
@@ -670,7 +653,7 @@ export default function MapboxMap({
     setData("src-prey", { type: "FeatureCollection", features: preyFeats });
 
     const baliseFeats = [];
-    const towerFeats = [];
+    const towers = [];
     for (const b of gameState.balises || []) {
       const capturing = b.beingCapturedBy != null;
       const mine = b.beingCapturedBy === mySessionId;
@@ -680,13 +663,11 @@ export default function MapboxMap({
         feature(circlePolygon(b.lat, b.lng, b.radiusM), { color, fill, id: b.id })
       );
       if (enable3d) {
-        towerFeats.push(
-          feature(towerPolygon(b.lat, b.lng), { color, height: 22, id: b.id })
-        );
+        towers.push({ id: b.id, lat: b.lat, lng: b.lng, color });
       }
     }
     setData("src-balise", { type: "FeatureCollection", features: baliseFeats });
-    setData("src-balise-tower", { type: "FeatureCollection", features: towerFeats });
+    syncSciFiTowers(map, towers, enable3d);
 
     if (baliseLureTarget && role === "cat") {
       setData("src-lure", {
