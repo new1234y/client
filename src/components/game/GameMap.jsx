@@ -666,7 +666,6 @@ function LeafletGameMap({
       )}
 
       {balises.map((balise) => {
-        const isBeingCaptured = balise.beingCapturedBy !== null;
         const isMyCapture = balise.beingCapturedBy === mySessionId;
         
         return (
@@ -674,8 +673,9 @@ function LeafletGameMap({
             key={balise.id}
             center={{ lat: balise.lat, lng: balise.lng }}
             radius={balise.radiusM}
-            visualScale={balise.visualScale}
+            visualScale={1}
             beingCapturedBy={balise.beingCapturedBy}
+            capturedBy={balise.capturedBy}
             isMyCapture={isMyCapture}
             captureProgress={balise.captureProgress || 0}
             onClick={() => handleBaliseClick(balise)}

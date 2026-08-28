@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Circle, CircleMarker, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+import { baliseTintColor, baliseFillColor } from "../../lib/map/baliseColors.js";
 
 function baliseIcon(sizePx, color) {
   return L.divIcon({
@@ -11,7 +12,7 @@ function baliseIcon(sizePx, color) {
   });
 }
 
-export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, isMyCapture, captureProgress, onClick }) {
+export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, capturedBy, isMyCapture, captureProgress, onClick }) {
   const [rotation, setRotation] = useState(0);
   const [pulse, setPulse] = useState(0);
   const animationRef = useRef(null);
@@ -34,16 +35,12 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
   if (!center || radius == null) return null;
 
   const captureRatio = captureProgress / 30000; // 30 seconds
-  const isBeingCaptured = beingCapturedBy !== null;
-  const markerSize = Math.round(26 * Math.max(0.75, Math.min(1.9, Number(visualScale) || radius / 30)));
+  const isBeingCaptured = beingCapturedBy !== null && !capturedBy;
+  const isCaptured = Boolean(capturedBy);
+  const markerSize = Math.round(26 * Math.max(0.75, Math.min(1.9, Number(visualScale) || 1)));
   
-  // Color based on capture state
-  const color = isBeingCaptured 
-    ? (isMyCapture ? "#22c55e" : "#f97316") 
-    : "#a855f7";
-  const fillColor = isBeingCaptured
-    ? (isMyCapture ? "#86efac" : "#fdba74")
-    : "#d8b4fe";
+  const color = baliseTintColor({ beingCapturedBy, capturedBy });
+  const fillColor = baliseFillColor({ beingCapturedBy, capturedBy });
 
   // Pulsing opacity
   const pulseOpacity = 0.2 + Math.sin(pulse) * 0.1;
@@ -139,8 +136,8 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
           center={center}
           radius={radius * (1 - captureRatio * 0.5)}
           pathOptions={{
-            color: isMyCapture ? "#22c55e" : "#f97316",
-            fillColor: isMyCapture ? "#86efac" : "#fdba74",
+            color: color,
+            fillColor: fillColor,
             fillOpacity: 0.3,
             weight: 2,
             className: "balise-progress-ring",

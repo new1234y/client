@@ -16,6 +16,13 @@ const ROT_X = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1, 0, 0), M
 /** Uniform extra scale so the ~24 m tower reads on the GPS map (~52 m / ~11 m). */
 const EXTRA_SCALE = 2.2;
 const LOCAL_SCALE = new THREE.Matrix4().makeScale(EXTRA_SCALE, EXTRA_SCALE, EXTRA_SCALE);
+/** Sonar ping: 2 staggered rings, ~2s loop, uniform torus scale in XZ. */
+const PULSE_COUNT = 2;
+const PULSE_PERIOD = 2.05;
+const PULSE_MIN_R = 2.4;
+const PULSE_MAX_R = 9.6;
+const PULSE_TUBE = 0.07;
+const PULSE_Y = 0.55;
 
 const SEG = 64;
 const BASE_H = 1.42;
@@ -168,6 +175,48 @@ function makeTint(mat, slot) {
   return mat;
 }
 
+function makePulseRing(color, phaseOffset) {
+  // Unique geo so dispose-with-tower does not touch shared lathes; uniform scale only.
+  const geo = new THREE.TorusGeometry(1, PULSE_TUBE, 10, 48);
+  const mat = makeTint(
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 1.05,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      metalness: 0.18,
+      roughness: 0.38,
+    }),
+    "pulse"
+  );
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.y = PULSE_Y;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  mesh.userData.pulse = true;
+  mesh.userData.phaseOffset = phaseOffset;
+  return mesh;
+}
+
+function tickPulseRings(group, tSec) {
+  const pulses = group?.userData?.pulses;
+  if (!pulses?.length) return;
+  const span = PULSE_MAX_R - PULSE_MIN_R;
+  for (let i = 0; i < pulses.length; i++) {
+    const mesh = pulses[i];
+    const off = Number(mesh.userData.phaseOffset) || 0;
+    const phase = ((tSec / PULSE_PERIOD) + off) % 1;
+    const r = PULSE_MIN_R + span * phase;
+    mesh.scale.set(r, r, r);
+    const fade = (1 - phase) * (1 - phase);
+    if (mesh.material) mesh.material.opacity = 0.62 * fade;
+    mesh.visible = phase < 0.97;
+  }
+}
+
 export function createSciFiTower(color = IDLE) {
   const g = getShared();
   const root = new THREE.Group();
@@ -278,6 +327,15 @@ export function createSciFiTower(color = IDLE) {
   tip.position.y = CAP_Y + CAP_H + SPIRE_H + TIP_H / 2;
   root.add(tip);
 
+  const pulses = [];
+  for (let i = 0; i < PULSE_COUNT; i++) {
+    const ring = makePulseRing(color, i / PULSE_COUNT);
+    root.add(ring);
+    tint.push(ring.material);
+    pulses.push(ring);
+  }
+  root.userData.pulses = pulses;
+
   root.userData.tint = tint;
   root.userData.heightM = TOWER_H;
   root.traverse((o) => {
@@ -297,6 +355,10 @@ export function tintSciFiTower(group, hex) {
       mat.color.copy(c);
       mat.emissive.copy(c);
       mat.emissiveIntensity = 0.55;
+    } else if (slot === "pulse") {
+      mat.color.copy(c);
+      mat.emissive.copy(c);
+      mat.emissiveIntensity = 1.05;
     } else if (slot === "copper") {
       mat.color.copy(copperCol);
     } else if (slot === "glass") {
@@ -615,6 +677,8 @@ export function createSciFiTowerLayer() {
       if (this.byId.size === 0) return;
       if (!fillProjection(this._m, matrix)) return;
 
+      const tSec = performance.now() / 1000;
+
       // Official pattern: mesh stays identity at origin (Y-up meters);
       // camera.projectionMatrix = m * l. Identity view.
       this.camera.matrix.identity();
@@ -625,6 +689,7 @@ export function createSciFiTowerLayer() {
       for (const rec of records) rec.group.visible = false;
 
       for (const rec of records) {
+        tickPulseRings(rec.group, tSec);
         rec.group.visible = true;
         rec.group.matrix.identity();
         rec.group.matrixWorldNeedsUpdate = true;
@@ -637,6 +702,11 @@ export function createSciFiTowerLayer() {
         rec.group.visible = false;
       }
       for (const rec of records) rec.group.visible = true;
+      try {
+        this.map?.triggerRepaint?.();
+      } catch {
+        // ignore
+      }
     },
   };
 }

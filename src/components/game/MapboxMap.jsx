@@ -14,6 +14,7 @@ import { getServerTime } from "../../lib/serverTime.js";
 import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
 import BaliseSheet from "./BaliseSheet.jsx";
 import { ensureSciFiTowerLayer, syncSciFiTowers } from "../../lib/map/SciFiTowerLayer.js";
+import { baliseTintColor, baliseFillColor } from "../../lib/map/baliseColors.js";
 
 function circlePolygon(lat, lng, radiusM, points = 64) {
   const coords = [];
@@ -670,10 +671,8 @@ export default function MapboxMap({
     const baliseFeats = [];
     const towers = [];
     for (const b of gameState.balises || []) {
-      const capturing = b.beingCapturedBy != null;
-      const mine = b.beingCapturedBy === mySessionId;
-      const color = capturing ? (mine ? "#22c55e" : "#f97316") : "#a855f7";
-      const fill = capturing ? (mine ? "#86efac" : "#fdba74") : "#d8b4fe";
+      const color = baliseTintColor(b);
+      const fill = baliseFillColor(b);
       baliseFeats.push(
         feature(circlePolygon(b.lat, b.lng, b.radiusM), { color, fill, id: b.id })
       );
@@ -795,9 +794,7 @@ export default function MapboxMap({
       });
     }
     for (const b of gameState.balises || []) {
-      const capturing = b.beingCapturedBy != null;
-      const mine = b.beingCapturedBy === mySessionId;
-      const color = capturing ? (mine ? "#22c55e" : "#f97316") : "#a855f7";
+      const color = baliseTintColor(b);
       if (enable3d) {
         pins.push({
           key: `balise-${b.id}`,

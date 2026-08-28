@@ -43,6 +43,14 @@ import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, s
 import { syncServerTime } from "./lib/serverTime.js";
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
+import {
+  maxPowerSecFromSettings,
+  defaultPowerDurationSec,
+  durationFactor60,
+  durationOptionsAtOrBelow,
+  isFirstFreeUse,
+  pickDurationOption,
+} from "./lib/powerDuration.js";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
@@ -771,7 +779,7 @@ export default function App() {
   const [freezeTargetMode, setFreezeTargetMode] = useState("single"); // single | all
   const [selectedFreezeTargets, setSelectedFreezeTargets] = useState([]); // cat sessionIds
   const [freezeDuration, setFreezeDuration] = useState(20);
-  const [invisDurationSec, setInvisDurationSec] = useState(300); // 60-900
+  const [invisDurationSec, setInvisDurationSec] = useState(60); // capped by match timer
   const [baliseLureSelecting, setBaliseLureSelecting] = useState(false);
   const [baliseLureTarget, setBaliseLureTarget] = useState(null);
   const [ghostUiNow, setGhostUiNow] = useState(() => Date.now());
@@ -781,6 +789,18 @@ export default function App() {
   // Helper function to get synchronized server time
   const getServerTime = () => Date.now() + serverTimeOffsetRef.current;
 
+  useEffect(() => {
+    const max = maxPowerSecFromSettings(gameState?.settings, gameState?.maxPowerSec);
+    const def = defaultPowerDurationSec(max);
+    setInvisDurationSec((d) => {
+      const n = Number(d);
+      if (!Number.isFinite(n) || n > max) return def;
+      return n;
+    });
+    setNoiseDuration((d) => Math.min(Number(d) || 30, max));
+    setFreezeDuration((d) => Math.min(Number(d) || 20, max));
+  }, [gameState?.maxPowerSec, gameState?.settings?.timeLimitMinutes, gameState?.settings?.timeLimitEnabled]);
+
   // Handle power shortcuts from PlayerSheet
   const handlePowerShortcut = ({ type, target, defaultSettings }) => {
     if (defaultSettings) {
@@ -789,11 +809,11 @@ export default function App() {
         case 'invis':
           socket?.emit(
             "use_power",
-            { kind: "invisibility", scope: "multi", targetSessionIds: [target], durationSec: 300 },
+            { kind: "invisibility", scope: "multi", targetSessionIds: [target], durationSec: defaultPowerDurationSec(maxPowerSecFromSettings(gameState?.settings, gameState?.maxPowerSec)) },
             (res) => {
               if (res?.ok) {
                 setCd("invisibility", 120);
-                addNotification("Invisibilité activée (5 min)", "success");
+                addNotification("Invisibilité activée (60 s)", "success");
                 setSelectedPlayer(null);
               } else {
                 addNotification(res?.error || "Erreur", "error");
@@ -841,7 +861,7 @@ export default function App() {
       switch (type) {
         case 'invis':
           setSelectedInvisTargets([target]);
-          setInvisDurationSec(300); // 5 min default
+          setInvisDurationSec(defaultPowerDurationSec(maxPowerSecFromSettings(gameState?.settings, gameState?.maxPowerSec)));
           break;
         case 'noise':
           setSelectedNoiseTargets([target]);
@@ -1471,7 +1491,7 @@ export default function App() {
       if (data.sessionId === sessionIdRef.current) {
         const notif = {
           kind: 'balise_blocked',
-          message: data.message,
+          message: data.message || "Une personne est déjà en train de la capturer",
           startedAt: Date.now(),
           durationMs: 2000,
         };
@@ -1586,6 +1606,19 @@ export default function App() {
           startedAt: getServerTime()
         });
         // Also show toast notification
+      } else if (kind === "balise_blocked") {
+        const notif = {
+          kind: "balise_blocked",
+          message: data.message || "Une personne est déjà en train de la capturer",
+          startedAt: Date.now(),
+          durationMs: 2000,
+        };
+        setBaliseBlockedNotification(notif);
+        if (baliseBlockedTimeoutRef.current) clearTimeout(baliseBlockedTimeoutRef.current);
+        baliseBlockedTimeoutRef.current = setTimeout(() => {
+          setBaliseBlockedNotification(null);
+          baliseBlockedTimeoutRef.current = null;
+        }, 2000);
       }
     });
 
@@ -3298,6 +3331,37 @@ if (stage === "role_reveal" && rolesReveal) {
 
     const powerLimits = gameState.powerLimits || {};
     const powerUses = gameState.powerUses || {};
+    const maxPowerSec = maxPowerSecFromSettings(gameState.settings, gameState.maxPowerSec);
+    const invisDurationOptions = durationOptionsAtOrBelow(
+      [
+        { label: "20 s", value: 20 },
+        { label: "45 s", value: 45 },
+        { label: "60 s", value: 60 },
+        { label: "90 s", value: 90 },
+        { label: "2 min", value: 120 },
+      ],
+      maxPowerSec
+    );
+    const noiseDurationOptions = durationOptionsAtOrBelow(
+      [
+        { label: "10 s", value: 10 },
+        { label: "30 s", value: 30 },
+        { label: "60 s", value: 60 },
+      ],
+      maxPowerSec
+    );
+    const freezeDurationOptions = durationOptionsAtOrBelow(
+      [
+        { label: "10 s", value: 10 },
+        { label: "20 s", value: 20 },
+        { label: "40 s", value: 40 },
+      ],
+      maxPowerSec
+    );
+    const invisDurationValue = pickDurationOption(invisDurationSec, invisDurationOptions, defaultPowerDurationSec(maxPowerSec));
+    const noiseDurationValue = pickDurationOption(noiseDuration, noiseDurationOptions, Math.min(30, maxPowerSec));
+    const freezeDurationValue = pickDurationOption(freezeDuration, freezeDurationOptions, Math.min(20, maxPowerSec));
+    const fakeDurationSec = Math.min(60, maxPowerSec);
 
     const formatUsage = (key) => {
       const used = Number(powerUses?.[key] || 0);
@@ -3410,7 +3474,7 @@ if (stage === "role_reveal" && rolesReveal) {
     })();
     const estimatedNoiseCost = (() => {
       const base = Number(powerCosts.noise || 20);
-      const durationSec = noiseDuration <= 10 ? 10 : noiseDuration >= 60 ? 60 : 30;
+      const durationSec = Number(noiseDurationValue) || 30;
       const durationFactor = durationSec === 10 ? 0.5 : durationSec === 60 ? 1.8 : 1.0;
       const volumeFactor = noiseVolume === "low" ? 0.7 : noiseVolume === "high" ? 1.4 : 1.0;
 
@@ -3424,6 +3488,7 @@ if (stage === "role_reveal" && rolesReveal) {
       const raw = base * durationFactor * volumeFactor * count;
       return Math.max(1, Math.ceil(raw));
     })();
+    const estimatedNoiseCostPaid = estimatedNoiseCost;
 
     // Bornes théoriques min/max de coût pour affichage (en fonction des paramètres extrêmes)
     const noiseMinCost = (() => {
@@ -3447,19 +3512,24 @@ if (stage === "role_reveal" && rolesReveal) {
     const invisMinCost = Number(powerCosts.invisibility_self || 40);
     const invisMaxCost = Number(powerCosts.invisibility_all_role || powerCosts.invisibility_single || invisMinCost);
 
-    const estimatedInvisCost = (() => {
-      const durationSec = Math.max(30, Math.min(900, Number(invisDurationSec) || 300));
-      const durationFactor = Math.pow(durationSec / 300, 1.6);
+    const estimatedInvisCostPaid = (() => {
+      const durationSec = Math.max(15, Math.min(maxPowerSec, Number(invisDurationValue) || defaultPowerDurationSec(maxPowerSec)));
+      const durationFactor = durationFactor60(durationSec);
       if (invisScope === "self") {
         const base = Number(powerCosts.invisibility_self || 40);
         return Math.max(1, Math.round(base * durationFactor));
       }
-      // multi: on utilise le même schéma que le backend (single/multi)
       const base = Number(powerCosts.invisibility_single || 70);
       const count = (selectedInvisTargets || []).length || 1;
       const perTarget = Math.max(1, Math.round(base * durationFactor));
       return perTarget * count;
     })();
+    const invisFree = isFirstFreeUse(powerUses, "invisibility");
+    const estimatedInvisCost = invisFree ? 0 : estimatedInvisCostPaid;
+    const noiseFree = isFirstFreeUse(powerUses, "noise");
+    const freezeFree = isFirstFreeUse(powerUses, "freeze_cats");
+    const fakeFree = isFirstFreeUse(powerUses, "fake_position");
+    const lureFree = isFirstFreeUse(powerUses, "balise_leurre");
 
     const tabBtn = (id, label, disabled = false, variant = "top") => {
       const active = gameTab === id && !disabled;
@@ -3556,10 +3626,10 @@ if (stage === "role_reveal" && rolesReveal) {
                       emoji="👻"
                       stars={4}
                       gradient={["#6366F1", "#A78BFA"]}
-                      costText={`${invisMinCost} - ${invisMaxCost}`}
+                      costText={invisFree ? `1 gratuit · ensuite ${invisMinCost}–${invisMaxCost}` : `${invisMinCost} - ${invisMaxCost}`}
                       usageLabel={formatUsage("invisibility")}
                       estimatedCost={estimatedInvisCost}
-                      insufficientCoins={(me?.coins ?? 0) < estimatedInvisCost}
+                      insufficientCoins={!invisFree && (me?.coins ?? 0) < estimatedInvisCostPaid}
                       details={<>
                         Devenez invisible pendant un certain temps. Le coût dépend de la <b>durée</b> et du <b>nombre de cibles</b>.
                       </>}
@@ -3568,8 +3638,8 @@ if (stage === "role_reveal" && rolesReveal) {
                         const scope = invisScope === "self" ? "self" : "multi";
                         const body =
                           scope === "self"
-                            ? { kind: "invisibility", scope, durationSec: invisDurationSec }
-                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: invisDurationSec };
+                            ? { kind: "invisibility", scope, durationSec: invisDurationValue }
+                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: invisDurationValue };
                         if (scope === "multi" && !selectedInvisTargets?.length) {
                           addNotification("Choisissez au moins une cible", "error");
                           return;
@@ -3638,19 +3708,14 @@ if (stage === "role_reveal" && rolesReveal) {
                         <div className="space-y-1 pt-1">
                           <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
                           <DiscreteSlider
-                            options={[
-                              { label: "1 min", value: 60 },
-                              { label: "5 min", value: 300 },
-                              { label: "10 min", value: 600 },
-                              { label: "15 min", value: 900 },
-                            ]}
-                            value={invisDurationSec}
+                            options={invisDurationOptions}
+                            value={invisDurationValue}
                             onChange={setInvisDurationSec}
                             color="blue"
                           />
                         </div>
 
-                        <AnimatedPrice value={estimatedInvisCost} />
+                        <AnimatedPrice value={estimatedInvisCostPaid} />
                       </div>
                     </PowerCard>
 
@@ -3659,12 +3724,12 @@ if (stage === "role_reveal" && rolesReveal) {
                       emoji="🔊"
                       stars={2}
                       gradient={["#F43F5E", "#FB923C"]}
-                      costText={`${noiseMinCost} - ${noiseMaxCost}`}
+                      costText={noiseFree ? `1 gratuit · ensuite ${noiseMinCost}–${noiseMaxCost}` : `${noiseMinCost} - ${noiseMaxCost}`}
                       locked={isCooldown("noise")}
                       lockReason="Recharge"
                       lockUntil={cooldownUntil("noise")}
-                      estimatedCost={estimatedNoiseCost}
-                      insufficientCoins={(me?.coins ?? 0) < estimatedNoiseCost}
+                      estimatedCost={noiseFree ? 0 : estimatedNoiseCostPaid}
+                      insufficientCoins={!noiseFree && (me?.coins ?? 0) < estimatedNoiseCostPaid}
                       usageLabel={formatUsage("noise")}
                       details={<>
                         Joue un son désagréable sur un ou plusieurs téléphones adverses. Le prix dépend de la <b>durée</b>, du <b>volume</b> et du <b>nombre de cibles</b>.
@@ -3681,7 +3746,7 @@ if (stage === "role_reveal" && rolesReveal) {
                           addNotification("Choisissez au moins une cible", "error");
                           return;
                         }
-                        const durationSec = noiseDuration;
+                        const durationSec = noiseDurationValue;
                         const volume = noiseVolume;
                         socket?.emit(
                           "use_power",
@@ -3760,12 +3825,8 @@ if (stage === "role_reveal" && rolesReveal) {
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
                             <DiscreteSlider 
-                              options={[
-                                { label: '10s', value: 10 },
-                                { label: '30s', value: 30 },
-                                { label: '1min', value: 60 }
-                              ]}
-                              value={noiseDuration}
+                              options={noiseDurationOptions}
+                              value={noiseDurationValue}
                               onChange={setNoiseDuration}
                               color="amber"
                             />
@@ -3797,15 +3858,15 @@ if (stage === "role_reveal" && rolesReveal) {
                           emoji="🎭"
                           gradient={["#8B5CF6", "#EC4899"]}
                           stars={3}
-                          costText={`${powerCosts.fake_position}`}
+                          costText={fakeFree ? `1 gratuit · ensuite ${powerCosts.fake_position}` : `${powerCosts.fake_position}`}
                           usageLabel={formatUsage("fake_position")}
-                          estimatedCost={Number(powerCosts.fake_position)}
-                          insufficientCoins={(me?.coins ?? 0) < Number(powerCosts.fake_position)}
+                          estimatedCost={fakeFree ? 0 : Number(powerCosts.fake_position)}
+                          insufficientCoins={!fakeFree && (me?.coins ?? 0) < Number(powerCosts.fake_position)}
                           details={<>
                             Affiche une fausse position aux autres joueurs pendant un certain temps. Les déplacements aléatoires restent crédibles et dans la zone de jeu.
                           </>}
                           onUse={() => {
-                            socket?.emit("use_power", { kind: "fake_position", durationSec: 60 }, (res) => {
+                            socket?.emit("use_power", { kind: "fake_position", durationSec: fakeDurationSec }, (res) => {
                               if (res?.ok) {
                                 // Rely on HUD/game state for fake position; avoid system notification
                                 setGameTab('map');
@@ -3942,12 +4003,12 @@ if (stage === "role_reveal" && rolesReveal) {
                           emoji="🎯"
                           gradient={["#8B5CF6", "#EC4899"]}
                           stars={4}
-                          costText={`${powerCosts.balise_leurre || 60}`}
+                          costText={lureFree ? `1 gratuit · ensuite ${powerCosts.balise_leurre || 60}` : `${powerCosts.balise_leurre || 60}`}
                           locked={Boolean(powerLimits?.balise_leurre) && Number(powerUses?.balise_leurre || 0) >= Number(powerLimits?.balise_leurre || 1)}
                           lockReason="Utilisation unique"
                           lockUntil={null}
-                          estimatedCost={Number(powerCosts.balise_leurre || 60)}
-                          insufficientCoins={(me?.coins ?? 0) < Number(powerCosts.balise_leurre || 60)}
+                          estimatedCost={lureFree ? 0 : Number(powerCosts.balise_leurre || 60)}
+                          insufficientCoins={!lureFree && (me?.coins ?? 0) < Number(powerCosts.balise_leurre || 60)}
                           usageLabel={formatUsage("balise_leurre")}
                           details={<>
                             Permet de programmer en secret l'emplacement de la <b>prochaine balise</b> qui apparaîtra dans la partie. Utilisable une seule fois.
@@ -3991,8 +4052,9 @@ if (stage === "role_reveal" && rolesReveal) {
                       locked={isCooldown("freeze_cats")}
                       lockReason="Recharge"
                       lockUntil={cooldownUntil("freeze_cats")}
-                      estimatedCost={estimatedFreezeCost}
-                      insufficientCoins={(me?.coins ?? 0) < estimatedFreezeCost}
+                      costText={freezeFree ? `1 gratuit · ensuite ${freezeMinCost}–${freezeMaxCost}` : `${freezeMinCost} - ${freezeMaxCost}`}
+                      estimatedCost={freezeFree ? 0 : estimatedFreezeCost}
+                      insufficientCoins={!freezeFree && (me?.coins ?? 0) < estimatedFreezeCost}
                       details={<>
                         Cache la carte du joueur ciblé pendant un court instant. Idéal pour s'échapper ou bloquer un adversaire.
                       </>}
@@ -4014,10 +4076,10 @@ if (stage === "role_reveal" && rolesReveal) {
                               : "single";
                         const payload =
                           scope === "all"
-                            ? { kind: "freeze_cats", scope, durationSec: freezeDuration }
+                            ? { kind: "freeze_cats", scope, durationSec: freezeDurationValue }
                             : scope === "multi"
-                              ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDuration }
-                              : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDuration };
+                              ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDurationValue }
+                              : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDurationValue };
                         socket?.emit("use_power", payload, (res) => {
                           if (res?.ok) {
                             setCd("freeze_cats", 90);
@@ -4085,12 +4147,8 @@ if (stage === "role_reveal" && rolesReveal) {
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
                             <DiscreteSlider 
-                              options={[
-                                { label: '10s', value: 10 },
-                                { label: '20s', value: 20 },
-                                { label: '40s', value: 40 }
-                              ]}
-                              value={freezeDuration}
+                              options={freezeDurationOptions}
+                              value={freezeDurationValue}
                               onChange={setFreezeDuration}
                               color="blue"
                             />
