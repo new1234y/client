@@ -462,6 +462,8 @@ export default function App() {
   const [hasSeenRole, setHasSeenRole] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  const showScanRef = useRef(false);
+  showScanRef.current = showScan;
   const prevMeRef = useRef(null);
   useEffect(() => {
     const meNow = gameState?.me || null;
@@ -1954,6 +1956,13 @@ export default function App() {
       if (!res?.ok) logger.error('[onBeginHunt] Error:', res?.error);
     });
   }, [socket, geoError, position]);
+
+  const openScanner = useCallback(() => {
+    if (showScanRef.current) return;
+    showScanRef.current = true;
+    setErrorBanner(null);
+    setShowScan(true);
+  }, []);
 
   const onScanResult = useCallback(
     (text) => {
@@ -4071,7 +4080,7 @@ if (stage === "role_reveal" && rolesReveal) {
               centerAction={isCat && !catLocked ? "scan" : isPrey || capturedPrey ? "qr" : null}
               onCenterAction={() => {
                 setErrorBanner(null);
-                if (isCat && !catLocked) setShowScan(true);
+                if (isCat && !catLocked) openScanner();
                 else if (isPrey || capturedPrey) setShowQr(true);
               }}
             />
@@ -4111,7 +4120,7 @@ if (stage === "role_reveal" && rolesReveal) {
                 </button>
               )}
               {isCat && !catLocked && (
-                <button type="button" onClick={() => { setErrorBanner(null); setShowScan(true); }} className="flex flex-1 items-center justify-center gap-2 rounded-[8px] bg-[#C45454] py-4 text-base font-semibold text-white transition-colors hover:bg-[#B04A4A]">
+                <button type="button" onClick={openScanner} className="flex flex-1 items-center justify-center gap-2 rounded-[8px] bg-[#C45454] py-4 text-base font-semibold text-white transition-colors hover:bg-[#B04A4A]">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
@@ -4124,7 +4133,7 @@ if (stage === "role_reveal" && rolesReveal) {
         </div>
 
         {showQr && <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />}
-        {showScan && <ScannerModal onScan={onScanResult} onClose={() => setShowScan(false)} />}
+        {showScan ? <ScannerModal onScan={onScanResult} onClose={() => setShowScan(false)} /> : null}
         {showRoleModal && <RoleModal role={role} onClose={() => setShowRoleModal(false)} />}
         {showZoneModal && <ZoneModal
           phaseState={gameState?.zonePhaseState}
