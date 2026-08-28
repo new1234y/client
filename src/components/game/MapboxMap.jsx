@@ -151,12 +151,6 @@ function ensureSources(map) {
   addLine("prey-line", "src-prey", ["get", "color"], 3);
   addFill("balise-fill", "src-balise", ["get", "fill"], 0.22);
   addLine("balise-line", "src-balise", ["get", "color"], 3);
-  try {
-    if (map.getLayer("balise-tower")) map.removeLayer("balise-tower");
-    if (map.getSource("src-balise-tower")) map.removeSource("src-balise-tower");
-  } catch {
-    // leftover cube extrusion from older builds
-  }
   ensureSciFiTowerLayer(map);
   addFill("highlight-fill", "src-highlight", "#fbbf24", 0.25);
   addLine("route-line", "src-route", "#10b981", 2, [2, 2]);

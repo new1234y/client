@@ -7,6 +7,7 @@
  */
 import * as THREE from "three";
 import mapboxgl from "mapbox-gl";
+import { offsetMeters } from "./geoOffset.js";
 
 export const SCIFI_TOWER_LAYER_ID = "sci-fi-towers";
 
@@ -160,9 +161,9 @@ function getShared() {
 function metal(color, extra = {}) {
   return new THREE.MeshStandardMaterial({
     color,
-    metalness: extra.metalness ?? 0.82,
-    roughness: extra.roughness ?? 0.28,
-    envMapIntensity: 0.9,
+    metalness: extra.metalness ?? 0.42,
+    roughness: extra.roughness ?? 0.4,
+    envMapIntensity: 0.35,
     ...extra,
   });
 }
@@ -176,20 +177,12 @@ export function createSciFiTower(color = IDLE) {
   const g = getShared();
   const root = new THREE.Group();
   root.name = "sci-fi-tower";
+  root.frustumCulled = false;
   const tint = [];
 
-  const hemi = new THREE.HemisphereLight(0xdbeafe, 0x3f3f46, 0.62);
-  root.add(hemi);
-  const key = new THREE.DirectionalLight(0xfff4e6, 0.78);
-  key.position.set(10, 26, 12);
-  root.add(key);
-  const fill = new THREE.DirectionalLight(0xbfdbfe, 0.22);
-  fill.position.set(-14, 8, -10);
-  root.add(fill);
-
-  const silver = metal(0xc9d1dc, { roughness: 0.24, metalness: 0.88 });
-  const silverDark = metal(0x6b7280, { roughness: 0.38, metalness: 0.7 });
-  const chrome = metal(0xe5e7eb, { roughness: 0.16, metalness: 0.95 });
+  const silver = metal(0xc9d1dc, { roughness: 0.34, metalness: 0.48 });
+  const silverDark = metal(0x6b7280, { roughness: 0.46, metalness: 0.38 });
+  const chrome = metal(0xe5e7eb, { roughness: 0.26, metalness: 0.58 });
   const copper = makeTint(metal(0xc2410c, { roughness: 0.36, metalness: 0.72 }), "copper");
   tint.push(copper);
 
@@ -333,6 +326,9 @@ export function createSciFiTower(color = IDLE) {
 
   root.userData.tint = tint;
   root.userData.heightM = TOWER_H;
+  root.traverse((o) => {
+    o.frustumCulled = false;
+  });
   tintSciFiTower(root, color);
   return root;
 }
@@ -372,10 +368,47 @@ export function disposeTowerInstance(group) {
   });
 }
 
+function isFinite16(src) {
+  if (!src || typeof src.length !== "number" || src.length < 16) return false;
+  for (let i = 0; i < 16; i++) {
+    if (!Number.isFinite(Number(src[i]))) return false;
+  }
+  return true;
+}
+
+/**
+ * Mapbox GL JS historically passed a 16-float array. v3 + globe / some
+ * builds pass a ProjectionData object instead. fromArray(object) writes
+ * NaNs and the mesh explodes into shards.
+ */
 function readMatrix(matrix) {
   if (!matrix) return null;
-  if (typeof matrix.length === "number") return matrix;
-  return matrix.defaultProjectionData?.mainMatrix || matrix.mainMatrix || null;
+  if (ArrayBuffer.isView(matrix) || Array.isArray(matrix)) {
+    return isFinite16(matrix) ? matrix : null;
+  }
+  if (typeof matrix !== "object") return null;
+  const candidates = [
+    matrix.defaultProjectionData?.mainMatrix,
+    matrix.modelViewProjectionMatrix,
+    matrix.mainMatrix,
+    matrix.defaultProjectionData?.fallbackMatrix,
+  ];
+  for (const c of candidates) {
+    if (isFinite16(c)) return c;
+  }
+  if (isFinite16(matrix)) return matrix;
+  return null;
+}
+
+function fillProjection(out, matrix) {
+  const arr = readMatrix(matrix);
+  if (!arr) return false;
+  out.fromArray(arr);
+  const e = out.elements;
+  for (let i = 0; i < 16; i++) {
+    if (!Number.isFinite(e[i])) return false;
+  }
+  return true;
 }
 
 function elevationOf(map, lng, lat) {
@@ -387,15 +420,122 @@ function elevationOf(map, lng, lat) {
   }
 }
 
-function placeGroup(group, lng, lat, alt) {
+/** Official Mapbox+Three model transform: T(mc) * scale(s,-s,s) * rotateX(PI/2). */
+function makeModelL(out, lng, lat, alt) {
   const mc = mapboxgl.MercatorCoordinate.fromLngLat({ lng, lat }, alt);
   const s = mc.meterInMercatorCoordinateUnits();
-  group.matrixAutoUpdate = false;
-  group.matrix
+  return out
     .makeTranslation(mc.x, mc.y, mc.z)
     .scale(new THREE.Vector3(s, -s, s))
     .multiply(ROT_X);
-  group.matrixWorldNeedsUpdate = true;
+}
+
+const FALLBACK_SRC = "src-balise-tower";
+const FALLBACK_LAYER = "balise-tower";
+
+function circlePoly(lat, lng, radiusM, n = 28) {
+  const coords = [];
+  for (let i = 0; i <= n; i++) {
+    const p = offsetMeters(lat, lng, (i * 360) / n, radiusM);
+    coords.push([p.lng, p.lat]);
+  }
+  return { type: "Polygon", coordinates: [coords] };
+}
+
+function fallbackFeatures(towers) {
+  const feats = [];
+  for (const t of towers) {
+    if (t?.id == null || !Number.isFinite(t.lat) || !Number.isFinite(t.lng)) continue;
+    const color = t.color || IDLE;
+    const { lat, lng } = t;
+    const rings = [
+      { r: 2.35, base: 0, height: 18.6 },
+      { r: 2.55, base: 3.25, height: 3.95 },
+      { r: 2.15, base: 7.05, height: 7.75 },
+      { r: 2.45, base: 10.9, height: 11.65 },
+      { r: 2.1, base: 14.75, height: 15.45 },
+      { r: 2.7, base: 18.35, height: 19.2 },
+      { r: 1.65, base: 19.2, height: 20.55 },
+      { r: 1.15, base: 20.55, height: 21.45 },
+      { r: 0.65, base: 21.45, height: 22.15 },
+      { r: 0.16, base: 22.15, height: 24.6 },
+    ];
+    for (const ring of rings) {
+      feats.push({
+        type: "Feature",
+        properties: { color, base: ring.base, height: ring.height },
+        geometry: circlePoly(lat, lng, ring.r),
+      });
+    }
+  }
+  return feats;
+}
+
+function ensureFallbackLayer(map) {
+  if (!map) return;
+  try {
+    if (!map.getSource(FALLBACK_SRC)) {
+      map.addSource(FALLBACK_SRC, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+    }
+    if (!map.getLayer(FALLBACK_LAYER)) {
+      map.addLayer({
+        id: FALLBACK_LAYER,
+        type: "fill-extrusion",
+        source: FALLBACK_SRC,
+        paint: {
+          "fill-extrusion-color": ["get", "color"],
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-base": ["get", "base"],
+          "fill-extrusion-opacity": 0.94,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
+    }
+  } catch {
+    // style not ready
+  }
+}
+
+function setFallbackTowers(map, towers) {
+  if (!map) return;
+  ensureFallbackLayer(map);
+  try {
+    map.getSource(FALLBACK_SRC)?.setData({
+      type: "FeatureCollection",
+      features: fallbackFeatures(towers),
+    });
+  } catch {
+    // ignore
+  }
+}
+
+function clearFallback(map) {
+  if (!map) return;
+  try {
+    if (map.getLayer(FALLBACK_LAYER)) map.removeLayer(FALLBACK_LAYER);
+    if (map.getSource(FALLBACK_SRC) && !map.getLayer(FALLBACK_LAYER)) {
+      map.removeSource(FALLBACK_SRC);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function addSceneLights(scene) {
+  // Model space is Y-up meters (official example). Lights MUST live on the
+  // scene, never on a mercator-scaled tower group (~1e-7) or they vanish.
+  const hemi = new THREE.HemisphereLight(0xe0f2fe, 0x1e293b, 1.2);
+  hemi.position.set(0, 1, 0);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xfff7ed, 1.28);
+  key.position.set(12, 28, 16);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbfdbfe, 0.38);
+  fill.position.set(-18, 10, -12);
+  scene.add(fill);
 }
 
 export function createSciFiTowerLayer() {
@@ -412,20 +552,29 @@ export function createSciFiTowerLayer() {
     camera: null,
     scene: null,
     renderer: null,
+    _m: null,
+    _l: null,
 
     onAdd(map, gl) {
       this.map = map;
       try {
         this.camera = new THREE.Camera();
+        this.camera.matrixAutoUpdate = false;
         this.scene = new THREE.Scene();
+        this._m = new THREE.Matrix4();
+        this._l = new THREE.Matrix4();
+        addSceneLights(this.scene);
         this.renderer = new THREE.WebGLRenderer({
           canvas: map.getCanvas(),
           context: gl,
           antialias: true,
         });
         this.renderer.autoClear = false;
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.renderer.toneMapping = THREE.NoToneMapping;
         this.ready = true;
         this.failed = false;
+        clearFallback(map);
         this.setTowers(this.pending);
       } catch {
         this.failed = true;
@@ -433,6 +582,7 @@ export function createSciFiTowerLayer() {
         this.renderer = null;
         this.scene = null;
         this.camera = null;
+        setFallbackTowers(map, this.pending);
       }
     },
 
@@ -449,14 +599,12 @@ export function createSciFiTowerLayer() {
       if (this.scene) {
         while (this.scene.children.length) this.scene.remove(this.scene.children[0]);
       }
-      try {
-        this.renderer?.dispose?.();
-      } catch {
-        // shared map context — ignore
-      }
+      // Do not renderer.dispose() — that is the shared Mapbox WebGL context.
       this.renderer = null;
       this.scene = null;
       this.camera = null;
+      this._m = null;
+      this._l = null;
       this.ready = false;
     },
 
@@ -468,7 +616,13 @@ export function createSciFiTowerLayer() {
     setTowers(list) {
       const towers = Array.isArray(list) ? list : [];
       this.pending = towers;
+      if (this.failed) {
+        if (this.enabled && towers.length) setFallbackTowers(this.map, towers);
+        else clearFallback(this.map);
+        return;
+      }
       if (!this.ready || !this.scene) return;
+      clearFallback(this.map);
       const seen = new Set();
       for (const t of towers) {
         if (t?.id == null || !Number.isFinite(t.lat) || !Number.isFinite(t.lng)) continue;
@@ -478,6 +632,8 @@ export function createSciFiTowerLayer() {
         let rec = this.byId.get(id);
         if (!rec) {
           const group = createSciFiTower(color);
+          group.matrixAutoUpdate = false;
+          group.matrix.identity();
           this.scene.add(group);
           rec = { group, color, lng: t.lng, lat: t.lat };
           this.byId.set(id, rec);
@@ -487,7 +643,6 @@ export function createSciFiTowerLayer() {
         }
         rec.lng = t.lng;
         rec.lat = t.lat;
-        placeGroup(rec.group, t.lng, t.lat, elevationOf(this.map, t.lng, t.lat));
       }
       for (const [id, rec] of this.byId) {
         if (seen.has(id)) continue;
@@ -505,11 +660,30 @@ export function createSciFiTowerLayer() {
     render(_gl, matrix) {
       if (this.failed || !this.enabled || !this.renderer || !this.scene || !this.camera) return;
       if (this.byId.size === 0) return;
-      const arr = readMatrix(matrix);
-      if (!arr) return;
-      this.camera.projectionMatrix.fromArray(arr);
-      this.renderer.resetState();
-      this.renderer.render(this.scene, this.camera);
+      if (!fillProjection(this._m, matrix)) return;
+
+      // Official pattern: mesh stays identity at origin (Y-up meters);
+      // camera.projectionMatrix = m * l. Identity view.
+      this.camera.matrix.identity();
+      this.camera.matrixWorld.identity();
+      this.camera.matrixWorldInverse.identity();
+
+      const records = [...this.byId.values()];
+      for (const rec of records) rec.group.visible = false;
+
+      for (const rec of records) {
+        rec.group.visible = true;
+        rec.group.matrix.identity();
+        rec.group.matrixWorldNeedsUpdate = true;
+        const alt = elevationOf(this.map, rec.lng, rec.lat);
+        makeModelL(this._l, rec.lng, rec.lat, alt);
+        this.camera.projectionMatrix.copy(this._m).multiply(this._l);
+        this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+        rec.group.visible = false;
+      }
+      for (const rec of records) rec.group.visible = true;
     },
   };
 }
@@ -522,14 +696,7 @@ export function ensureSciFiTowerLayer(map) {
     map._sciFiTowers = impl;
   }
   try {
-    if (map.getLayer("balise-tower")) map.removeLayer("balise-tower");
-    if (map.getSource("src-balise-tower") && !map.getLayer("balise-tower")) {
-      try {
-        map.removeSource("src-balise-tower");
-      } catch {
-        // still attached
-      }
-    }
+    if (!impl.failed) clearFallback(map);
   } catch {
     // style not ready
   }
