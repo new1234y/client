@@ -1489,9 +1489,13 @@ export default function App() {
 
     s.on("balise_capture_blocked", (data) => {
       if (data.sessionId === sessionIdRef.current) {
+        const capturerNickname = typeof data.capturerNickname === "string" ? data.capturerNickname.trim() : "";
         const notif = {
           kind: 'balise_blocked',
-          message: data.message || "Une personne est déjà en train de la capturer",
+          capturerNickname: capturerNickname || null,
+          message: capturerNickname
+            ? `${capturerNickname} est déjà en train de la capturer`
+            : (data.message || "Une personne est déjà en train de la capturer"),
           startedAt: Date.now(),
           durationMs: 2000,
         };
@@ -1607,9 +1611,13 @@ export default function App() {
         });
         // Also show toast notification
       } else if (kind === "balise_blocked") {
+        const capturerNickname = typeof data.capturerNickname === "string" ? data.capturerNickname.trim() : "";
         const notif = {
           kind: "balise_blocked",
-          message: data.message || "Une personne est déjà en train de la capturer",
+          capturerNickname: capturerNickname || null,
+          message: capturerNickname
+            ? `${capturerNickname} est déjà en train de la capturer`
+            : (data.message || "Une personne est déjà en train de la capturer"),
           startedAt: Date.now(),
           durationMs: 2000,
         };

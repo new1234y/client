@@ -399,12 +399,17 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel, visible = true
 
     if (currentEffect.kind === "balise_blocked") {
       return (
-        <div className="mt-2 overflow-hidden rounded-xl bg-blue-600 px-3 py-2 text-white animate-[slideDown_0.25s_ease-out]">
-          <p className="text-[10px] font-bold uppercase tracking-wider">Balise bloquée</p>
-          <p className="text-[11px] font-semibold">
-            {currentEffect.message}
-          </p>
-        </div>
+        <>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white"><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></span>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200">Capture de balise</p>
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                {currentEffect.message}
+              </p>
+            </div>
+          </div>
+        </>
       );
     }
 
