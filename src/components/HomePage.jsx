@@ -5,11 +5,11 @@ import SliderWithParticles from "./ui/SliderWithParticles.jsx";
 import heroChase from "../assets/hero-chase.png";
 
 const powers = [
-  { name: "Invisibilité", code: "01", color: "blue", description: "Masquez temporairement votre position. Le Chat perd votre trace pendant quelques secondes : idéal pour changer de direction ou quitter une zone dangereuse.", stat: "Position masquée", duration: "20 s" },
-  { name: "Bruit fantôme", code: "02", color: "amber", description: "Créez un faux signal GPS ailleurs sur la carte. Le Chat voit un leurre crédible et doit choisir quelle piste suivre.", stat: "Fausse piste", duration: "30 s" },
-  { name: "Immobilisation", code: "03", color: "blue", description: "Bloquez brièvement un adversaire à portée. Une fenêtre courte, mais suffisante pour gagner du terrain ou préparer une capture.", stat: "Cible ralentie", duration: "10 s" },
-  { name: "Position exacte", code: "04", color: "amber", description: "Révélez précisément la position d'une cible. Le brouillard disparaît et le marqueur s'affiche en direct sur la carte.", stat: "Radar précis", duration: "15 s" },
-  { name: "Balise-leurre", code: "05", color: "blue", description: "Posez une balise trompeuse dans la zone. Elle attire les poursuivants et ouvre un nouvel itinéraire à votre équipe.", stat: "Leurre posé", duration: "45 s" },
+  { name: "Invisibilité", code: "01", color: "blue", description: "Masquez votre position. Pendant quelques secondes, votre marqueur disparaît de la carte du Chat.", stat: "Carte : position masquée", duration: "20 s" },
+  { name: "Bruit fantôme", code: "02", color: "amber", description: "Déclenchez un faux signal GPS ailleurs. Le Chat voit un leurre et doit choisir la mauvaise piste.", stat: "Carte : fausse position", duration: "30 s" },
+  { name: "Immobilisation", code: "03", color: "blue", description: "Figez un adversaire à portée. Profitez de cette fenêtre pour changer d’itinéraire ou préparer une capture.", stat: "Carte : cible ralentie", duration: "10 s" },
+  { name: "Position exacte", code: "04", color: "amber", description: "Révélez précisément une cible. Son marqueur devient visible en direct malgré le brouillard.", stat: "Carte : radar précis", duration: "15 s" },
+  { name: "Balise-leurre", code: "05", color: "blue", description: "Placez un leurre sur la carte. Il attire les poursuivants et ouvre un détour à votre équipe.", stat: "Carte : leurre posé", duration: "45 s" },
 ];
 
 function Icon({ name, className = "h-5 w-5" }) {
@@ -22,6 +22,8 @@ function Icon({ name, className = "h-5 w-5" }) {
     bolt: <path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/>,
     coin: <><circle cx="12" cy="12" r="8"/><path d="M14.5 8.5c-.6-.7-1.5-1-2.5-1-1.7 0-3 1-3 2.4 0 3.6 6 1.4 6 4.6 0 1.3-1.2 2.3-3 2.3-1.2 0-2.2-.4-3-1.2M12 5.5v13"/></>,
     target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></>,
+    cat: <><path d="M5 9 4 4l4 2a7 7 0 0 1 8 0l4-2-1 5"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M9 16c2 1.5 4 1.5 6 0"/></>,
+    mouse: <><circle cx="12" cy="13" r="7"/><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="12" r="1"/></>,
   };
   return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -46,7 +48,7 @@ function PlayerMarker({ role, label, className = "" }) {
     <div className={`flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/90 ${className}`}>
       <span className={`relative flex h-11 w-11 items-center justify-center rounded-full ${cat ? "bg-blue-600" : "bg-amber-500"}`}>
         <span className={`absolute inset-0 rounded-full border-2 ${cat ? "border-blue-400" : "border-amber-300"} landing-marker-pulse`} />
-        <Icon name={cat ? "target" : "arrow"} className="h-5 w-5 text-white" />
+        <Icon name={cat ? "cat" : "mouse"} className="h-5 w-5 text-white" />
       </span>
       <span><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">{role}</span><span className="text-sm font-black text-slate-950 dark:text-white">{label}</span></span>
     </div>
@@ -120,6 +122,34 @@ function HeroMap() {
           <div className="rounded-xl bg-white/10 px-2 py-2"><span className="block text-base text-orange-300">⌁</span>Scanner</div>
           <div className="rounded-xl bg-white/10 px-2 py-2"><span className="block text-base text-amber-300">✦</span>Pouvoirs</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ReplayPreview() {
+  return (
+    <div className="overflow-hidden rounded-[2rem] border border-slate-700 bg-slate-950 text-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300">Replay de la partie</p>
+          <p className="mt-1 text-sm font-black">Les trajectoires, action par action.</p>
+        </div>
+        <span className="rounded-full bg-blue-500/20 px-3 py-1 font-mono text-xs font-bold text-blue-200">18:42</span>
+      </div>
+      <div className="relative h-56 overflow-hidden bg-[linear-gradient(135deg,#172033_25%,#243449_25%,#243449_27%,#172033_27%,#172033_55%,#293c4e_55%,#293c4e_58%,#172033_58%)]">
+        <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "linear-gradient(30deg, transparent 48%, #93c5fd 49%, #93c5fd 51%, transparent 52%), linear-gradient(120deg, transparent 48%, #93c5fd 49%, #93c5fd 51%, transparent 52%)", backgroundSize: "90px 90px" }} />
+        <div className="absolute left-[18%] top-[22%] h-32 w-32 rounded-full border border-blue-400/70 bg-blue-400/10" />
+        <div className="absolute left-[18%] top-[22%] h-2 w-2 rounded-full bg-blue-300 shadow-[0_0_0_5px_rgba(96,165,250,.2)]" />
+        <div className="absolute left-[18%] top-[22%] h-2 w-2 animate-ping rounded-full bg-blue-300" />
+        <div className="absolute left-[21%] top-[24%] h-28 w-[54%] rotate-[18deg] border-t-2 border-dashed border-blue-300" />
+        <div className="absolute right-[18%] top-[54%] flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-900 text-xs text-red-100">◉</span><span className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold">Chat</span></div>
+        <div className="absolute left-[42%] bottom-[25%] flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-xs">●</span><span className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold">Souris</span></div>
+      </div>
+      <div className="grid grid-cols-3 gap-px border-t border-white/10 bg-white/10 text-center text-[10px] font-bold">
+        <div className="bg-slate-950 px-3 py-3 text-slate-300"><span className="block text-blue-300">12</span>événements</div>
+        <div className="bg-slate-950 px-3 py-3 text-slate-300"><span className="block text-amber-300">3,4 km</span>parcourus</div>
+        <div className="bg-slate-950 px-3 py-3 text-slate-300"><span className="block text-emerald-300">2</span>captures</div>
       </div>
     </div>
   );
@@ -465,7 +495,7 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
 
         <section id="powers" className="landing-dots-muted flex min-h-screen items-center border-y border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"><div className="mx-auto w-full max-w-7xl px-5 py-24 sm:px-8 lg:px-10"><Reveal><SectionIntro eyebrow="05 — Pouvoirs spéciaux" title="Retournez la partie au bon moment." text="Les pouvoirs s'achètent avec les pièces gagnées en jeu. Ils sont courts, lisibles et conçus pour créer un choix tactique — jamais une victoire automatique."/></Reveal><Reveal className="mt-12"><div className="overflow-hidden" onMouseEnter={()=>setCarouselPaused(true)} onMouseLeave={()=>setCarouselPaused(false)} onFocus={()=>setCarouselPaused(true)} onBlur={()=>setCarouselPaused(false)} onTouchStart={(e)=>{touchStart.current=e.touches[0].clientX}} onTouchEnd={(e)=>{if(touchStart.current===null)return;const d=e.changedTouches[0].clientX-touchStart.current;if(Math.abs(d)>45)changePower(d>0?-1:1);touchStart.current=null}}><div className="grid items-center gap-8 lg:grid-cols-[.75fr_1.25fr]"><div className="relative mx-auto flex aspect-square w-full max-w-sm items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950"><div className="landing-radar absolute inset-8 rounded-full border border-dashed border-blue-300 dark:border-blue-800"/><div className="absolute inset-20 rounded-full border border-slate-200 dark:border-slate-800"/><div key={powers[powerIndex].name} className={`landing-power-symbol relative flex h-28 w-28 items-center justify-center rounded-3xl ${powers[powerIndex].color === "blue" ? "bg-blue-600" : "bg-amber-500"} text-white shadow-2xl`}><Icon name="bolt" className="h-12 w-12"/></div></div><article key={powers[powerIndex].code} className="landing-slide rounded-[2rem] border border-slate-200 bg-white p-7 shadow-xl dark:border-slate-700 dark:bg-slate-950 sm:p-10"><div className="flex items-start justify-between"><span className="font-mono text-sm font-black text-blue-600">POUVOIR {powers[powerIndex].code} / 05</span><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold dark:bg-slate-800">{powers[powerIndex].duration}</span></div><h3 className="mt-8 text-4xl font-black tracking-tight sm:text-5xl">{powers[powerIndex].name}</h3><p className="mt-5 text-lg leading-relaxed text-slate-600 dark:text-slate-300">{powers[powerIndex].description}</p><div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6 dark:border-slate-800"><span className="text-sm font-black text-blue-600">{powers[powerIndex].stat}</span><div className="flex gap-2"><button type="button" onClick={()=>changePower(-1)} className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800" aria-label="Pouvoir précédent"><Icon name="arrow" className="h-5 w-5 rotate-180"/></button><button type="button" onClick={()=>changePower(1)} className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700" aria-label="Pouvoir suivant"><Icon name="arrow"/></button></div></div></article></div><div className="mt-8 flex justify-center gap-2" role="tablist" aria-label="Choisir un pouvoir">{powers.map((power,index)=><button key={power.name} type="button" onClick={()=>setPowerIndex(index)} className={`h-2.5 rounded-full transition-all ${index===powerIndex?"w-8 bg-blue-600":"w-2.5 bg-slate-300 dark:bg-slate-700"}`} aria-label={power.name} aria-selected={index===powerIndex}/>)}</div></div></Reveal></div></section>
 
-        <section id="score" className="landing-dots flex min-h-screen items-center"><div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:px-10"><Reveal><SectionIntro eyebrow="06 — Pièces et score" title="Chaque action laisse une trace." text="Survivez, capturez, posez des balises et utilisez vos pouvoirs avec précision pour gagner des pièces. Le récapitulatif final révèle les captures, le temps de survie et le classement de chaque joueur."/><div className="mt-8 flex gap-3"><div className="rounded-2xl bg-amber-100 p-4 text-amber-800 dark:bg-amber-950 dark:text-amber-300"><Icon name="coin" className="h-7 w-7"/><p className="mt-3 text-2xl font-black">+250</p><p className="text-xs font-bold">Survie</p></div><div className="rounded-2xl bg-blue-100 p-4 text-blue-800 dark:bg-blue-950 dark:text-blue-300"><Icon name="target" className="h-7 w-7"/><p className="mt-3 text-2xl font-black">+400</p><p className="text-xs font-bold">Capture</p></div></div></Reveal><Reveal><div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"><p className="text-xs font-black uppercase tracking-widest text-slate-400">Classement final</p><div className="mt-10 flex items-end justify-center gap-3">{[["2","Lina","h-36","bg-slate-300"],["1","Camille","h-52","bg-blue-600"],["3","Noa","h-28","bg-amber-500"]].map(([rank,name,height,color])=><div key={rank} className="flex flex-1 flex-col items-center"><span className="mb-3 text-sm font-black">{name}</span><div className={`${height} ${color} landing-podium flex w-full items-start justify-center rounded-t-2xl pt-5 text-3xl font-black text-white`}>{rank}</div></div>)}</div><div className="flex items-center justify-between rounded-b-2xl bg-white p-5 dark:bg-slate-950"><span className="font-black">Partie terminée</span><span className="font-mono font-black text-amber-600">1 280 pièces</span></div></div></Reveal></div></section>
+        <section id="score" className="landing-dots flex min-h-screen items-center"><div className="mx-auto grid w-full max-w-7xl items-center gap-14 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:px-10"><Reveal><SectionIntro eyebrow="06 — Pièces et score" title="Chaque action laisse une trace." text="Le récapitulatif reprend la vraie partie : score, trajectoires, captures et chronologie complète des événements."/><div className="mt-8 flex gap-3"><div className="rounded-2xl bg-amber-100 p-4 text-amber-800 dark:bg-amber-950 dark:text-amber-300"><Icon name="coin" className="h-7 w-7"/><p className="mt-3 text-2xl font-black">+250</p><p className="text-xs font-bold">Survie</p></div><div className="rounded-2xl bg-blue-100 p-4 text-blue-800 dark:bg-blue-950 dark:text-blue-300"><Icon name="target" className="h-7 w-7"/><p className="mt-3 text-2xl font-black">+400</p><p className="text-xs font-bold">Capture</p></div></div></Reveal><Reveal><ReplayPreview /></Reveal></div></section>
 
         <section className="relative overflow-hidden bg-blue-600 text-white"><div className="landing-dots-dark mx-auto flex min-h-[75vh] max-w-7xl flex-col items-center justify-center px-5 py-24 text-center sm:px-8"><Reveal><p className="text-xs font-black uppercase tracking-[.25em] text-blue-200">À vous de jouer</p><h2 className="mx-auto mt-5 max-w-4xl text-balance text-5xl font-black leading-none tracking-[-.045em] sm:text-7xl">La prochaine poursuite commence ici.</h2><p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-blue-100">Créez une salle en quelques secondes ou rejoignez votre groupe avec le code partagé.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><button type="button" onClick={goCreate} className="rounded-full bg-white px-7 py-4 font-black text-blue-700 hover:bg-blue-50">Créer une partie</button><a href="#top" className="rounded-full border border-blue-300 px-7 py-4 font-black text-white hover:bg-blue-500">Saisir un code</a></div></Reveal></div></section>
 

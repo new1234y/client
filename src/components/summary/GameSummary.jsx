@@ -31,6 +31,9 @@ import {
   effectiveGlobalRadiusAtTime,
   effectiveZoneCenterAtTime,
 } from "../../lib/recapZone.js";
+import mapboxgl from "mapbox-gl";
+import { getMapboxToken } from "../../lib/map/mapboxKey.js";
+import { resolveMapboxStyleUrl } from "../../lib/map/mapPrefs.js";
 
 
 function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
@@ -306,6 +309,7 @@ function SummaryPodiumView({
   copyRecap,
 }) {
   const players = summary?.players || [];
+  const [selectedSessionId, setSelectedSessionId] = useState(() => players[0]?.sessionId || null);
   const analyticsPlayers = analytics?.players || {};
   const gameAnalytics = analytics?.game || {};
   const gameMode = gameAnalytics.mode || summary?.settingsSnapshot?.gameMode || "tag_swap";
@@ -670,6 +674,52 @@ function capturedAt(sessionId, timeline, absT) {
     if (ev.t > absT) break;
     if (ev.type === "captured" && ev.sessionId === sessionId) return true;
   }
+
+  function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow }) {
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    const token = getMapboxToken();
+
+    useEffect(() => {
+      if (!token || !containerRef.current) return undefined;
+      mapboxgl.accessToken = token;
+      const map = new mapboxgl.Map({
+        container: containerRef.current,
+        style: resolveMapboxStyleUrl("streets"),
+        center: [center[1], center[0]],
+        zoom: 15,
+        pitch: 58,
+        bearing: 18,
+        antialias: true,
+        attributionControl: true,
+      });
+      mapRef.current = map;
+      map.on("load", () => {
+        map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
+        map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
+        map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
+        map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+        map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
+        map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
+      });
+      return () => { map.remove(); mapRef.current = null; };
+    }, [token]);
+
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded()) return;
+      const paths = map.getSource("recap-paths");
+      const markers = map.getSource("recap-markers");
+      paths?.setData({ type: "FeatureCollection", features: pathFeatures });
+      markers?.setData({ type: "FeatureCollection", features: markerFeatures });
+      if (follow && selectedPosition) {
+        map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 58, duration: 450, essential: true });
+      }
+    }, [pathFeatures, markerFeatures, selectedPosition, follow]);
+
+    if (!token) return null;
+    return <div ref={containerRef} className="absolute inset-0 z-10" aria-label="Replay 3D Mapbox de la partie" />;
+  }
   return false;
 }
 
@@ -888,6 +938,29 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     return out;
   }, [summary, players, visible, absT]);
 
+  const replayPathFeatures = useMemo(
+    () => polylines.map((pl) => ({
+      type: "Feature",
+      properties: { color: pl.color },
+      geometry: { type: "LineString", coordinates: pl.positions.map(([lat, lng]) => [lng, lat]) },
+    })),
+    [polylines]
+  );
+  const replayMarkerFeatures = useMemo(
+    () => markers.map((m) => ({
+      type: "Feature",
+      properties: { color: m.cap ? "#64748b" : m.nickname === players.find((p) => p.sessionId === m.sessionId)?.nickname ? (summary.colors?.[m.sessionId] || "#2563eb") : "#94a3b8" },
+      geometry: { type: "Point", coordinates: [m.position[1], m.position[0]] },
+    })),
+    [markers, players, summary?.colors]
+  );
+  const selectedPosition = useMemo(
+    () => markers.find((m) => m.sessionId === selectedSessionId)?.position
+      ? (() => { const p = markers.find((m) => m.sessionId === selectedSessionId).position; return { lat: p[0], lng: p[1] }; })()
+      : null,
+    [markers, selectedSessionId]
+  );
+
   const jamCircles = useMemo(() => {
     if (!summary || !showJam) return [];
     const jam = summary.jamHistory || [];
@@ -987,6 +1060,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
 
         <div className="relative min-h-0 flex-1">
+          <ReplayMapbox
+            center={center}
+            selectedPosition={selectedPosition}
+            pathFeatures={replayPathFeatures}
+            markerFeatures={replayMarkerFeatures}
+            follow={Boolean(selectedSessionId)}
+          />
           <MapContainer
             center={center}
             zoom={15}
@@ -1083,6 +1163,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                 const st = analytics.players?.[p.sessionId] || {};
                 return (
                 <label
+                  onClick={() => setSelectedSessionId(p.sessionId)}
                   key={p.sessionId}
                   className="flex cursor-pointer flex-col gap-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800/90"
                 >
