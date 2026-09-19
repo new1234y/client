@@ -77,8 +77,10 @@ export default function SettingsPage({
   const [accent, setAccentState] = useState(() => getAccent());
   const [reduceMotion, setReduce] = useState(() => getReducedMotion());
   const [notificationPermission, setNotificationPermission] = useState(() =>
-    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+    typeof Notification === "undefined" ? "fallback" : Notification.permission
   );
+  const hasNotificationApi = typeof Notification !== "undefined";
+  const hasServiceWorker = typeof navigator !== "undefined" && "serviceWorker" in navigator;
   const storedNick = nicknameProp ?? readNickname();
   const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
   const showAdmin = Boolean(inGame && isKarim && admin);
@@ -114,8 +116,8 @@ export default function SettingsPage({
   };
 
   const requestNotifications = async () => {
-    if (typeof Notification === "undefined") {
-      setNotificationPermission("unsupported");
+    if (!hasNotificationApi) {
+      setNotificationPermission(hasServiceWorker ? "fallback" : "unsupported");
       return;
     }
     try {
@@ -222,9 +224,16 @@ export default function SettingsPage({
               Vérifier l’autorisation
             </button>
           </div>
+        ) : notificationPermission === "fallback" ? (
+          <div className="space-y-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+            <p className="font-bold">Mode compatible activé</p>
+            <p className="text-xs font-semibold">
+              Ce navigateur ne propose pas la permission classique, mais l’application utilise ses notifications PWA quand elles sont disponibles. Gardez le jeu installé sur l’écran d’accueil pour une meilleure réception.
+            </p>
+          </div>
         ) : notificationPermission === "unsupported" ? (
           <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-            Les notifications système ne sont pas disponibles dans ce navigateur. Les alertes du jeu restent actives.
+            Les notifications en arrière-plan ne sont pas disponibles sur cet ancien navigateur. Les alertes intégrées au jeu restent actives.
           </p>
         ) : (
           <button
