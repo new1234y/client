@@ -43,6 +43,16 @@ import { getOsmApiKey } from "./lib/map/osmKey.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
 import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, setMapStyleId } from "./lib/map/mapPrefs.js";
 import { syncServerTime } from "./lib/serverTime.js";
+
+function sendSystemNotification(title, body) {
+  if (typeof document === "undefined" || document.visibilityState !== "hidden") return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    new Notification(title, { body, tag: "chase-gps-game", renotify: true });
+  } catch (error) {
+    logger.warn("Notification système indisponible", error);
+  }
+}
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
 import { getBaliseCaptureMs } from "./lib/baliseTypes.js";
@@ -767,6 +777,49 @@ export default function App() {
   const [focusZoom, setFocusZoom] = useState(18);
   const [highlightSessionId, setHighlightSessionId] = useState(null);
   const [localCooldowns, setLocalCooldowns] = useState({});
+  const notificationPromptedRef = useRef(false);
+
+  useEffect(() => {
+    if (stage !== "game" || notificationPromptedRef.current) return;
+    notificationPromptedRef.current = true;
+    if (typeof Notification === "undefined") {
+      addNotification("Les alertes téléphone ne sont pas disponibles sur ce navigateur. Les alertes du jeu restent actives.", "info", 6000);
+      return;
+    }
+    if (Notification.permission === "default") {
+      addNotification("Autorisez les notifications pour recevoir les alertes même si vous quittez cette page.", "info", 5000);
+      Notification.requestPermission().then((permission) => {
+        if (permission === "denied") {
+          addNotification("Notifications refusées : le téléphone ne pourra pas vous prévenir hors de cette page. Vous pouvez les réactiver dans les réglages du navigateur.", "warning", 8000);
+        } else if (permission === "granted") {
+          addNotification("Notifications activées.", "success", 2500);
+        }
+      }).catch(() => {
+        addNotification("La demande de notification n'a pas abouti. Les alertes du jeu restent actives.", "warning", 6000);
+      });
+    } else if (Notification.permission === "denied") {
+      addNotification("Notifications désactivées dans le navigateur : les alertes téléphone sont indisponibles, mais le jeu continue normalement.", "warning", 7000);
+    }
+  }, [stage, addNotification]);
+
+  useEffect(() => {
+    let reconnectReminder = null;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && stageRef.current === "game") {
+        reconnectReminder = window.setTimeout(() => {
+          sendSystemNotification("Chase GPS", "Vous êtes absent depuis 1 minute. Revenez dans le jeu pour rester connecté.");
+        }, 60_000);
+      } else if (reconnectReminder) {
+        window.clearTimeout(reconnectReminder);
+        reconnectReminder = null;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (reconnectReminder) window.clearTimeout(reconnectReminder);
+    };
+  }, []);
 
   useEffect(() => {
     if (gameState?.me?.powerCooldowns) {
@@ -1619,6 +1672,7 @@ export default function App() {
       playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, durationSec, volume).catch((e) => {
         logger.warn("AudioContext non disponible pour bruit", e);
       });
+      sendSystemNotification("Bruit fantôme", `${by || "Un adversaire"} vous a ciblé.`);
 
       setActiveNoise({
         startedAt: getServerTime(),
@@ -1640,6 +1694,7 @@ export default function App() {
           durationSec: data.durationSec,
           startedAt: getServerTime()
         });
+        sendSystemNotification("Pouvoir activé contre vous", "Vous êtes affecté par une invisibilité.");
         // Also show toast notification
       } else if (kind === "balise_blocked") {
         const capturerNickname = typeof data.capturerNickname === "string" ? data.capturerNickname.trim() : "";
@@ -1663,6 +1718,7 @@ export default function App() {
 
     s.on("immobilized", ({ until, by, durationSec }) => {
       setImmobilizedMeta({ until, by, durationSec });
+      sendSystemNotification("Vous êtes immobilisé", `${by || "Un adversaire"} vous bloque pendant ${durationSec || 0} secondes.`);
     });
 
     s.on("admin_role_changed", (data) => {

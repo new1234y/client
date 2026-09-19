@@ -46,8 +46,6 @@ export default function PowerCard({
   usageLabel,
   visible = true,
 }) {
-  const [open, setOpen] = useState(false);
-
   const now = useServerNow();
   const remaining = remainingSeconds(lockUntil, now) || 0;
   const isCurrentlyLocked = locked || remaining > 0;
@@ -62,22 +60,12 @@ export default function PowerCard({
           <div className="flex items-center gap-3">
             <PowerGlyph title={title} emoji={emoji} />
             <div className="min-w-0">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Pouvoir
-              </div>
               <div className="text-base font-black text-slate-950 dark:text-white">{title}</div>
             </div>
           </div>
       {costText && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-800">
         <span>{typeof costText === 'number' ? formatCoins(costText) : costText}</span>
-            </div>
-          )}
-          {stars > 0 && (
-            <div className="mt-2 flex items-center gap-0.5" title={`Puissance: ${stars}/5`}>
-              {[...Array(5)].map((_, i) => (
-                <span key={i} className={`text-sm ${i < stars ? "text-amber-400" : "text-slate-300 dark:text-slate-600"}`}>★</span>
-              ))}
             </div>
           )}
         </div>
@@ -97,22 +85,7 @@ export default function PowerCard({
             ) : "Utiliser"}
           </Button>
 
-          {details && (
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-full border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              {open ? "Moins" : "Plus"}
-            </button>
-          )}
         </div>
-
-        {details && open && (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            {details}
-          </div>
-        )}
       </div>
 
       {isCurrentlyLocked && (
