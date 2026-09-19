@@ -44,8 +44,16 @@ import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
 import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, setMapStyleId } from "./lib/map/mapPrefs.js";
 import { syncServerTime } from "./lib/serverTime.js";
 
+function isIosDevice() {
+  if (typeof navigator === "undefined") return false;
+  const userAgent = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 function sendSystemNotification(title, body) {
   if (typeof document === "undefined" || document.visibilityState !== "hidden") return;
+  if (isIosDevice()) return;
   const options = { body, tag: "chase-gps-game", renotify: true, icon: "/icon-192x192.png" };
   const useServiceWorkerNotification = navigator.serviceWorker?.ready
     ? navigator.serviceWorker.ready.then((registration) =>
@@ -1448,6 +1456,7 @@ export default function App() {
     });
 
     s.on("notification_permission_request", (data) => {
+      if (isIosDevice()) return;
       if (typeof Notification !== "undefined" && Notification.permission === "granted") return;
       setNotificationPermissionRequest({
         title: data?.title || "Notifications de partie",
