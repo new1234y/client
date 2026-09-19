@@ -50,20 +50,20 @@ function readNickname() {
   } catch {
     return "";
   }
+}
 
-  function getNotificationPlatform() {
-    if (typeof navigator === "undefined") return "other";
-    const ua = navigator.userAgent || "";
-    if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
-      return "ios";
-    }
-    return "other";
+function getNotificationPlatform() {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+    return "ios";
   }
+  return "other";
+}
 
-  function isStandalonePwa() {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
-  }
+function isStandalonePwa() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
 }
 
 function Section({ title, hint, children }) {
