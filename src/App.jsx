@@ -4305,8 +4305,9 @@ if (stage === "role_reveal" && rolesReveal) {
                   embedded
                   inGame
                   nickname={me?.nickname || nickname}
+                  isHost={isHost}
                   onLeaveGame={leaveGame}
-                  admin={(me?.nickname || nickname || "").trim().toLowerCase() === "karim"
+                  admin={isHost
                     ? {
                         roomCode: currentRoomCode,
                         rosterList,

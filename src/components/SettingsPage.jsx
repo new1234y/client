@@ -82,6 +82,7 @@ export default function SettingsPage({
   embedded = false,
   inGame = false,
   nickname: nicknameProp,
+  isHost = false,
   onLeaveGame,
   admin = null,
 }) {
@@ -98,8 +99,7 @@ export default function SettingsPage({
   const notificationPlatform = getNotificationPlatform();
   const iosNeedsInstall = notificationPlatform === "ios" && !isStandalonePwa();
   const storedNick = nicknameProp ?? readNickname();
-  const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
-  const showAdmin = Boolean(inGame && isKarim && admin);
+  const showAdmin = Boolean(inGame && isHost && admin);
   const appearance = highContrast ? "contrast" : theme === "dark" ? "dark" : "light";
 
   useEffect(() => {
