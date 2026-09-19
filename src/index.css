@@ -518,6 +518,7 @@ button, a, [role="button"] {
 
 html { scroll-behavior: smooth; }
 section[id] { scroll-margin-top: 64px; }
+.hero-map { isolation: isolate; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -531,6 +532,7 @@ section[id] { scroll-margin-top: 64px; }
   .landing-slide,
   .landing-power-symbol,
   .landing-podium { animation: none !important; }
+  .hero-map img { transition: none !important; }
 }
 
 /* Mapbox GL — full-size, compact attribution */

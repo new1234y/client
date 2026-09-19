@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import BrandMark from "./ui/BrandMark.jsx";
 import GlassHeader from "./ui/GlassHeader.jsx";
 import SliderWithParticles from "./ui/SliderWithParticles.jsx";
+import heroChase from "../assets/hero-chase.png";
 
 const powers = [
   { name: "Invisibilité", code: "01", color: "blue", description: "Masquez temporairement votre position. Le Chat perd votre trace pendant quelques secondes : idéal pour changer de direction ou quitter une zone dangereuse.", stat: "Position masquée", duration: "20 s" },
@@ -62,6 +63,33 @@ function MapPreview({ zone = false }) {
       <PlayerMarker role="chat" label="Chasseur" className="absolute left-[10%] top-[22%]" />
       <PlayerMarker role="souris" label="À 180 m" className="absolute bottom-[15%] right-[8%]" />
       <div className="landing-route absolute left-[35%] top-[45%] h-px w-[34%] rotate-[24deg] border-t-2 border-dashed border-blue-500" />
+    </div>
+  );
+}
+
+function HeroMap() {
+  return (
+    <div className="hero-map relative mx-auto aspect-[4/5] w-full max-w-[520px] overflow-hidden rounded-[2rem] border border-blue-200/80 bg-slate-100 shadow-[0_24px_80px_-24px_rgba(37,99,235,0.45)] dark:border-blue-900 dark:bg-slate-900 sm:aspect-square">
+      <img
+        src={heroChase}
+        alt="Carte stylisée avec une zone de recherche et une balise"
+        width="1024"
+        height="1024"
+        fetchPriority="high"
+        className="h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-white/10" />
+      <div className="absolute left-[15%] top-[16%] flex items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-2 text-xs font-black text-slate-800 shadow-lg backdrop-blur dark:bg-slate-950/90 dark:text-white">
+        <span className="h-2 w-2 rounded-full bg-amber-500" />
+        Balise détectée
+      </div>
+      <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Zone active</p>
+          <p className="mt-1 text-2xl font-black">À 180 m</p>
+        </div>
+        <span className="rounded-full border border-white/30 bg-slate-950/35 px-3 py-2 text-xs font-bold backdrop-blur">Signal en direct</span>
+      </div>
     </div>
   );
 }
@@ -144,6 +172,9 @@ function JoinNickPage({ connected, onOpenSettings, onBack, draftNick, setDraftNi
         <label htmlFor="join-nick" className="mt-8 block text-sm font-bold">Pseudo</label>
         <input
           id="join-nick"
+        name="nickname"
+        autoComplete="nickname"
+        spellCheck={false}
           autoFocus
           className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3.5 font-semibold outline-none focus:border-blue-500 dark:bg-slate-950 ${nicknameError ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 dark:border-slate-700"}`}
           placeholder="Ex. Camille"
@@ -184,6 +215,9 @@ function CreatePartyPage({ connected, onOpenSettings, onBack, draftNick, setDraf
         <label htmlFor="create-nick" className="block text-sm font-bold">Pseudo</label>
         <input
           id="create-nick"
+          name="nickname"
+          autoComplete="nickname"
+          spellCheck={false}
           autoFocus
           className={`w-full rounded-2xl border bg-white px-4 py-3.5 font-semibold outline-none focus:border-blue-500 dark:bg-slate-950 ${nicknameError ? "border-red-500 ring-2 ring-red-200" : "border-slate-200 dark:border-slate-700"}`}
           placeholder="Ex. Camille"
@@ -372,7 +406,7 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
       <GlassHeader variant="fixed">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
           <a href="#top" aria-label="Chase GPS, accueil"><BrandMark /></a>
-          <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-500 dark:text-slate-400 lg:flex" aria-label="Navigation principale"><a className="hover:text-blue-600" href="#roles">Rôles</a><a className="hover:text-blue-600" href="#zone">Zone</a><a className="hover:text-blue-600" href="#capture">Capture</a><a className="hover:text-blue-600" href="#powers">Pouvoirs</a></nav>
+          <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-500 dark:text-slate-400 lg:flex" aria-label="Navigation principale"><a className="hover:text-blue-600 focus-visible:text-blue-600" href="#preparation">La partie</a><a className="hover:text-blue-600 focus-visible:text-blue-600" href="#roles">Rôles</a><a className="hover:text-blue-600 focus-visible:text-blue-600" href="#powers">Pouvoirs</a></nav>
           <div className="flex items-center gap-2"><span className="hidden items-center gap-2 text-xs font-bold text-slate-500 sm:flex"><span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "animate-pulse bg-amber-500"}`}/>{connected ? "En ligne" : "Connexion"}</span><button type="button" onClick={onOpenSettings} className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-label="Paramètres"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg></button><button type="button" onClick={goCreate} disabled={Boolean(entryBusyKind)} className="rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60 sm:px-5">{entryBusyKind === "create" ? "Création…" : "Créer une partie"}</button></div>
         </div>
       </GlassHeader>
@@ -381,9 +415,10 @@ export default function HomePage({ connected, nickname, setNickname, nicknameErr
         <section className="landing-dots flex min-h-screen items-center pt-24">
           <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-2 lg:px-10">
             <Reveal><p className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-black uppercase tracking-widest text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"><span className="h-2 w-2 animate-pulse rounded-full bg-blue-600"/>La chasse commence dehors</p><h1 className="mt-6 text-balance text-5xl font-black leading-[.97] tracking-[-0.05em] sm:text-6xl lg:text-7xl">La ville devient votre <span className="text-blue-600 dark:text-blue-400">terrain de jeu.</span></h1><p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600 dark:text-slate-300">Un jeu de poursuite GPS grandeur nature. Créez une salle, recevez votre rôle et transformez chaque rue en décision tactique.</p>
-              <div className="mt-8 max-w-xl rounded-3xl border border-slate-200 bg-slate-50/90 p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900/90"><div className="flex flex-col gap-3 sm:flex-row"><label htmlFor="room-code" className="sr-only">Code de la partie</label><input id="room-code" className={`min-w-0 flex-1 rounded-2xl border bg-white px-5 py-4 font-mono font-bold uppercase tracking-[.2em] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:bg-slate-950 dark:text-white ${codeError ? "border-red-500 ring-2 ring-red-200 dark:border-red-700" : "border-slate-200 dark:border-slate-700"}`} placeholder="Code de la partie" value={roomCodeInput} onChange={(e) => { setRoomCodeInput(e.target.value.toUpperCase()); setCodeError(null); }} onKeyDown={handleJoinKeyDown} maxLength={8} disabled={Boolean(entryBusyKind)}/><button type="button" onClick={tryJoin} disabled={Boolean(entryBusyKind)} className="rounded-2xl bg-slate-950 px-7 py-4 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-700">{entryBusyKind === "join" ? "Connexion…" : "Rejoindre"}</button></div>{codeError && <p className="mt-2 text-sm font-bold text-red-600 dark:text-red-400">{codeError}</p>}{nicknameError && view === "home" && <p className="mt-2 text-sm font-bold text-red-600 dark:text-red-400">{nicknameError} <button type="button" className="underline" onClick={() => { setDraftNick(resolvedNick); setView("join-nick"); }}>changer de pseudo</button></p>}</div>
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-slate-500 dark:text-slate-400"><span><strong className="text-slate-950 dark:text-white">2–12</strong> joueurs</span><span><strong className="text-slate-950 dark:text-white">30 min</strong> de tension</span><span><strong className="text-slate-950 dark:text-white">1 ville</strong> à explorer</span></div>
+              <div className="mt-8 max-w-xl rounded-3xl border border-slate-200 bg-slate-50/90 p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900/90"><div className="flex flex-col gap-3 sm:flex-row"><label htmlFor="room-code" className="sr-only">Code de la partie</label><input id="room-code" name="room-code" autoComplete="off" spellCheck={false} className={`min-w-0 flex-1 rounded-2xl border bg-white px-5 py-4 font-mono font-bold uppercase tracking-[.2em] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:bg-slate-950 dark:text-white ${codeError ? "border-red-500 ring-2 ring-red-200 dark:border-red-700" : "border-slate-200 dark:border-slate-700"}`} placeholder="Code de la partie…" value={roomCodeInput} onChange={(e) => { setRoomCodeInput(e.target.value.toUpperCase()); setCodeError(null); }} onKeyDown={handleJoinKeyDown} maxLength={8} disabled={Boolean(entryBusyKind)}/><button type="button" onClick={tryJoin} disabled={Boolean(entryBusyKind)} className="rounded-2xl bg-slate-950 px-7 py-4 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-700">{entryBusyKind === "join" ? "Connexion…" : "Rejoindre"}</button></div>{codeError && <p className="mt-2 text-sm font-bold text-red-600 dark:text-red-400" role="alert">{codeError}</p>}{nicknameError && view === "home" && <p className="mt-2 text-sm font-bold text-red-600 dark:text-red-400" role="alert">{nicknameError} <button type="button" className="underline" onClick={() => { setDraftNick(resolvedNick); setView("join-nick"); }}>changer de pseudo</button></p>}</div>
               {errorBanner && <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">{errorBanner}</div>}{entryBusyKind && <button type="button" onClick={onCancel} className="mt-3 text-sm font-bold underline">Annuler</button>}
-            </Reveal><Reveal className="[transition-delay:150ms]"><MapPreview/></Reveal>
+            </Reveal><Reveal className="[transition-delay:150ms]"><HeroMap /></Reveal>
           </div>
         </section>
 
