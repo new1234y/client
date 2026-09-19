@@ -2,8 +2,8 @@
  * Joue le son du bruit fantôme avec reprise AudioContext (iOS) et fallback HTML5.
  */
 export async function playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, durationSec, volume) {
-  const dur = Math.max(1, durationSec || 1);
-  const baseGain = volume === "low" ? 0.5 : volume === "high" ? 1.0 : 0.8;
+  const dur = Math.min(20, Math.max(1, Number(durationSec) || 1));
+  const baseGain = 1;
 
   if (noiseAudioRef?.current) {
     try {
@@ -23,14 +23,12 @@ export async function playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, 
       if (sharedAudioContextRef) sharedAudioContextRef.current = audioCtx;
     }
 
-    if (audioCtx.state === "suspended") {
-      await audioCtx.resume();
-    }
+    if (audioCtx.state !== "running") await audioCtx.resume();
 
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = "square";
-    osc.frequency.value = 600;
+    osc.frequency.value = 880;
     gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
     osc.connect(gain).connect(audioCtx.destination);
     osc.start();
@@ -38,7 +36,7 @@ export async function playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, 
     for (let i = 0; i < dur; i += 1) {
       const t0 = audioCtx.currentTime + i * 1.0;
       gain.gain.setValueAtTime(baseGain, t0);
-      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.7);
     }
 
     const stopTimer = setTimeout(() => {
@@ -61,13 +59,14 @@ export async function playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, 
 
   if (!webAudioOk) {
     try {
-      const beepCount = Math.min(dur, 30);
+      const beepCount = Math.min(dur, 20);
       for (let i = 0; i < beepCount; i++) {
         setTimeout(() => {
           const a = new Audio(
             "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleRkFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeRgFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE="
           );
-          a.volume = baseGain;
+          a.setAttribute("playsinline", "");
+          a.volume = 1;
           a.play().catch(() => {});
         }, i * 1000);
       }

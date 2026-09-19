@@ -792,7 +792,7 @@ export default function App() {
   const [noiseTargetMode, setNoiseTargetMode] = useState("single"); // single | all
   const [selectedNoiseTargets, setSelectedNoiseTargets] = useState([]); // sessionIds
   const [noiseDuration, setNoiseDuration] = useState(20);
-  const [noiseVolume, setNoiseVolume] = useState("medium"); // low | medium | high
+  const [noiseVolume, setNoiseVolume] = useState("high");
   const [freezeTargetMode, setFreezeTargetMode] = useState("single"); // single | all
   const [selectedFreezeTargets, setSelectedFreezeTargets] = useState([]); // cat sessionIds
   const [freezeDuration, setFreezeDuration] = useState(20);
@@ -814,7 +814,7 @@ export default function App() {
       if (!Number.isFinite(n) || n > max) return def;
       return n;
     });
-    setNoiseDuration((d) => Math.min(Number(d) || 30, max));
+    setNoiseDuration((d) => Math.min(Number(d) || 20, 20, max));
     setFreezeDuration((d) => Math.min(Number(d) || 20, max));
   }, [gameState?.maxPowerSec, gameState?.settings?.timeLimitMinutes, gameState?.settings?.timeLimitEnabled]);
 
@@ -845,7 +845,7 @@ export default function App() {
             (res) => {
               if (res?.ok) {
                 setCd("noise", 60);
-                addNotification("Bruit fantôme activé (30s)", "success");
+                addNotification("Bruit fantôme activé (20 s)", "success");
                 setSelectedPlayer(null);
               } else {
                 addNotification(res?.error || "Erreur", "error");
@@ -1035,9 +1035,17 @@ export default function App() {
   // Global audio unlock on user interaction (required for iOS)
   useEffect(() => {
     const unlockAudio = () => {
-      if (sharedAudioContextRef.current && sharedAudioContextRef.current.state === 'suspended') {
-        sharedAudioContextRef.current.resume();
-        logger.log('[Global unlock] AudioContext resumed');
+      try {
+        if (!sharedAudioContextRef.current) {
+          const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextCtor) sharedAudioContextRef.current = new AudioContextCtor();
+        }
+        if (sharedAudioContextRef.current?.state !== 'running') {
+          sharedAudioContextRef.current?.resume();
+          logger.log('[Global unlock] AudioContext resumed');
+        }
+      } catch (error) {
+        logger.warn('[Global unlock] AudioContext unavailable', error);
       }
     };
 
@@ -3388,7 +3396,7 @@ if (stage === "role_reveal" && rolesReveal) {
       maxPowerSec
     );
     const invisDurationValue = pickDurationOption(invisDurationSec, invisDurationOptions, defaultPowerDurationSec(maxPowerSec));
-    const noiseDurationValue = pickDurationOption(noiseDuration, noiseDurationOptions, Math.min(30, maxPowerSec));
+    const noiseDurationValue = pickDurationOption(noiseDuration, noiseDurationOptions, Math.min(20, maxPowerSec));
     const freezeDurationValue = pickDurationOption(freezeDuration, freezeDurationOptions, Math.min(20, maxPowerSec));
     const fakeDurationSec = Math.min(60, maxPowerSec);
     const roundPrice = (value) => Math.max(0, Math.round(Number(value || 0) / 10) * 10);
@@ -3505,8 +3513,8 @@ if (stage === "role_reveal" && rolesReveal) {
     })();
     const estimatedNoiseCost = (() => {
       const base = Number(powerCosts.noise || 20);
-      const durationSec = Number(noiseDurationValue) || 30;
-      const durationFactor = durationSec === 10 ? 0.5 : durationSec === 60 ? 1.8 : 1.0;
+      const durationSec = Math.min(20, Number(noiseDurationValue) || 20);
+      const durationFactor = durationSec <= 10 ? 0.5 : 1.0;
       const volumeFactor = 1.4;
 
       let count = 0;
@@ -3525,13 +3533,13 @@ if (stage === "role_reveal" && rolesReveal) {
     const noiseMinCost = (() => {
       const base = Number(powerCosts.noise || 20);
       const durationFactor = 0.5; // 10s
-      const volumeFactor = 0.7; // low
+      const volumeFactor = 1.4; // high, always enforced
       const count = 1;
       return roundPrice(Math.max(10, Math.ceil(base * durationFactor * volumeFactor * count)));
     })();
     const noiseMaxCost = (() => {
       const base = Number(powerCosts.noise || 20);
-      const durationFactor = 1.8; // 60s
+      const durationFactor = 1.0; // 20s maximum
       const volumeFactor = 1.4; // high
       const maxTargets = (rosterList || []).filter((p) => p.role !== role && !p.spectator).length || 1;
       return roundPrice(Math.max(10, Math.ceil(base * durationFactor * volumeFactor * maxTargets)));
