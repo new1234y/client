@@ -2731,21 +2731,6 @@ export default function App() {
     return (
       <>
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
-        {isCat && compassUnlocked && gameState.compassTarget && (
-          <div className="pointer-events-none fixed bottom-24 left-3 z-[1100] flex items-center gap-3 rounded-2xl border border-cyan-300 bg-slate-950/90 px-3 py-2 text-white shadow-xl">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-950/70 text-2xl transition-transform"
-              style={{ transform: `rotate(${Number(gameState.compassTarget.bearing || 0) - Number(heading || 0)}deg)` }}
-              aria-label="Direction de la Souris"
-            >
-              ↑
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Souris dans le cercle</p>
-              <p className="text-xs font-bold">{Math.round(Number(gameState.compassTarget.distanceM || 0))} m</p>
-            </div>
-          </div>
-        )}
         {notificationPermissionRequest && (
           <div className="fixed inset-x-3 top-[max(4.5rem,env(safe-area-inset-top)+3.5rem)] z-[1200] mx-auto max-w-md rounded-2xl border border-blue-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-blue-800 dark:bg-slate-900 dark:text-white">
             <p className="text-sm font-black">{notificationPermissionRequest.title}</p>
@@ -3738,6 +3723,21 @@ if (stage === "role_reveal" && rolesReveal) {
     return (
       <div className="stage-enter flex h-full min-h-0 flex-col bg-white pt-[env(safe-area-inset-top)] text-slate-950 dark:bg-slate-950 dark:text-white">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        {isCat && compassUnlocked && gameState.compassTarget && (
+          <div className="pointer-events-none fixed bottom-24 left-3 z-[1100] flex items-center gap-3 rounded-2xl border border-cyan-300 bg-slate-950/90 px-3 py-2 text-white shadow-xl">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-950/70 text-2xl transition-transform"
+              style={{ transform: `rotate(${Number(gameState.compassTarget.bearing || 0) - Number(heading || 0)}deg)` }}
+              aria-label="Direction de la Souris"
+            >
+              ↑
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Souris dans le cercle</p>
+              <p className="text-xs font-bold">{Math.round(Number(gameState.compassTarget.distanceM || 0))} m</p>
+            </div>
+          </div>
+        )}
         {reconnectModal}
         {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
 
