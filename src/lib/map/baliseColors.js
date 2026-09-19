@@ -8,6 +8,7 @@ export const BALISE_CAPTURED = "#22c55e";
 export function baliseTintColor(b) {
   if (b?.capturedBy) return BALISE_CAPTURED;
   if (b?.beingCapturedBy) return BALISE_CAPTURING;
+  if (b?.isDecoy || b?.rarity === "leurre") return "#38bdf8";
   return getBaliseType(b).color || BALISE_IDLE;
 }
 

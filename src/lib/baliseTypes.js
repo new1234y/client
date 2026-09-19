@@ -34,6 +34,16 @@ export const BALISE_TYPES = {
 };
 
 export function getBaliseType(balise) {
+  if (balise?.isDecoy || String(balise?.rarity || "").toLowerCase() === "leurre") {
+    return {
+      label: "Leurre",
+      icon: "target",
+      color: "#38bdf8",
+      captureMs: 60000,
+      reward: 0,
+      rarity: "leurre",
+    };
+  }
   const key = String(balise?.type || balise?.rarity || "normal").toLowerCase();
   if (key === "far" || key === "long" || key === "lointaine") return BALISE_TYPES.distant;
   if (key === "circle" || key === "ronde") return BALISE_TYPES.circular;

@@ -86,7 +86,7 @@ export default function BaliseSheet({
                     : "Disponible"}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {type.rarity} · +{getBaliseReward(balise)} pièces · capture {Math.round(captureTime / 60000)} min
+                {type.rarity} · {balise.isDecoy ? "attire les joueurs" : `+${getBaliseReward(balise)} pièces`} · disparaît après {Math.round(lifetimeMs / 60000)} min
               </p>
             </div>
           </div>
