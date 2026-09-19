@@ -1,5 +1,9 @@
 import L from "leaflet";
 
+const roleSvg = (role, color = "#fff") => role === "cat"
+  ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 10.2 4.3 4.4l4.6 2.8a7.1 7.1 0 0 1 6.2 0l4.6-2.8-.9 5.8"/><path d="M5.5 11.5c0-3.1 2.9-5.2 6.5-5.2s6.5 2.1 6.5 5.2v2.3c0 3.4-2.9 5.7-6.5 5.7s-6.5-2.3-6.5-5.7z"/><circle cx="9.3" cy="12.7" r="1" fill="${color}" stroke="none"/><circle cx="14.7" cy="12.7" r="1" fill="${color}" stroke="none"/><path d="M10.2 16c1.2.8 2.4.8 3.6 0M7.2 15.5l-2.7-.8M16.8 15.5l2.7-.8"/></svg>`
+  : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="6.8"/><circle cx="7.1" cy="6.8" r="3.1"/><circle cx="16.9" cy="6.8" r="3.1"/><circle cx="9.7" cy="12.8" r="1" fill="${color}" stroke="none"/><circle cx="14.3" cy="12.8" r="1" fill="${color}" stroke="none"/><path d="M10.5 16.3c1 .7 2 .7 3 0M5.1 15.2l-2.4.7M18.9 15.2l2.4.7"/></svg>`;
+
 const div = (html, className, size = 34) =>
   L.divIcon({
     className: `map-pin ${className}`,
@@ -22,7 +26,7 @@ export const iconSelfOutOfBounds = div(
 );
 
 export const iconAlly = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#d97706;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fef3c7" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><circle cx="10" cy="12" r="1" fill="#fef3c7" stroke="none"/><circle cx="14" cy="12" r="1" fill="#fef3c7" stroke="none"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#d97706;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)">${roleSvg("mouse", "#fff")}</span>`,
   "pin-ally",
   38
 );
@@ -34,7 +38,7 @@ export const iconAllyOutOfBounds = div(
 );
 
 export const iconCat = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#7f1d1d;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="1.5" stroke-linecap="round"><path d="M5 9 4 4l4 2a7 7 0 0 1 8 0l4-2-1 5"/><circle cx="9" cy="12" r="1" fill="#fca5a5" stroke="none"/><circle cx="15" cy="12" r="1" fill="#fca5a5" stroke="none"/><path d="M9 16c2 1.5 4 1.5 6 0"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#7f1d1d;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)">${roleSvg("cat", "#fff")}</span>`,
   "pin-cat",
   40
 );
@@ -46,7 +50,7 @@ export const iconCatOutOfBounds = div(
 );
 
 export const iconPreyExact = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ea580c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><circle cx="10" cy="12" r="1" fill="#fff" stroke="none"/><circle cx="14" cy="12" r="1" fill="#fff" stroke="none"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ea580c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)">${roleSvg("mouse")}</span>`,
   "pin-prey",
   36
 );
