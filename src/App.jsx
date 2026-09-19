@@ -535,11 +535,6 @@ export default function App() {
     return saved?.nickname || loadLastNickname();
   });
 
-  s.on("balise_coin_awarded", (data) => {
-    if (data?.sessionId !== sessionIdRef.current) return;
-    setCoinBurst(true);
-    window.setTimeout(() => setCoinBurst(false), 950);
-  });
   const [roomCodeInput, setRoomCodeInput] = useState(() => getCodeFromUrl());
   const [rejoinCandidate, setRejoinCandidate] = useState(null);
   const [sessionId, setSessionId] = useState(null);
