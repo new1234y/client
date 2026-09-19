@@ -67,28 +67,59 @@ function MapPreview({ zone = false }) {
   );
 }
 
+function GameMarker({ type, label, className = "" }) {
+  const styles = {
+    self: "bg-blue-600 border-white text-white",
+    cat: "bg-red-900 border-white text-red-100",
+    prey: "bg-orange-600 border-white text-white",
+    ally: "bg-amber-600 border-white text-amber-100",
+  };
+  const symbols = { self: "Moi", cat: "◉", prey: "●", ally: "●" };
+  return (
+    <div className={`absolute flex items-center gap-2 ${className}`}>
+      <span className={`flex h-9 w-9 items-center justify-center rounded-full border-[3px] text-[10px] font-black shadow-lg ${styles[type]}`}>
+        {symbols[type]}
+      </span>
+      <span className="rounded-full bg-slate-950/75 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function HeroMap() {
   return (
-    <div className="hero-map relative mx-auto aspect-[4/5] w-full max-w-[520px] overflow-hidden rounded-[2rem] border border-blue-200/80 bg-slate-100 shadow-[0_24px_80px_-24px_rgba(37,99,235,0.45)] dark:border-blue-900 dark:bg-slate-900 sm:aspect-square">
+    <div className="hero-map relative mx-auto aspect-[4/5] w-full max-w-[520px] overflow-hidden rounded-[2rem] border border-slate-300 bg-slate-950 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.55)] dark:border-slate-700 sm:aspect-square">
       <img
         src={heroChase}
-        alt="Carte stylisée avec une zone de recherche et une balise"
+        alt="Aperçu de la carte de jeu Chase GPS"
         width="1024"
         height="1024"
         fetchPriority="high"
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover opacity-75"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-white/10" />
-      <div className="absolute left-[15%] top-[16%] flex items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-2 text-xs font-black text-slate-800 shadow-lg backdrop-blur dark:bg-slate-950/90 dark:text-white">
-        <span className="h-2 w-2 rounded-full bg-amber-500" />
-        Balise détectée
-      </div>
-      <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Zone active</p>
-          <p className="mt-1 text-2xl font-black">À 180 m</p>
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-transparent to-slate-950/90" />
+      <div className="absolute inset-x-4 top-4 rounded-2xl border border-white/20 bg-slate-950/80 p-3 text-white shadow-xl backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-200">Partie en cours</p>
+            <p className="mt-1 text-sm font-black">Zone 2 · 500 m</p>
+          </div>
+          <span className="rounded-lg bg-blue-500/20 px-2.5 py-1.5 font-mono text-sm font-black text-blue-100">24:18</span>
         </div>
-        <span className="rounded-full border border-white/30 bg-slate-950/35 px-3 py-2 text-xs font-bold backdrop-blur">Signal en direct</span>
+        <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full w-[62%] rounded-full bg-blue-400" /></div>
+      </div>
+      <div className="absolute left-[19%] top-[43%] h-48 w-48 rounded-full border-2 border-blue-400/70 bg-blue-500/10 shadow-[0_0_40px_rgba(96,165,250,0.2)]" />
+      <div className="absolute left-[32%] top-[56%] h-20 w-20 rounded-full border border-dashed border-blue-300/80" />
+      <GameMarker type="cat" label="Chat · 82 m" className="left-[12%] top-[35%]" />
+      <GameMarker type="self" label="Moi" className="left-[43%] top-[57%]" />
+      <GameMarker type="prey" label="Souris · 180 m" className="bottom-[25%] right-[8%]" />
+      <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-slate-950/90 p-2 shadow-xl backdrop-blur">
+        <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-bold text-slate-300">
+          <div className="rounded-xl bg-blue-600 px-2 py-2 text-white"><span className="block text-base">⌖</span>Carte</div>
+          <div className="rounded-xl bg-white/10 px-2 py-2"><span className="block text-base text-orange-300">⌁</span>Scanner</div>
+          <div className="rounded-xl bg-white/10 px-2 py-2"><span className="block text-base text-amber-300">✦</span>Pouvoirs</div>
+        </div>
       </div>
     </div>
   );
