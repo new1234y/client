@@ -29,6 +29,10 @@ export default function BaliseSheet({
   const captureProgress = balise.captureProgress || 0;
   const captureTime = getBaliseCaptureMs(balise);
   const type = getBaliseType(balise);
+  const lifetimeMs = Math.max(
+    captureTime,
+    Number(balise.expiresAt) - Number(balise.createdAt || (Number(balise.expiresAt) - captureTime))
+  );
   const capturePercent = Math.min(100, (captureProgress / captureTime) * 100);
 
   const handleShowOnMap = () => {
@@ -61,7 +65,7 @@ export default function BaliseSheet({
 
         <div className="px-5 pb-4">
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg" style={{ backgroundColor: type.color }}>
               <svg className="h-8 w-8" viewBox="0 0 24 36" fill="currentColor" aria-hidden="true"><rect x="9" y="10" width="6" height="18" rx="1.2"/><polygon points="12,2 17,10 7,10"/><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg>
             </div>
             <div className="flex-1">
@@ -110,8 +114,8 @@ export default function BaliseSheet({
             {timeLeft !== null && timeLeft > 0 && (
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div
-                  className="h-full rounded-full bg-violet-500 transition-all duration-1000"
-                  style={{ width: `${Math.max(0, Math.min(100, (timeLeft / 120000) * 100))}%` }}
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.max(0, Math.min(100, (timeLeft / lifetimeMs) * 100))}%`, backgroundColor: type.color }}
                 />
               </div>
             )}
