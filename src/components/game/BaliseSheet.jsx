@@ -143,6 +143,18 @@ export default function BaliseSheet({
             </div>
           )}
 
+          <div className="mt-3 flex items-center justify-between rounded-2xl border px-4 py-3" style={{ borderColor: `${type.color}66`, backgroundColor: `${type.color}18` }}>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider" style={{ color: type.color }}>Récompense</p>
+              <p className="text-lg font-black text-slate-900 dark:text-white">
+                {balise.isDecoy ? "Aucune pièce" : `+${getBaliseReward(balise)} pièces`}
+              </p>
+            </div>
+            <span className="rounded-full px-3 py-1 text-xs font-black uppercase text-white" style={{ backgroundColor: type.color }}>
+              Type : {type.label}
+            </span>
+          </div>
+
           {onShowOnMap && (
             <button
               type="button"

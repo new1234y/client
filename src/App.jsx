@@ -26,6 +26,7 @@ import CircularLobby from "./components/CircularLobby.jsx";
 import CoinFeed from "./components/game/CoinFeed.jsx";
 import CoinBurst from "./components/game/CoinBurst.jsx";
 import BeaconConflictModal from "./components/game/BeaconConflictModal.jsx";
+import ImmobilizedModal from "./components/game/ImmobilizedModal.jsx";
 import MapHud from "./components/game/MapHud.jsx";
 import CoinsBadge, { CoinsHistoryModal } from "./components/game/CoinsBadge.jsx";
 import { PlayerModal } from "./components/game/GameStatusModal.jsx";
@@ -720,6 +721,7 @@ export default function App() {
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [beaconConflict, setBeaconConflict] = useState(null);
   const [coinBurst, setCoinBurst] = useState(false);
+  const [immobilizedMeta, setImmobilizedMeta] = useState(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectError, setReconnectError] = useState(null);
   const [reconnectReason, setReconnectReason] = useState(null);
@@ -1653,8 +1655,7 @@ export default function App() {
     });
 
     s.on("immobilized", ({ until, by, durationSec }) => {
-      // L'overlay d'immobilisation est déjà géré côté UI via me.immobilizedUntil ;
-      // pas de notification toast supplémentaire ici pour garder un impact visuel fort.
+      setImmobilizedMeta({ until, by, durationSec });
     });
 
     s.on("admin_role_changed", (data) => {
@@ -4383,9 +4384,12 @@ if (stage === "role_reveal" && rolesReveal) {
               }}
             />
 
-            {/* Overlay d'immobilisation — fond léger, détail dans le HUD */}
             {me?.immobilizedUntil && me.immobilizedUntil > ghostUiNow && (
-              <div className="pointer-events-auto fixed inset-0 z-[1900] bg-slate-950/50 backdrop-blur-[2px]" />
+              <ImmobilizedModal
+                until={me.immobilizedUntil}
+                durationSec={immobilizedMeta?.durationSec || me.immobilizedDurationSec || 10}
+                by={immobilizedMeta?.by || me.immobilizedByNickname || me.immobilizedBy}
+              />
             )}
 
             {/* Desktop tabs (hidden on mobile since dock replaces them) */}
