@@ -89,9 +89,19 @@ export function useDeviceOrientation() {
   }, [isIOS]);
 
   const handleOrientationAbsolute = useCallback((event) => {
-    // deviceorientationabsolute provides more accurate compass heading
-    if (event.alpha !== null) {
-      let newHeading = event.alpha;
+    // Absolute events still use the DeviceOrientation alpha convention on
+    // several Android browsers: alpha is clockwise rotation, not a compass
+    // bearing. Prefer the iOS-provided heading and normalize the fallback.
+    if (typeof event.webkitCompassHeading === 'number' || event.alpha !== null) {
+      let newHeading = typeof event.webkitCompassHeading === 'number'
+        ? event.webkitCompassHeading
+        : 360 - event.alpha;
+      if (typeof window !== 'undefined') {
+        const screenAngle =
+          (window.screen?.orientation?.angle) ||
+          (typeof window.orientation === 'number' ? window.orientation : 0);
+        newHeading -= screenAngle;
+      }
       // Normalize to 0-360 range
       newHeading = newHeading % 360;
       if (newHeading < 0) newHeading += 360;
