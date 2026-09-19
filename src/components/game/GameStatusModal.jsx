@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import useAnimatedClose from '../../hooks/useAnimatedClose.js';
 import { formatCoins } from '../../lib/format';
+import RoleIcon from "../ui/RoleIcon.jsx";
 
 function zonePhaseLabel(zoneState, currentPhase, totalPhases) {
   if (!zoneState) return null;
@@ -209,13 +210,7 @@ export function PlayerModal({ playerType, onClose, playerName = 'Joueur', player
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className={`flex h-11 w-11 items-center justify-center rounded-full text-white ${isPlayer ? "bg-amber-500" : "bg-blue-600"}`}>
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                {isPlayer ? (
-                  <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>
-                ) : (
-                  <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></>
-                )}
-              </svg>
+              <RoleIcon role={isPlayer ? "player" : "cat"} className="h-5 w-5" />
             </span>
             <div>
               <h2 className="text-xl font-black text-slate-900 dark:text-white">Profil {roleLabel}</h2>

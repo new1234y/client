@@ -1,6 +1,7 @@
 import PartyChatPanel from "./PartyChatPanel.jsx";
 import Button from "../ui/Button.jsx";
 import { formatCoins } from "../../lib/format";
+import RoleIcon from "../ui/RoleIcon.jsx";
 
 export default function SocialPanel({
   roomCode,
@@ -54,12 +55,8 @@ export default function SocialPanel({
                     onClick={() => onSelectPlayer(p)}
                     className={`flex min-h-11 w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left dark:border-slate-700 dark:bg-slate-900 ${isGhost ? 'opacity-50' : ''}`}
                   >
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white ${
-                        isCat ? "bg-blue-600" : "bg-amber-500"
-                      }`}
-                    >
-                      {p.nickname.charAt(0).toUpperCase()}
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white ${isCat ? "bg-blue-600" : "bg-amber-500"}`}>
+                      <RoleIcon role={p.role} className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">

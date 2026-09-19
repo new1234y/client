@@ -22,7 +22,7 @@ export const iconSelfOutOfBounds = div(
 );
 
 export const iconAlly = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#d97706;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" fill="#fef3c7"/><circle cx="10" cy="10" r="1.2" fill="#1a1a1a"/><circle cx="14" cy="10" r="1.2" fill="#1a1a1a"/><circle cx="12" cy="13" r="1" fill="#f59e0b"/><path d="M8 5c-2-2-4 0-3 2" stroke="#fef3c7" stroke-width="1.5" stroke-linecap="round"/><path d="M16 5c2-2 4 0 3 2" stroke="#fef3c7" stroke-width="1.5" stroke-linecap="round"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#d97706;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fef3c7" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><circle cx="10" cy="12" r="1" fill="#fef3c7" stroke="none"/><circle cx="14" cy="12" r="1" fill="#fef3c7" stroke="none"/></svg></span>`,
   "pin-ally",
   38
 );
@@ -34,7 +34,7 @@ export const iconAllyOutOfBounds = div(
 );
 
 export const iconCat = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#7f1d1d;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#fca5a5"/><circle cx="9" cy="10" r="1.5" fill="#1a1a1a"/><circle cx="15" cy="10" r="1.5" fill="#1a1a1a"/><path d="M9 14c0 0 1.5 2 3 2s3-2 3-2" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/><path d="M6 6l2 3M18 6l-2 3" stroke="#fca5a5" stroke-width="1.5" stroke-linecap="round"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#7f1d1d;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="1.5" stroke-linecap="round"><path d="M5 9 4 4l4 2a7 7 0 0 1 8 0l4-2-1 5"/><circle cx="9" cy="12" r="1" fill="#fca5a5" stroke="none"/><circle cx="15" cy="12" r="1" fill="#fca5a5" stroke="none"/><path d="M9 16c2 1.5 4 1.5 6 0"/></svg></span>`,
   "pin-cat",
   40
 );
@@ -46,7 +46,7 @@ export const iconCatOutOfBounds = div(
 );
 
 export const iconPreyExact = div(
-  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ea580c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.5" fill="#fff"/><path d="M8 22l4-8 4 8M6 12l6-3 6 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`,
+  `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:#ea580c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><circle cx="10" cy="12" r="1" fill="#fff" stroke="none"/><circle cx="14" cy="12" r="1" fill="#fff" stroke="none"/></svg></span>`,
   "pin-prey",
   36
 );

@@ -3,6 +3,7 @@ import BrandMark from "./ui/BrandMark.jsx";
 import GlassHeader from "./ui/GlassHeader.jsx";
 import SliderWithParticles from "./ui/SliderWithParticles.jsx";
 import heroChase from "../assets/hero-chase.png";
+import RoleIcon from "./ui/RoleIcon.jsx";
 
 const powers = [
   { name: "Invisibilité", code: "01", color: "blue", description: "Masquez votre position. Pendant quelques secondes, votre marqueur disparaît de la carte du Chat.", stat: "Carte : position masquée", duration: "20 s" },
@@ -48,7 +49,7 @@ function PlayerMarker({ role, label, className = "" }) {
     <div className={`flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/90 ${className}`}>
       <span className={`relative flex h-11 w-11 items-center justify-center rounded-full ${cat ? "bg-blue-600" : "bg-amber-500"}`}>
         <span className={`absolute inset-0 rounded-full border-2 ${cat ? "border-blue-400" : "border-amber-300"} landing-marker-pulse`} />
-        <Icon name={cat ? "cat" : "mouse"} className="h-5 w-5 text-white" />
+        <RoleIcon role={cat ? "cat" : "player"} className="h-5 w-5 text-white" />
       </span>
       <span><span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">{role}</span><span className="text-sm font-black text-slate-950 dark:text-white">{label}</span></span>
     </div>

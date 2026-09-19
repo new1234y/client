@@ -1,5 +1,6 @@
 import Button from "../ui/Button.jsx";
 import { formatCoins } from "../../lib/format";
+import RoleIcon from "../ui/RoleIcon.jsx";
 
 export default function AdminPanel({
   roomCode,
@@ -79,7 +80,7 @@ export default function AdminPanel({
                       {formatCoins(p.coins || 0)}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-white/80">{p.role === "cat" ? "Chat" : "Souris"}</p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/80"><RoleIcon role={p.role} className="h-4 w-4" />{p.role === "cat" ? "Chat" : "Souris"}</p>
                 </div>
                 <div className="space-y-2 p-3">
                   <div className="flex flex-wrap gap-1">

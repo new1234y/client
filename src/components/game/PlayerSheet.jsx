@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import { formatCoins } from "../../lib/format";
+import RoleIcon from "../ui/RoleIcon.jsx";
 
 function roleBadgeText(p) {
   if (p.spectator) return "Spectateur";
@@ -66,11 +67,7 @@ export default function PlayerSheet({
         <div className="px-5 pb-4">
           <div className="flex items-start gap-4">
             <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white ${player.role === "cat" ? "bg-blue-600" : "bg-amber-500"}`}>
-              {player.role === "cat" ? (
-                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>
-              ) : (
-                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-              )}
+              <RoleIcon role={player.role} className="h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="truncate whitespace-nowrap overflow-hidden text-ellipsis text-xl font-bold text-slate-900 dark:text-white">

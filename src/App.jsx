@@ -1461,6 +1461,12 @@ export default function App() {
     s.on("capture_ok", (data) => {
       haptic(15);
       addNotification(`${data.preyNickname} a été attrapé !`, "success");
+      // A capture can swap roles immediately; fetch the authoritative roster/HUD
+      // before rendering the next map state.
+      s.emit("refresh_state");
+      if (data?.newRole && data.preySessionId === sessionIdRef.current) {
+        setRole(data.newRole);
+      }
       if (data?.preySessionId && data.preySessionId === sessionIdRef.current) {
         setShowScan(false);
         // Only show QR automatically if we are still a player (e.g. to be rescued)
