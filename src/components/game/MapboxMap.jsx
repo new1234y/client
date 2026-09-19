@@ -690,7 +690,7 @@ export default function MapboxMap({
         feature(circlePolygon(b.lat, b.lng, b.radiusM), { color, fill, id: b.id })
       );
       if (enable3d) {
-        towers.push({ id: b.id, lat: b.lat, lng: b.lng, color });
+        towers.push({ id: b.id, lat: b.lat, lng: b.lng, color, type: b.type || "normal" });
       }
     }
     setData("src-balise", { type: "FeatureCollection", features: baliseFeats });

@@ -217,7 +217,7 @@ function tickPulseRings(group, tSec) {
   }
 }
 
-export function createSciFiTower(color = IDLE) {
+export function createSciFiTower(color = IDLE, type = "normal") {
   const g = getShared();
   const root = new THREE.Group();
   root.name = "sci-fi-tower";
@@ -327,6 +327,42 @@ export function createSciFiTower(color = IDLE) {
   tip.position.y = CAP_Y + CAP_H + SPIRE_H + TIP_H / 2;
   root.add(tip);
 
+  const variantMat = makeTint(
+    new THREE.MeshStandardMaterial({
+      color: 0xa855f7,
+      emissive: 0xa855f7,
+      emissiveIntensity: 0.7,
+      metalness: 0.55,
+      roughness: 0.24,
+    }),
+    "variant"
+  );
+  tint.push(variantMat);
+  if (type === "circular") {
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.16, 12, 48), variantMat);
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 3.3;
+    root.add(halo);
+    const haloTop = halo.clone();
+    haloTop.position.y = CAP_Y + 1.1;
+    root.add(haloTop);
+  } else if (type === "distant") {
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.72, 4.6, 4), variantMat);
+    arrow.position.y = TOWER_H + 1.7;
+    root.add(arrow);
+    root.userData.variantScale = 1.12;
+  } else if (type === "gold") {
+    const crown = new THREE.Mesh(new THREE.OctahedronGeometry(1.25, 0), variantMat);
+    crown.position.y = CAP_Y + CAP_H + 1.1;
+    crown.rotation.y = Math.PI / 4;
+    root.add(crown);
+    const crownRing = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.12, 12, 32), variantMat);
+    crownRing.rotation.x = Math.PI / 2;
+    crownRing.position.y = CAP_Y + CAP_H + 0.35;
+    root.add(crownRing);
+    root.userData.variantScale = 1.18;
+  }
+
   const pulses = [];
   for (let i = 0; i < PULSE_COUNT; i++) {
     const ring = makePulseRing(color, i / PULSE_COUNT);
@@ -335,6 +371,7 @@ export function createSciFiTower(color = IDLE) {
     pulses.push(ring);
   }
   root.userData.pulses = pulses;
+  root.userData.type = type;
 
   root.userData.tint = tint;
   root.userData.heightM = TOWER_H;
@@ -646,12 +683,24 @@ export function createSciFiTowerLayer() {
         const color = t.color || IDLE;
         let rec = this.byId.get(id);
         if (!rec) {
-          const group = createSciFiTower(color);
+          const type = String(t.type || "normal").toLowerCase();
+          const group = createSciFiTower(color, type);
           group.matrixAutoUpdate = false;
           group.matrix.identity();
           this.scene.add(group);
-          rec = { group, color, lng: t.lng, lat: t.lat };
+          rec = { group, color, type, lng: t.lng, lat: t.lat };
           this.byId.set(id, rec);
+        } else if (rec.type !== String(t.type || "normal").toLowerCase()) {
+          this.scene.remove(rec.group);
+          disposeTowerInstance(rec.group);
+          const type = String(t.type || "normal").toLowerCase();
+          const group = createSciFiTower(color, type);
+          group.matrixAutoUpdate = false;
+          group.matrix.identity();
+          this.scene.add(group);
+          rec.group = group;
+          rec.type = type;
+          rec.color = color;
         } else if (rec.color !== color) {
           rec.color = color;
           tintSciFiTower(rec.group, color);
