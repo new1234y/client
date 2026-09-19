@@ -789,9 +789,16 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   }, []);
 
   const players = summary?.players || [];
+  const [selectedSessionId, setSelectedSessionId] = useState(() => players[0]?.sessionId || null);
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(players.map((p) => [p.sessionId, true]))
   );
+
+  useEffect(() => {
+    if (!selectedSessionId && players[0]?.sessionId) {
+      setSelectedSessionId(players[0].sessionId);
+    }
+  }, [players, selectedSessionId]);
 
   useEffect(() => {
     setVisible((v) => {
