@@ -15,6 +15,7 @@ import { useDeviceOrientation } from "../../hooks/useDeviceOrientation.js";
 import BaliseSheet from "./BaliseSheet.jsx";
 import { ensureSciFiTowerLayer, syncSciFiTowers } from "../../lib/map/SciFiTowerLayer.js";
 import { baliseTintColor, baliseFillColor } from "../../lib/map/baliseColors.js";
+import { getBaliseType } from "../../lib/baliseTypes.js";
 
 function circlePolygon(lat, lng, radiusM, points = 64) {
   const coords = [];
@@ -105,11 +106,19 @@ function chatLocHtml() {
   return `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:14px;background:#0ea5e9;border:2px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,.35)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#fff"/><circle cx="12" cy="9" r="2.5" fill="#0ea5e9"/></svg></span>`;
 }
 
-function baliseHtml(color, mode3d) {
+function baliseHtml(color, mode3d, balise) {
+  const type = getBaliseType(balise);
+  const shape = type.icon === "ring"
+    ? `<circle cx="12" cy="18" r="7" fill="none" stroke="${color}" stroke-width="2"/><circle cx="12" cy="18" r="3" fill="${color}"/>`
+    : type.icon === "crown"
+      ? `<path d="M5 26 4 8l8 7 8-7-1 18z" fill="${color}"/><path d="M7 29h10" stroke="#fff" stroke-width="2"/>`
+      : type.icon === "spire"
+        ? `<path d="M12 2 18 28H6z" fill="${color}"/><path d="M12 8v15M9 18h6" stroke="#fff" stroke-width="1.5"/>`
+        : `<rect x="7" y="8" width="10" height="20" rx="1.5" fill="${color}"/><path d="M12 3 17 8H7z" fill="${color}"/><circle cx="12" cy="13" r="2" fill="#fff"/>`;
   const pulse = mode3d !== "2d"
     ? `<span class="chase-balise-pulse" style="position:absolute;inset:-6px;border-radius:50%;border:2px solid ${color};opacity:.55"></span>`
     : "";
-  return `<div style="position:relative;width:28px;height:36px;display:flex;align-items:flex-end;justify-content:center">${pulse}<svg width="22" height="32" viewBox="0 0 24 36" aria-hidden="true"><rect x="9" y="10" width="6" height="18" rx="1.2" fill="${color}"/><polygon points="12,2 17,10 7,10" fill="${color}"/><circle cx="12" cy="12" r="2.2" fill="#fff"/><rect x="6" y="28" width="12" height="4" rx="1" fill="${color}"/></svg></div>`;
+  return `<div style="position:relative;width:28px;height:36px;display:flex;align-items:flex-end;justify-content:center">${pulse}<svg width="22" height="32" viewBox="0 0 24 36" aria-hidden="true">${shape}</svg></div>`;
 }
 
 /** Invisible click target so 3D towers stay tappable without the 2D rocket pin. */
@@ -810,7 +819,7 @@ export default function MapboxMap({
           lng: b.lng,
           lat: b.lat,
           size: 28,
-          html: baliseHtml(color, mode3d),
+          html: baliseHtml(color, mode3d, b),
           balise: b,
         });
       }

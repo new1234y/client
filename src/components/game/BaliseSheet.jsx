@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import { formatDurationMs } from "../../lib/format";
 import { remainingMs, useServerNow } from "../../hooks/useServerNow.js";
+import { getBaliseCaptureMs, getBaliseReward, getBaliseType } from "../../lib/baliseTypes.js";
 
 export default function BaliseSheet({
   balise,
@@ -26,7 +27,8 @@ export default function BaliseSheet({
   const isBeingCaptured = balise.beingCapturedBy !== null;
   const isMyCapture = balise.beingCapturedBy === mySessionId;
   const captureProgress = balise.captureProgress || 0;
-  const captureTime = 20 * 1000; // 20 seconds
+  const captureTime = getBaliseCaptureMs(balise);
+  const type = getBaliseType(balise);
   const capturePercent = Math.min(100, (captureProgress / captureTime) * 100);
 
   const handleShowOnMap = () => {
@@ -64,7 +66,7 @@ export default function BaliseSheet({
             </div>
             <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Balise
+                Balise {type.label}
               </h2>
               <p className={`text-sm font-medium ${
                 balise.capturedBy
@@ -78,6 +80,9 @@ export default function BaliseSheet({
                   : isBeingCaptured
                     ? (isMyCapture ? "En cours de capture par vous" : "En cours de capture")
                     : "Disponible"}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {type.rarity} · +{getBaliseReward(balise)} pièces · capture {Math.round(captureTime / 60000)} min
               </p>
             </div>
           </div>

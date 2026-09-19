@@ -1,4 +1,6 @@
-/** Idle purple, capturing blue, fully captured green (until expiry). */
+import { getBaliseType } from "../baliseTypes.js";
+
+/** State colors keep capture status readable while type colors distinguish rarity. */
 export const BALISE_IDLE = "#a855f7";
 export const BALISE_CAPTURING = "#3b82f6";
 export const BALISE_CAPTURED = "#22c55e";
@@ -6,7 +8,7 @@ export const BALISE_CAPTURED = "#22c55e";
 export function baliseTintColor(b) {
   if (b?.capturedBy) return BALISE_CAPTURED;
   if (b?.beingCapturedBy) return BALISE_CAPTURING;
-  return BALISE_IDLE;
+  return getBaliseType(b).color || BALISE_IDLE;
 }
 
 export function baliseFillColor(b) {

@@ -32,6 +32,16 @@ body,
   }
 }
 
+@keyframes coin-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--coin-angle)) translateX(0) scale(.4); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--coin-angle)) translateX(42vw) scale(1); }
+}
+
+.coin-burst-particle {
+  animation: coin-burst 900ms cubic-bezier(.2,.8,.3,1) var(--coin-delay) both;
+}
+
 /* Default page chrome — no !important so dark mode can win */
 body {
   background-color: #ffffff;

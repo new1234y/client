@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Circle, CircleMarker, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { baliseTintColor, baliseFillColor } from "../../lib/map/baliseColors.js";
+import { getBaliseCaptureMs, getBaliseType } from "../../lib/baliseTypes.js";
 
 function baliseIcon(sizePx, color) {
   return L.divIcon({
@@ -12,7 +13,7 @@ function baliseIcon(sizePx, color) {
   });
 }
 
-export default function BaliseCircle({ center, radius, visualScale, beingCapturedBy, capturedBy, isMyCapture, captureProgress, onClick }) {
+export default function BaliseCircle({ center, radius, visualScale, balise, beingCapturedBy, capturedBy, isMyCapture, captureProgress, onClick }) {
   const [rotation, setRotation] = useState(0);
   const [pulse, setPulse] = useState(0);
   const animationRef = useRef(null);
@@ -34,13 +35,14 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
 
   if (!center || radius == null) return null;
 
-  const captureRatio = captureProgress / 30000; // 30 seconds
+  const captureRatio = captureProgress / getBaliseCaptureMs(balise);
   const isBeingCaptured = beingCapturedBy !== null && !capturedBy;
   const isCaptured = Boolean(capturedBy);
   const markerSize = Math.round(26 * Math.max(0.75, Math.min(1.9, Number(visualScale) || 1)));
   
   const color = baliseTintColor({ beingCapturedBy, capturedBy });
   const fillColor = baliseFillColor({ beingCapturedBy, capturedBy });
+  const type = getBaliseType(balise);
 
   // Pulsing opacity
   const pulseOpacity = 0.2 + Math.sin(pulse) * 0.1;
@@ -115,7 +117,7 @@ export default function BaliseCircle({ center, radius, visualScale, beingCapture
       />
 
       {/* Center blinking dot */}
-      <Marker center={center} position={center} icon={baliseIcon(markerSize, color)} eventHandlers={{
+      <Marker center={center} position={center} icon={baliseIcon(markerSize, type.color || color)} eventHandlers={{
           click: (e) => {
             L.DomEvent.stopPropagation(e);
             if (onClick) onClick();

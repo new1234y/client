@@ -24,6 +24,8 @@ import PlayerSheet from "./components/game/PlayerSheet.jsx";
 import BottomNav from "./components/ui/BottomNav.jsx";
 import CircularLobby from "./components/CircularLobby.jsx";
 import CoinFeed from "./components/game/CoinFeed.jsx";
+import CoinBurst from "./components/game/CoinBurst.jsx";
+import BeaconConflictModal from "./components/game/BeaconConflictModal.jsx";
 import MapHud from "./components/game/MapHud.jsx";
 import CoinsBadge, { CoinsHistoryModal } from "./components/game/CoinsBadge.jsx";
 import { PlayerModal } from "./components/game/GameStatusModal.jsx";
@@ -43,6 +45,7 @@ import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, s
 import { syncServerTime } from "./lib/serverTime.js";
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
+import { getBaliseCaptureMs } from "./lib/baliseTypes.js";
 import {
   maxPowerSecFromSettings,
   defaultPowerDurationSec,
@@ -531,6 +534,12 @@ export default function App() {
     const saved = loadSession();
     return saved?.nickname || loadLastNickname();
   });
+
+  s.on("balise_coin_awarded", (data) => {
+    if (data?.sessionId !== sessionIdRef.current) return;
+    setCoinBurst(true);
+    window.setTimeout(() => setCoinBurst(false), 950);
+  });
   const [roomCodeInput, setRoomCodeInput] = useState(() => getCodeFromUrl());
   const [rejoinCandidate, setRejoinCandidate] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -667,6 +676,8 @@ export default function App() {
     const onBalise = (data) => {
       if (!mine(data.sessionId)) return;
       pushCoin(Number.isFinite(data.awardedCoins) ? data.awardedCoins : 10, "Capture de balise");
+      setCoinBurst(true);
+      window.setTimeout(() => setCoinBurst(false), 950);
     };
     const onSurvive = (data) => {
       if (!mine(data.sessionId)) return;
@@ -680,6 +691,12 @@ export default function App() {
     socket.on("balise_captured", onBalise);
     socket.on("zone_survive", onSurvive);
     socket.on("zone_survived", onSurvive);
+    const onBeaconConflict = (data) => {
+      if (!data || (data.sessionIds && !data.sessionIds.includes(sessionIdRef.current))) return;
+      setBeaconConflict({ ...data, sessionId: sessionIdRef.current });
+    };
+    socket.on("beacon_conflict", onBeaconConflict);
+    socket.on("balise_conflict", onBeaconConflict);
     return () => {
       socket.off("coins_lost", onLost);
       socket.off("coin_gain", onGain);
@@ -687,6 +704,8 @@ export default function App() {
       socket.off("balise_captured", onBalise);
       socket.off("zone_survive", onSurvive);
       socket.off("zone_survived", onSurvive);
+      socket.off("beacon_conflict", onBeaconConflict);
+      socket.off("balise_conflict", onBeaconConflict);
     };
   }, [socket, pushCoin]);
 
@@ -704,6 +723,8 @@ export default function App() {
   const [showGameModal, setShowGameModal] = useState(false);
   const [showCoinsModal, setShowCoinsModal] = useState(false);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
+  const [beaconConflict, setBeaconConflict] = useState(null);
+  const [coinBurst, setCoinBurst] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [reconnectError, setReconnectError] = useState(null);
   const [reconnectReason, setReconnectReason] = useState(null);
@@ -3443,6 +3464,7 @@ if (stage === "role_reveal" && rolesReveal) {
           nickname: "Vous",
           isMyCapture: true,
           captureProgress: balise.captureProgress || 0,
+          captureDurationMs: getBaliseCaptureMs(balise),
           awardedCoins: balise.awardedCoins || null,
         });
         hudPowerUiNow = getServerTime();
@@ -4350,6 +4372,7 @@ if (stage === "role_reveal" && rolesReveal) {
               )}
 
               <CoinFeed socket={socket} sessionId={sessionIdRef.current} />
+              <CoinBurst active={coinBurst} />
             </div>
 
             <BottomNav
@@ -4414,6 +4437,12 @@ if (stage === "role_reveal" && rolesReveal) {
 
         {showQr && <QRModal sessionId={sessionId} onClose={() => setShowQr(false)} />}
         {showScan ? <ScannerModal onScan={onScanResult} onClose={() => setShowScan(false)} /> : null}
+        {beaconConflict && (
+          <BeaconConflictModal
+            conflict={beaconConflict}
+            onClose={() => setBeaconConflict(null)}
+          />
+        )}
         {showRoleModal && <RoleModal role={role} onClose={() => setShowRoleModal(false)} />}
         {showZoneModal && <ZoneModal
           phaseState={gameState?.zonePhaseState}

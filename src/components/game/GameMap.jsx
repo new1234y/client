@@ -674,6 +674,7 @@ function LeafletGameMap({
             center={{ lat: balise.lat, lng: balise.lng }}
             radius={balise.radiusM}
             visualScale={1}
+            balise={balise}
             beingCapturedBy={balise.beingCapturedBy}
             capturedBy={balise.capturedBy}
             isMyCapture={isMyCapture}

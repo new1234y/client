@@ -360,7 +360,9 @@ function AnimatedGameNotification({ effect, uiNow, onGhostCancel, visible = true
     }
 
     if (currentEffect.kind === "balise_capture") {
-      const captureTime = 30 * 1000; // 30 seconds
+      const captureTime = Number(currentEffect.captureDurationMs) > 0
+        ? Number(currentEffect.captureDurationMs)
+        : 30 * 1000;
       const elapsedMs = currentEffect.captureProgress || 0;
       const remainingMs = Math.max(0, captureTime - elapsedMs);
   const remainingMsSafe = Math.max(0, remainingMs);

@@ -20,6 +20,7 @@ export default function CoinFeed({ socket, sessionId }) {
 
     const handleBaliseCaptured = (data) => {
       const isMe = data.sessionId === sessionId;
+      if (!isMe) return;
       const amount = Number.isFinite(data.awardedCoins) ? data.awardedCoins : 10;
       setCurrentEvent({
         type: "gained",
