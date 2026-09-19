@@ -801,30 +801,22 @@ export default function App() {
   const [focusZoom, setFocusZoom] = useState(18);
   const [highlightSessionId, setHighlightSessionId] = useState(null);
   const [localCooldowns, setLocalCooldowns] = useState({});
-  const notificationPromptedRef = useRef(false);
+  const [notificationPermissionRequest, setNotificationPermissionRequest] = useState(null);
 
-  useEffect(() => {
-    if (stage !== "game" || notificationPromptedRef.current) return;
-    notificationPromptedRef.current = true;
+  const requestNotificationsFromGame = async () => {
+    setNotificationPermissionRequest(null);
     if (typeof Notification === "undefined") {
-      addNotification("Les alertes téléphone ne sont pas disponibles sur ce navigateur. Les alertes du jeu restent actives.", "info", 6000);
+      addNotification("Les alertes téléphone ne sont pas disponibles ici. Les alertes du jeu restent actives.", "info", 6000);
       return;
     }
-    if (Notification.permission === "default") {
-      addNotification("Autorisez les notifications pour recevoir les alertes même si vous quittez cette page.", "info", 5000);
-      Notification.requestPermission().then((permission) => {
-        if (permission === "denied") {
-          addNotification("Notifications refusées : le téléphone ne pourra pas vous prévenir hors de cette page. Vous pouvez les réactiver dans les réglages du navigateur.", "warning", 8000);
-        } else if (permission === "granted") {
-          addNotification("Notifications activées.", "success", 2500);
-        }
-      }).catch(() => {
-        addNotification("La demande de notification n'a pas abouti. Les alertes du jeu restent actives.", "warning", 6000);
-      });
-    } else if (Notification.permission === "denied") {
-      addNotification("Notifications désactivées dans le navigateur : les alertes téléphone sont indisponibles, mais le jeu continue normalement.", "warning", 7000);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") addNotification("Notifications activées.", "success", 2500);
+      else addNotification("Notifications refusées : les alertes restent visibles dans le jeu.", "warning", 6000);
+    } catch {
+      addNotification("La demande de notification n'a pas abouti. Les alertes du jeu restent actives.", "warning", 6000);
     }
-  }, [stage, addNotification]);
+  };
 
   useEffect(() => {
     let reconnectReminder = null;
@@ -1453,6 +1445,14 @@ export default function App() {
         setReconnectError(null);
         attemptReconnect(s);
       }
+    });
+
+    s.on("notification_permission_request", (data) => {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") return;
+      setNotificationPermissionRequest({
+        title: data?.title || "Notifications de partie",
+        message: data?.message || "Autorisez les notifications pour recevoir les alertes importantes hors du jeu.",
+      });
     });
 
     s.on("disconnect", () => {
@@ -2720,6 +2720,16 @@ export default function App() {
     return (
       <>
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        {notificationPermissionRequest && (
+          <div className="fixed inset-x-3 top-[max(4.5rem,env(safe-area-inset-top)+3.5rem)] z-[1200] mx-auto max-w-md rounded-2xl border border-blue-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-blue-800 dark:bg-slate-900 dark:text-white">
+            <p className="text-sm font-black">{notificationPermissionRequest.title}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">{notificationPermissionRequest.message}</p>
+            <div className="mt-3 flex gap-2">
+              <button type="button" onClick={requestNotificationsFromGame} className="min-h-10 flex-1 rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white">Autoriser</button>
+              <button type="button" onClick={() => setNotificationPermissionRequest(null)} className="min-h-10 rounded-full border border-slate-200 px-4 py-2 text-xs font-bold dark:border-slate-700">Pas maintenant</button>
+            </div>
+          </div>
+        )}
         {reconnectModal}
         {rejoinCandidate && connected && !isReconnecting && !resumeCandidate && (
           <EntryPromptSheet
