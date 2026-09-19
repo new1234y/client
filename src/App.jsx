@@ -43,6 +43,7 @@ import { getOsmApiKey } from "./lib/map/osmKey.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
 import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, setMapStyleId } from "./lib/map/mapPrefs.js";
 import { syncServerTime } from "./lib/serverTime.js";
+import { useDeviceOrientation } from "./hooks/useDeviceOrientation.js";
 
 function isIosDevice() {
   if (typeof navigator === "undefined") return false;
@@ -564,6 +565,7 @@ function JoinRequestOverlay({ queue, onRespond }) {
 export default function App() {
   const { theme } = useTheme();
   const { notifications, addNotification, removeNotification } = useNotifications();
+  const { heading, requestPermission: requestCompassPermission } = useDeviceOrientation();
   const navigate = useNavigate();
   const location = useLocation();
   const [entryMode, setEntryMode] = useState("create");
@@ -2729,6 +2731,21 @@ export default function App() {
     return (
       <>
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        {isCat && compassUnlocked && gameState.compassTarget && (
+          <div className="pointer-events-none fixed bottom-24 left-3 z-[1100] flex items-center gap-3 rounded-2xl border border-cyan-300 bg-slate-950/90 px-3 py-2 text-white shadow-xl">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-950/70 text-2xl transition-transform"
+              style={{ transform: `rotate(${Number(gameState.compassTarget.bearing || 0) - Number(heading || 0)}deg)` }}
+              aria-label="Direction de la Souris"
+            >
+              ↑
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Souris dans le cercle</p>
+              <p className="text-xs font-bold">{Math.round(Number(gameState.compassTarget.distanceM || 0))} m</p>
+            </div>
+          </div>
+        )}
         {notificationPermissionRequest && (
           <div className="fixed inset-x-3 top-[max(4.5rem,env(safe-area-inset-top)+3.5rem)] z-[1200] mx-auto max-w-md rounded-2xl border border-blue-200 bg-white p-4 text-slate-900 shadow-2xl dark:border-blue-800 dark:bg-slate-900 dark:text-white">
             <p className="text-sm font-black">{notificationPermissionRequest.title}</p>
@@ -3487,6 +3504,7 @@ if (stage === "role_reveal" && rolesReveal) {
       freeze_cats_multi: 80,
       freeze_cats_all: 140,
       fake_position: 60,
+      compass: 90,
     };
 
     const powerLimits = gameState.powerLimits || {};
@@ -3521,6 +3539,7 @@ if (stage === "role_reveal" && rolesReveal) {
     const noiseDurationValue = pickDurationOption(noiseDuration, noiseDurationOptions, Math.min(20, maxPowerSec));
     const freezeDurationValue = pickDurationOption(freezeDuration, freezeDurationOptions, Math.min(20, maxPowerSec));
     const fakeDurationSec = Math.min(60, maxPowerSec);
+    const compassCost = Number(powerCosts.compass || 90);
     const roundPrice = (value) => Math.max(0, Math.round(Number(value || 0) / 10) * 10);
 
     const formatUsage = (key) => {
@@ -3691,6 +3710,7 @@ if (stage === "role_reveal" && rolesReveal) {
     const freezeFree = isFirstFreeUse(powerUses, "freeze_cats");
     const fakeFree = isFirstFreeUse(powerUses, "fake_position");
     const lureFree = isFirstFreeUse(powerUses, "balise_leurre");
+    const compassUnlocked = Boolean(me?.compassUnlocked);
 
     const tabBtn = (id, label, disabled = false, variant = "top") => {
       const active = gameTab === id && !disabled;
@@ -3784,7 +3804,7 @@ if (stage === "role_reveal" && rolesReveal) {
                   <div className="grid grid-cols-1 gap-4">
                     <PowerCard
                       title="Invisibilité"
-                      visible={role === "cat"}
+                      visible={role === "cat" || role === "player"}
                       emoji="👻"
                       stars={4}
                       gradient={["#6366F1", "#A78BFA"]}
@@ -3797,15 +3817,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       </>}
                       onUse={() => {
                         if (isCooldown("invisibility")) return;
-                        const scope = invisScope === "self" ? "self" : "multi";
-                        const body =
-                          scope === "self"
-                            ? { kind: "invisibility", scope, durationSec: invisDurationValue }
-                            : { kind: "invisibility", scope, targetSessionIds: selectedInvisTargets, durationSec: invisDurationValue };
-                        if (scope === "multi" && !selectedInvisTargets?.length) {
-                          addNotification("Choisissez au moins une cible", "error");
-                          return;
-                        }
+                        const body = { kind: "invisibility", scope: "self", durationSec: Math.min(90, invisDurationValue) };
                         socket?.emit("use_power", body, (res) => {
                           if (res?.ok) {
                             setCd("invisibility", 120);
@@ -3830,14 +3842,14 @@ if (stage === "role_reveal" && rolesReveal) {
                             options={[{ value: "self", label: "Moi" }, { value: "single", label: "Cible" }]}
                           />
                         </div>
-                        {invisScope === "single" && (
+                        {false && invisScope === "single" && (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                               Choisir les cibles
                             </div>
                             <div className="max-h-32 space-y-1.5 overflow-y-auto text-[13px]">
                               {rosterList
-                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
+                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId && p.role !== role)
                                 .map((p) => {
                                   const checked = (selectedInvisTargets || []).includes(p.sessionId);
                                   return (
@@ -3937,7 +3949,7 @@ if (stage === "role_reveal" && rolesReveal) {
                           <SegmentedControl
                             value={noiseTargetMode}
                             onChange={setNoiseTargetMode}
-                            options={[{ value: "all", label: "Tous" }, { value: "single", label: "Choix" }]}
+                            options={[{ value: "single", label: "Choisir une cible" }]}
                           />
                         </div>
                         
@@ -4155,6 +4167,30 @@ if (stage === "role_reveal" && rolesReveal) {
                         </PowerCard>
 
                         <PowerCard
+                          title="Boussole"
+                          emoji="🧭"
+                          gradient={["#0EA5E9", "#2563EB"]}
+                          visible={role === "cat"}
+                          costText={compassUnlocked ? "Activée pour la partie" : `${compassCost} pièces`}
+                          locked={compassUnlocked}
+                          lockReason="Déjà activée"
+                          estimatedCost={compassUnlocked ? 0 : compassCost}
+                          insufficientCoins={!compassUnlocked && (me?.coins ?? 0) < compassCost}
+                          details={<>Détecte la direction de la Souris quand vous entrez dans son cercle de brouillage. Achat unique, valable jusqu'à la fin de la partie.</>}
+                          onUse={() => {
+                            if (compassUnlocked) return;
+                            socket?.emit("use_power", { kind: "compass" }, async (res) => {
+                              if (res?.ok) {
+                                await requestCompassPermission();
+                                setGameTab("map");
+                              } else {
+                                addNotification(res?.error || "Erreur", "error");
+                              }
+                            });
+                          }}
+                        />
+
+                        <PowerCard
                           title="Balise-leurre"
                           emoji="🎯"
                           gradient={["#8B5CF6", "#EC4899"]}
@@ -4202,7 +4238,7 @@ if (stage === "role_reveal" && rolesReveal) {
 
                     <PowerCard
                       title="Immobiliser un joueur"
-                      visible={role === "cat"}
+                      visible={role === "cat" || role === "player"}
                       emoji="🧊"
                       stars={3}
                       gradient={["#3B82F6", "#60A5FA"]}
@@ -4221,22 +4257,11 @@ if (stage === "role_reveal" && rolesReveal) {
                           freezeTargetMode === "all"
                             ? []
                             : selectedFreezeTargets;
-                        if (freezeTargetMode === "single" && !targetIds.length) {
+                        if (!selectedFreezeTargets.length) {
                           addNotification("Choisissez au moins une cible", "error");
                           return;
                         }
-                        const scope =
-                          freezeTargetMode === "all"
-                            ? "all"
-                            : targetIds.length > 1
-                              ? "multi"
-                              : "single";
-                        const payload =
-                          scope === "all"
-                            ? { kind: "freeze_cats", scope, durationSec: freezeDurationValue }
-                            : scope === "multi"
-                              ? { kind: "freeze_cats", scope, targetSessionIds: targetIds, durationSec: freezeDurationValue }
-                              : { kind: "freeze_cats", scope, targetSessionId: targetIds[0], durationSec: freezeDurationValue };
+                        const payload = { kind: "freeze_cats", scope: "single", targetSessionId: selectedFreezeTargets[0], durationSec: freezeDurationValue };
                         socket?.emit("use_power", payload, (res) => {
                           if (res?.ok) {
                             setCd("freeze_cats", 90);
@@ -4254,18 +4279,18 @@ if (stage === "role_reveal" && rolesReveal) {
                           <SegmentedControl
                             value={freezeTargetMode}
                             onChange={setFreezeTargetMode}
-                            options={[{ value: "all", label: "Tous" }, { value: "single", label: "Choix" }]}
+                            options={[{ value: "single", label: "Choisir une cible" }]}
                           />
                         </div>
                         
-                        {freezeTargetMode === "single" && (
+                        {true && (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                             <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                               Choisir les cibles
                             </div>
                             <div className="max-h-28 space-y-1.5 overflow-y-auto text-[13px]">
                               {rosterList
-                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId)
+                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId && p.role !== role)
                                 .map((p) => {
                                   const checked = selectedFreezeTargets.includes(p.sessionId);
                                   return (
@@ -4296,7 +4321,7 @@ if (stage === "role_reveal" && rolesReveal) {
                         
                         {freezeTargetMode === "all" && (
                           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] font-semibold text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-200 text-center">
-                            Tous les autres joueurs seront immobilisés.
+                          Une seule cible du rôle adverse sera immobilisée.
                           </div>
                         )}
                         
