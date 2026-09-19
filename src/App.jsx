@@ -3813,7 +3813,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       estimatedCost={estimatedInvisCost}
                       insufficientCoins={!invisFree && (me?.coins ?? 0) < estimatedInvisCostPaid}
                       details={<>
-                        Devenez invisible pendant un certain temps. Le coût dépend de la <b>durée</b> et du <b>nombre de cibles</b>.
+                        Vous devenez invisible pendant la durée choisie. Le coût dépend uniquement de la durée.
                       </>}
                       onUse={() => {
                         if (isCooldown("invisibility")) return;
@@ -3834,50 +3834,7 @@ if (stage === "role_reveal" && rolesReveal) {
                       lockUntil={cooldownUntil("invisibility")}
                     >
                       <div className="space-y-4 text-xs text-slate-600 dark:text-slate-300">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Qui rendre invisible :</span>
-                          <SegmentedControl
-                            value={invisScope}
-                            onChange={setInvisScope}
-                            options={[{ value: "self", label: "Moi" }, { value: "single", label: "Cible" }]}
-                          />
-                        </div>
-                        {false && invisScope === "single" && (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                              Choisir les cibles
-                            </div>
-                            <div className="max-h-32 space-y-1.5 overflow-y-auto text-[13px]">
-                              {rosterList
-                                .filter((p) => !p.spectator && p.sessionId !== me?.sessionId && p.role !== role)
-                                .map((p) => {
-                                  const checked = (selectedInvisTargets || []).includes(p.sessionId);
-                                  return (
-                                    <div
-                                      key={p.sessionId}
-                                      onClick={() => {
-                                        setSelectedInvisTargets((prev) => {
-                                          const l = prev || [];
-                                          if (checked) return l.filter((id) => id !== p.sessionId);
-                                          return [...l, p.sessionId];
-                                        });
-                                      }}
-                                      className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
-                                        checked 
-                                          ? "bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:border-blue-800" 
-                                          : "bg-slate-50 border border-slate-100 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                                      }`}
-                                    >
-                                      <span className={`truncate font-semibold ${checked ? "text-blue-800 dark:text-blue-200" : "text-slate-700 dark:text-slate-200"}`}>
-                                        {p.nickname}
-                                      </span>
-                                      {checked && <div className="h-2 w-2 rounded-full bg-blue-600" />}
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        )}
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">Vous uniquement · maximum 1 min 30</p>
 
                         <div className="space-y-1 pt-1">
                           <span className="font-semibold text-slate-800 dark:text-slate-200">Durée</span>
@@ -4298,8 +4255,8 @@ if (stage === "role_reveal" && rolesReveal) {
                                       key={p.sessionId}
                                       onClick={() => {
                                         setSelectedFreezeTargets((prev) => {
-                                          if (checked) return prev.filter((id) => id !== p.sessionId);
-                                          return [...prev, p.sessionId];
+                                          if (checked) return [];
+                                          return [p.sessionId];
                                         });
                                       }}
                                       className={`flex cursor-pointer items-center justify-between gap-2.5 rounded-lg px-3 py-2 transition-all ${
