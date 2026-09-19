@@ -47,18 +47,26 @@ import { syncServerTime } from "./lib/serverTime.js";
 function sendSystemNotification(title, body) {
   if (typeof document === "undefined" || document.visibilityState !== "hidden") return;
   const options = { body, tag: "chase-gps-game", renotify: true, icon: "/icon-192x192.png" };
+  const useServiceWorkerNotification = navigator.serviceWorker?.ready
+    ? navigator.serviceWorker.ready.then((registration) =>
+        registration.showNotification(title, options)
+      )
+    : null;
   if (typeof Notification !== "undefined" && Notification.permission === "granted") {
     try {
-      new Notification(title, options);
+      // iOS PWA and mobile browsers are more reliable through the service worker.
+      if (useServiceWorkerNotification) {
+        useServiceWorkerNotification.catch((error) => logger.warn("Notification PWA indisponible", error));
+      } else {
+        new Notification(title, options);
+      }
       return;
     } catch (error) {
       logger.warn("Notification système indisponible", error);
     }
   }
-  if (navigator.serviceWorker?.ready) {
-    navigator.serviceWorker.ready
-      .then((registration) => registration.showNotification(title, options))
-      .catch((error) => logger.warn("Notification PWA indisponible", error));
+  if (useServiceWorkerNotification) {
+    useServiceWorkerNotification.catch((error) => logger.warn("Notification PWA indisponible", error));
   }
 }
 

@@ -50,6 +50,20 @@ function readNickname() {
   } catch {
     return "";
   }
+
+  function getNotificationPlatform() {
+    if (typeof navigator === "undefined") return "other";
+    const ua = navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+      return "ios";
+    }
+    return "other";
+  }
+
+  function isStandalonePwa() {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+  }
 }
 
 function Section({ title, hint, children }) {
@@ -81,6 +95,8 @@ export default function SettingsPage({
   );
   const hasNotificationApi = typeof Notification !== "undefined";
   const hasServiceWorker = typeof navigator !== "undefined" && "serviceWorker" in navigator;
+  const notificationPlatform = getNotificationPlatform();
+  const iosNeedsInstall = notificationPlatform === "ios" && !isStandalonePwa();
   const storedNick = nicknameProp ?? readNickname();
   const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
   const showAdmin = Boolean(inGame && isKarim && admin);
@@ -116,6 +132,10 @@ export default function SettingsPage({
   };
 
   const requestNotifications = async () => {
+    if (notificationPlatform === "ios" && !isStandalonePwa()) {
+      setNotificationPermission("ios-install");
+      return;
+    }
     if (!hasNotificationApi) {
       setNotificationPermission(hasServiceWorker ? "fallback" : "unsupported");
       return;
@@ -209,6 +229,23 @@ export default function SettingsPage({
         {notificationPermission === "granted" ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
             Notifications autorisées sur cet appareil.
+          </div>
+        ) : notificationPermission === "ios-install" || iosNeedsInstall ? (
+          <div className="space-y-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+            <p className="font-bold">Activer sur iPhone</p>
+            <p className="text-xs font-semibold">
+              Safari bloque les notifications d’un simple onglet. Touchez <b>Partager</b>, puis <b>Sur l’écran d’accueil</b>. Ouvrez ensuite l’icône Chase GPS et revenez ici pour autoriser les notifications.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (isStandalonePwa()) requestNotifications();
+                else window.location.reload();
+              }}
+              className="min-h-10 rounded-full border border-blue-300 px-4 py-2 text-xs font-black hover:bg-blue-100 dark:border-blue-700 dark:hover:bg-blue-900/40"
+            >
+              J’ai installé l’application
+            </button>
           </div>
         ) : notificationPermission === "denied" ? (
           <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
