@@ -17,7 +17,6 @@ import Button from "./components/ui/Button.jsx";
 import ConfigHint from "./components/ui/ConfigHint.jsx";
 import DiscreteSlider from "./components/ui/DiscreteSlider.jsx";
 import SliderWithParticles from "./components/ui/SliderWithParticles.jsx";
-import AnimatedPrice from "./components/ui/AnimatedPrice.jsx";
 import { getGameByCode } from "./supabase.js";
 import PartyChatPanel from "./components/game/PartyChatPanel.jsx";
 import PlayerSheet from "./components/game/PlayerSheet.jsx";
@@ -792,12 +791,12 @@ export default function App() {
   const [exactPosDuration, setExactPosDuration] = useState(1); // 1 | 5 | 15 | 30
   const [noiseTargetMode, setNoiseTargetMode] = useState("single"); // single | all
   const [selectedNoiseTargets, setSelectedNoiseTargets] = useState([]); // sessionIds
-  const [noiseDuration, setNoiseDuration] = useState(30); // 10 | 30 | 60
+  const [noiseDuration, setNoiseDuration] = useState(20);
   const [noiseVolume, setNoiseVolume] = useState("medium"); // low | medium | high
   const [freezeTargetMode, setFreezeTargetMode] = useState("single"); // single | all
   const [selectedFreezeTargets, setSelectedFreezeTargets] = useState([]); // cat sessionIds
   const [freezeDuration, setFreezeDuration] = useState(20);
-  const [invisDurationSec, setInvisDurationSec] = useState(60); // capped by match timer
+  const [invisDurationSec, setInvisDurationSec] = useState(60); // capped at 1 min 30
   const [baliseLureSelecting, setBaliseLureSelecting] = useState(false);
   const [baliseLureTarget, setBaliseLureTarget] = useState(null);
   const [ghostUiNow, setGhostUiNow] = useState(() => Date.now());
@@ -842,7 +841,7 @@ export default function App() {
         case 'noise':
           socket?.emit(
             "use_power",
-            { kind: "noise", targetSessionIds: [target], durationSec: 30, volume: "medium" },
+            { kind: "noise", targetSessionIds: [target], durationSec: 20, volume: "high" },
             (res) => {
               if (res?.ok) {
                 setCd("noise", 60);
@@ -3369,15 +3368,14 @@ if (stage === "role_reveal" && rolesReveal) {
         { label: "45 s", value: 45 },
         { label: "60 s", value: 60 },
         { label: "90 s", value: 90 },
-        { label: "2 min", value: 120 },
+        { label: "1 min 30", value: 90 },
       ],
       maxPowerSec
     );
     const noiseDurationOptions = durationOptionsAtOrBelow(
       [
         { label: "10 s", value: 10 },
-        { label: "30 s", value: 30 },
-        { label: "60 s", value: 60 },
+        { label: "20 s", value: 20 },
       ],
       maxPowerSec
     );
@@ -3393,6 +3391,7 @@ if (stage === "role_reveal" && rolesReveal) {
     const noiseDurationValue = pickDurationOption(noiseDuration, noiseDurationOptions, Math.min(30, maxPowerSec));
     const freezeDurationValue = pickDurationOption(freezeDuration, freezeDurationOptions, Math.min(20, maxPowerSec));
     const fakeDurationSec = Math.min(60, maxPowerSec);
+    const roundPrice = (value) => Math.max(0, Math.round(Number(value || 0) / 10) * 10);
 
     const formatUsage = (key) => {
       const used = Number(powerUses?.[key] || 0);
@@ -3508,7 +3507,7 @@ if (stage === "role_reveal" && rolesReveal) {
       const base = Number(powerCosts.noise || 20);
       const durationSec = Number(noiseDurationValue) || 30;
       const durationFactor = durationSec === 10 ? 0.5 : durationSec === 60 ? 1.8 : 1.0;
-      const volumeFactor = noiseVolume === "low" ? 0.7 : noiseVolume === "high" ? 1.4 : 1.0;
+      const volumeFactor = 1.4;
 
       let count = 0;
       if (noiseTargetMode === "all") {
@@ -3518,7 +3517,7 @@ if (stage === "role_reveal" && rolesReveal) {
       }
       if (count <= 0) return 0;
       const raw = base * durationFactor * volumeFactor * count;
-      return Math.max(1, Math.ceil(raw));
+      return roundPrice(Math.max(10, Math.ceil(raw)));
     })();
     const estimatedNoiseCostPaid = estimatedNoiseCost;
 
@@ -3528,14 +3527,14 @@ if (stage === "role_reveal" && rolesReveal) {
       const durationFactor = 0.5; // 10s
       const volumeFactor = 0.7; // low
       const count = 1;
-      return Math.max(1, Math.ceil(base * durationFactor * volumeFactor * count));
+      return roundPrice(Math.max(10, Math.ceil(base * durationFactor * volumeFactor * count)));
     })();
     const noiseMaxCost = (() => {
       const base = Number(powerCosts.noise || 20);
       const durationFactor = 1.8; // 60s
       const volumeFactor = 1.4; // high
       const maxTargets = (rosterList || []).filter((p) => p.role !== role && !p.spectator).length || 1;
-      return Math.max(1, Math.ceil(base * durationFactor * volumeFactor * maxTargets));
+      return roundPrice(Math.max(10, Math.ceil(base * durationFactor * volumeFactor * maxTargets)));
     })();
 
     const freezeMinCost = Number(powerCosts.freeze_cats_single || 45);
@@ -3549,11 +3548,11 @@ if (stage === "role_reveal" && rolesReveal) {
       const durationFactor = durationFactor60(durationSec);
       if (invisScope === "self") {
         const base = Number(powerCosts.invisibility_self || 40);
-        return Math.max(1, Math.round(base * durationFactor));
+        return roundPrice(Math.max(10, Math.round(base * durationFactor)));
       }
       const base = Number(powerCosts.invisibility_single || 70);
       const count = (selectedInvisTargets || []).length || 1;
-      const perTarget = Math.max(1, Math.round(base * durationFactor));
+      const perTarget = roundPrice(Math.max(10, Math.round(base * durationFactor)));
       return perTarget * count;
     })();
     const invisFree = isFirstFreeUse(powerUses, "invisibility");
@@ -3655,10 +3654,11 @@ if (stage === "role_reveal" && rolesReveal) {
                   <div className="grid grid-cols-1 gap-4">
                     <PowerCard
                       title="Invisibilité"
+                      visible={role === "cat"}
                       emoji="👻"
                       stars={4}
                       gradient={["#6366F1", "#A78BFA"]}
-                      costText={invisFree ? `1 gratuit · ensuite ${invisMinCost}–${invisMaxCost}` : `${invisMinCost} - ${invisMaxCost}`}
+                      costText={invisFree ? "1 gratuit" : `${estimatedInvisCostPaid} pièces`}
                       usageLabel={formatUsage("invisibility")}
                       estimatedCost={estimatedInvisCost}
                       insufficientCoins={!invisFree && (me?.coins ?? 0) < estimatedInvisCostPaid}
@@ -3747,16 +3747,16 @@ if (stage === "role_reveal" && rolesReveal) {
                           />
                         </div>
 
-                        <AnimatedPrice value={estimatedInvisCostPaid} />
                       </div>
                     </PowerCard>
 
                     <PowerCard
                       title="Bruit fantôme"
+                      visible={role === "cat"}
                       emoji="🔊"
                       stars={2}
                       gradient={["#F43F5E", "#FB923C"]}
-                      costText={noiseFree ? `1 gratuit · ensuite ${noiseMinCost}–${noiseMaxCost}` : `${noiseMinCost} - ${noiseMaxCost}`}
+                      costText={noiseFree ? "1 gratuit" : `${estimatedNoiseCost} pièces`}
                       locked={isCooldown("noise")}
                       lockReason="Recharge"
                       lockUntil={cooldownUntil("noise")}
@@ -3779,7 +3779,7 @@ if (stage === "role_reveal" && rolesReveal) {
                           return;
                         }
                         const durationSec = noiseDurationValue;
-                        const volume = noiseVolume;
+                        const volume = "high";
                         socket?.emit(
                           "use_power",
                           {
@@ -3867,19 +3867,13 @@ if (stage === "role_reveal" && rolesReveal) {
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-slate-800 dark:text-slate-200">Volume</span>
                             <DiscreteSlider 
-                              options={[
-                                { label: 'Bas', value: 'low' },
-                                { label: 'Moyen', value: 'medium' },
-                                { label: 'Fort', value: 'high' }
-                              ]}
-                              value={noiseVolume}
-                              onChange={setNoiseVolume}
+                              options={[{ label: "Fort", value: "high" }]}
+                              value="high"
                               color="amber"
                             />
                           </div>
                         </div>
 
-                        <AnimatedPrice value={estimatedNoiseCost} />
                       </div>
                     </PowerCard>
 
@@ -4078,13 +4072,14 @@ if (stage === "role_reveal" && rolesReveal) {
 
                     <PowerCard
                       title="Immobiliser un joueur"
+                      visible={role === "cat"}
                       emoji="🧊"
                       stars={3}
                       gradient={["#3B82F6", "#60A5FA"]}
                       locked={isCooldown("freeze_cats")}
                       lockReason="Recharge"
                       lockUntil={cooldownUntil("freeze_cats")}
-                      costText={freezeFree ? `1 gratuit · ensuite ${freezeMinCost}–${freezeMaxCost}` : `${freezeMinCost} - ${freezeMaxCost}`}
+                      costText={freezeFree ? "1 gratuit" : `${roundPrice(estimatedFreezeCost)} pièces`}
                       estimatedCost={freezeFree ? 0 : estimatedFreezeCost}
                       insufficientCoins={!freezeFree && (me?.coins ?? 0) < estimatedFreezeCost}
                       details={<>
@@ -4187,7 +4182,6 @@ if (stage === "role_reveal" && rolesReveal) {
                           </div>
                         </div>
 
-                        <AnimatedPrice value={estimatedFreezeCost} />
                       </div>
                     </PowerCard>
                   </div>

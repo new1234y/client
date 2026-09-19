@@ -44,6 +44,7 @@ export default function PowerCard({
   children,
   details,
   usageLabel,
+  visible = true,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -51,9 +52,10 @@ export default function PowerCard({
   const remaining = remainingSeconds(lockUntil, now) || 0;
   const isCurrentlyLocked = locked || remaining > 0;
   const isButtonDisabled = isCurrentlyLocked || insufficientCoins;
+  if (!visible) return null;
   return (
     <div
-      className={`relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-950 ${isCurrentlyLocked ? 'opacity-70' : ''}`}
+      className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950 ${isCurrentlyLocked ? 'opacity-70' : ''}`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -63,7 +65,7 @@ export default function PowerCard({
               <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 Pouvoir
               </div>
-              <div className="text-lg font-black text-slate-950 dark:text-white">{title}</div>
+              <div className="text-base font-black text-slate-950 dark:text-white">{title}</div>
             </div>
           </div>
       {costText && (
@@ -81,7 +83,7 @@ export default function PowerCard({
         </div>
       </div>
 
-      <div className="mt-4 relative">
+      <div className="mt-3 relative">
         {children}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
@@ -91,7 +93,7 @@ export default function PowerCard({
             className="min-h-11 flex-1"
           >
             {isButtonDisabled ? (
-              insufficientCoins ? `Pas assez de pièces (${typeof estimatedCost === 'number' ? formatCoins(estimatedCost) : estimatedCost})` : remaining ? `Attente (${formatDurationMs(remaining*1000)})` : lockReason || "Indisponible"
+              insufficientCoins ? "Pas assez de pièces" : remaining ? `Attente (${formatDurationMs(remaining*1000)})` : lockReason || "Indisponible"
             ) : "Utiliser"}
           </Button>
 
