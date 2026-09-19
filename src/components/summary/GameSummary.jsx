@@ -669,56 +669,54 @@ function jamAt(jamHistory, sessionId, absT) {
   return last;
 }
 
+function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow }) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const token = getMapboxToken();
+
+  useEffect(() => {
+    if (!token || !containerRef.current) return undefined;
+    mapboxgl.accessToken = token;
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: resolveMapboxStyleUrl("streets"),
+      center: [center[1], center[0]],
+      zoom: 15,
+      pitch: 58,
+      bearing: 18,
+      antialias: true,
+      attributionControl: true,
+    });
+    mapRef.current = map;
+    map.on("load", () => {
+      map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
+      map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
+      map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
+      map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
+      map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
+    });
+    return () => { map.remove(); mapRef.current = null; };
+  }, [token]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
+    map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
+    if (follow && selectedPosition) {
+      map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 58, duration: 450, essential: true });
+    }
+  }, [pathFeatures, markerFeatures, selectedPosition, follow]);
+
+  if (!token) return null;
+  return <div ref={containerRef} className="absolute inset-0 z-10" aria-label="Replay 3D Mapbox de la partie" />;
+}
+
 function capturedAt(sessionId, timeline, absT) {
   for (const ev of timeline || []) {
     if (ev.t > absT) break;
     if (ev.type === "captured" && ev.sessionId === sessionId) return true;
-  }
-
-  function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow }) {
-    const containerRef = useRef(null);
-    const mapRef = useRef(null);
-    const token = getMapboxToken();
-
-    useEffect(() => {
-      if (!token || !containerRef.current) return undefined;
-      mapboxgl.accessToken = token;
-      const map = new mapboxgl.Map({
-        container: containerRef.current,
-        style: resolveMapboxStyleUrl("streets"),
-        center: [center[1], center[0]],
-        zoom: 15,
-        pitch: 58,
-        bearing: 18,
-        antialias: true,
-        attributionControl: true,
-      });
-      mapRef.current = map;
-      map.on("load", () => {
-        map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
-        map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
-        map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
-        map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-        map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
-        map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
-      });
-      return () => { map.remove(); mapRef.current = null; };
-    }, [token]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map || !map.isStyleLoaded()) return;
-      const paths = map.getSource("recap-paths");
-      const markers = map.getSource("recap-markers");
-      paths?.setData({ type: "FeatureCollection", features: pathFeatures });
-      markers?.setData({ type: "FeatureCollection", features: markerFeatures });
-      if (follow && selectedPosition) {
-        map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 58, duration: 450, essential: true });
-      }
-    }, [pathFeatures, markerFeatures, selectedPosition, follow]);
-
-    if (!token) return null;
-    return <div ref={containerRef} className="absolute inset-0 z-10" aria-label="Replay 3D Mapbox de la partie" />;
   }
   return false;
 }
