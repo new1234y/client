@@ -76,6 +76,9 @@ export default function SettingsPage({
   const [highContrast, setHc] = useState(() => getHighContrast());
   const [accent, setAccentState] = useState(() => getAccent());
   const [reduceMotion, setReduce] = useState(() => getReducedMotion());
+  const [notificationPermission, setNotificationPermission] = useState(() =>
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
   const storedNick = nicknameProp ?? readNickname();
   const isKarim = (storedNick || "").trim().toLowerCase() === "karim";
   const showAdmin = Boolean(inGame && isKarim && admin);
@@ -108,6 +111,19 @@ export default function SettingsPage({
     setReduce(on);
     setReducedMotion(on);
     applyReducedMotionClass(on);
+  };
+
+  const requestNotifications = async () => {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    } catch {
+      setNotificationPermission("denied");
+    }
   };
 
   const goBack = () => {
@@ -182,6 +198,44 @@ export default function SettingsPage({
             className="h-5 w-5 accent-blue-600"
           />
         </label>
+      </Section>
+
+      <Section
+        title="Notifications"
+        hint="Recevez les alertes importantes quand le jeu passe en arrière-plan."
+      >
+        {notificationPermission === "granted" ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+            Notifications autorisées sur cet appareil.
+          </div>
+        ) : notificationPermission === "denied" ? (
+          <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="font-bold">Notifications bloquées</p>
+            <p className="text-xs font-semibold">
+              Le navigateur les a refusées. Autorisez-les dans les réglages du site ou du navigateur, puis réessayez.
+            </p>
+            <button
+              type="button"
+              onClick={requestNotifications}
+              className="min-h-10 rounded-full border border-amber-300 px-4 py-2 text-xs font-black hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900/40"
+            >
+              Vérifier l’autorisation
+            </button>
+          </div>
+        ) : notificationPermission === "unsupported" ? (
+          <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+            Les notifications système ne sont pas disponibles dans ce navigateur. Les alertes du jeu restent actives.
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={requestNotifications}
+            className="flex min-h-11 w-full items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-left text-sm font-black text-blue-800 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:bg-blue-950/50"
+          >
+            <span>Autoriser les notifications</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        )}
       </Section>
 
       {inGame && (
