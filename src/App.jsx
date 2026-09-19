@@ -53,6 +53,14 @@ function sendSystemNotification(title, body) {
     logger.warn("Notification système indisponible", error);
   }
 }
+
+function notifyGameOrSystem(addNotification, title, body, type = "warning") {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    sendSystemNotification(title, body);
+    return;
+  }
+  addNotification(`${title} : ${body}`, type, 5000);
+}
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
 import { getBaliseCaptureMs } from "./lib/baliseTypes.js";
@@ -1433,6 +1441,14 @@ export default function App() {
 
     s.on("disconnect", () => {
       setConnected(false);
+      if (stageRef.current !== "entry") {
+        notifyGameOrSystem(
+          addNotification,
+          "Connexion perdue",
+          "Revenez dans le jeu pour vous reconnecter.",
+          "warning"
+        );
+      }
       if (sessionTakenOverRef.current) return;
       if (stageRef.current === "entry") {
         // On home screen, clear main session but keep backup for crash recovery
@@ -1672,7 +1688,12 @@ export default function App() {
       playGhostNoiseSound(sharedAudioContextRef, noiseAudioRef, durationSec, volume).catch((e) => {
         logger.warn("AudioContext non disponible pour bruit", e);
       });
-      sendSystemNotification("Bruit fantôme", `${by || "Un adversaire"} vous a ciblé.`);
+      notifyGameOrSystem(
+        addNotification,
+        "Bruit fantôme",
+        `${by || "Un adversaire"} vous a ciblé.`,
+        "warning"
+      );
 
       setActiveNoise({
         startedAt: getServerTime(),
@@ -1694,7 +1715,12 @@ export default function App() {
           durationSec: data.durationSec,
           startedAt: getServerTime()
         });
-        sendSystemNotification("Pouvoir activé contre vous", "Vous êtes affecté par une invisibilité.");
+        notifyGameOrSystem(
+          addNotification,
+          "Pouvoir activé contre vous",
+          "Vous êtes affecté par une invisibilité.",
+          "warning"
+        );
         // Also show toast notification
       } else if (kind === "balise_blocked") {
         const capturerNickname = typeof data.capturerNickname === "string" ? data.capturerNickname.trim() : "";
@@ -1718,7 +1744,12 @@ export default function App() {
 
     s.on("immobilized", ({ until, by, durationSec }) => {
       setImmobilizedMeta({ until, by, durationSec });
-      sendSystemNotification("Vous êtes immobilisé", `${by || "Un adversaire"} vous bloque pendant ${durationSec || 0} secondes.`);
+      notifyGameOrSystem(
+        addNotification,
+        "Vous êtes immobilisé",
+        `${by || "Un adversaire"} vous bloque pendant ${durationSec || 0} secondes.`,
+        "warning"
+      );
     });
 
     s.on("admin_role_changed", (data) => {
