@@ -39,53 +39,14 @@ import HomePage from "./components/HomePage.jsx";
 import BrandMark from "./components/ui/BrandMark.jsx";
 import GlassHeader from "./components/ui/GlassHeader.jsx";
 import logger from "./lib/logger.js";
+import { isIosDevice, notifyGameOrSystem, sendSystemNotification } from "./lib/notifications.js";
+import { SOCKET_URL } from "./lib/appConfig.js";
 import { getOsmApiKey } from "./lib/map/osmKey.js";
 import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
 import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, setMapStyleId } from "./lib/map/mapPrefs.js";
 import { syncServerTime } from "./lib/serverTime.js";
 import { useDeviceOrientation } from "./hooks/useDeviceOrientation.js";
 
-function isIosDevice() {
-  if (typeof navigator === "undefined") return false;
-  const userAgent = navigator.userAgent || "";
-  return /iPad|iPhone|iPod/.test(userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-}
-
-function sendSystemNotification(title, body) {
-  if (typeof document === "undefined" || document.visibilityState !== "hidden") return;
-  if (isIosDevice()) return;
-  const options = { body, tag: "chase-gps-game", renotify: true, icon: "/icon-192x192.png" };
-  const useServiceWorkerNotification = navigator.serviceWorker?.ready
-    ? navigator.serviceWorker.ready.then((registration) =>
-        registration.showNotification(title, options)
-      )
-    : null;
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    try {
-      // iOS PWA and mobile browsers are more reliable through the service worker.
-      if (useServiceWorkerNotification) {
-        useServiceWorkerNotification.catch((error) => logger.warn("Notification PWA indisponible", error));
-      } else {
-        new Notification(title, options);
-      }
-      return;
-    } catch (error) {
-      logger.warn("Notification système indisponible", error);
-    }
-  }
-  if (useServiceWorkerNotification) {
-    useServiceWorkerNotification.catch((error) => logger.warn("Notification PWA indisponible", error));
-  }
-}
-
-function notifyGameOrSystem(addNotification, title, body, type = "warning") {
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-    sendSystemNotification(title, body);
-    return;
-  }
-  addNotification(`${title} : ${body}`, type, 5000);
-}
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
 import { getBaliseCaptureMs } from "./lib/baliseTypes.js";
@@ -97,9 +58,6 @@ import {
   isFirstFreeUse,
   pickDurationOption,
 } from "./lib/powerDuration.js";
-
-const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
 // localStorage keys for session persistence
 const LS_SESSION_KEY = "chase_gps_session";

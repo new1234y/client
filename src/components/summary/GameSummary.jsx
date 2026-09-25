@@ -34,6 +34,7 @@ import {
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken } from "../../lib/map/mapboxKey.js";
 import { resolveMapboxStyleUrl } from "../../lib/map/mapPrefs.js";
+import { getPublicUrl } from "../../lib/appConfig.js";
 
 
 function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
@@ -813,7 +814,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   useEffect(() => {
     if (!summary || publishOnce.current) return;
     if (readOnlyRecap) {
-      setPublicRecapUrl(window.location.href.split("?")[0]);
+      setPublicRecapUrl(getPublicUrl(window.location.pathname));
       publishOnce.current = true;
       return;
     }
@@ -826,8 +827,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((j) => {
-        const origin = window.location.origin;
-        setPublicRecapUrl(`${origin}/recap/${j.id}`);
+        setPublicRecapUrl(getPublicUrl(`/recap/${j.id}`));
       })
       .catch(() => {
         setPublicRecapUrl("");

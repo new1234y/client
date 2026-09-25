@@ -2,12 +2,13 @@ import { QRCodeSVG } from "qrcode.react";
 import { useCallback } from "react";
 import Button from "../ui/Button.jsx";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
+import { getPublicUrl } from "../../lib/appConfig.js";
 
 export default function SharePartyModal({ code, title, onClose }) {
   const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
   const joinUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}${window.location.pathname}?code=${encodeURIComponent(code || "")}`
+      ? getPublicUrl(`?code=${encodeURIComponent(code || "")}`)
       : "";
 
   const handleShare = useCallback(async () => {

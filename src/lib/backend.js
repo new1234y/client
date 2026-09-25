@@ -1,4 +1,4 @@
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+import { SOCKET_URL } from "./appConfig.js";
 
 function healthUrls() {
   const urls = [`${SOCKET_URL.replace(/\/$/, "")}/health`];
