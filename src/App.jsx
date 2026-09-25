@@ -46,6 +46,13 @@ import { hasMapboxToken, MAPBOX_TOKEN_EVENT } from "./lib/map/mapboxKey.js";
 import { getMapStyleId, hasUserPickedMapStyle, MAPBOX_STYLES, MAP_PREF_EVENTS, setMapStyleId } from "./lib/map/mapPrefs.js";
 import { syncServerTime } from "./lib/serverTime.js";
 import { useDeviceOrientation } from "./hooks/useDeviceOrientation.js";
+import {
+  NotFoundPage,
+  RecapError,
+  RecapLoading,
+  ReconnectBanner,
+  ServerErrorPage,
+} from "./components/app/StatusScreens.jsx";
 
 import { haptic } from "./lib/haptic.js";
 import SegmentedControl from "./components/ui/SegmentedControl.jsx";
@@ -530,6 +537,7 @@ export default function App() {
   const [entryBusyKind, setEntryBusyKind] = useState(null);
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
+  const [startupError, setStartupError] = useState(null);
   const [stage, setStage] = useState("entry");
   const [resumeCandidate, setResumeCandidate] = useState(null);
   const [nickname, setNickname] = useState(() => {
@@ -1399,6 +1407,7 @@ export default function App() {
 
     s.on("connect", () => {
       setConnected(true);
+      setStartupError(null);
       lastPingRef.current = getServerTime();
       if (sessionTakenOverRef.current) return;
       let saved = loadSession();
@@ -1413,6 +1422,14 @@ export default function App() {
         setReconnectError(null);
         attemptReconnect(s);
       }
+    });
+
+    s.on("connect_error", (error) => {
+      setConnected(false);
+      if (stageRef.current === "entry") {
+        setStartupError("Le serveur ne répond pas pour le moment.");
+      }
+      logger.warn("[Client] Socket startup error", error);
     });
 
     s.on("notification_permission_request", (data) => {
@@ -2640,32 +2657,23 @@ export default function App() {
     return <SettingsPage />;
   }
 
+  const isRecapPath = /^\/recap\/[A-Za-z0-9]+\/?$/.test(location.pathname);
+  if (location.pathname !== "/" && !isRecapPath) {
+    return <NotFoundPage onHome={() => navigate("/")} />;
+  }
+
   if (recapSlug && recapLoading) {
-    return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-3 bg-slate-50 p-8 dark:bg-slate-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-        <p className="text-sm text-slate-600 dark:text-slate-400">Chargement du récap…</p>
-      </div>
-    );
+    return <RecapLoading />;
   }
 
   if (recapSlug && recapErr) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center gap-4 bg-slate-50 p-8 dark:bg-slate-950">
-        <p className="text-center text-slate-700 dark:text-slate-300">
-          Récap introuvable ou expiré.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            window.history.replaceState({}, "", "/");
-            window.location.reload();
-          }}
-          className="min-h-11 rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white hover:bg-blue-700"
-        >
-          Accueil
-        </button>
-      </div>
+      <RecapError
+        onHome={() => {
+          window.history.replaceState({}, "", "/");
+          window.location.reload();
+        }}
+      />
     );
   }
 
@@ -2679,6 +2687,25 @@ export default function App() {
           setRecapSlug(null);
           setRecapData(null);
           window.location.reload();
+        }}
+      />
+    );
+  }
+
+  if (startupError && stage === "entry") {
+    return (
+      <ServerErrorPage
+        error={startupError}
+        onRetry={() => {
+          setStartupError(null);
+          const s = socketRef.current;
+          if (s && !s.connected) {
+            try { s.connect(); } catch (error) { logger.warn("[Client] Socket retry failed", error); }
+          }
+        }}
+        onHome={() => {
+          setStartupError(null);
+          navigate("/");
         }}
       />
     );
@@ -3700,20 +3727,11 @@ if (stage === "role_reveal" && rolesReveal) {
         {isHost && <JoinRequestOverlay queue={joinRequestQueue} onRespond={respondJoinRequest} />}
 
         {isReconnecting && !showReconnectModal && (
-          <div className="z-[1200] shrink-0 border-b border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-700 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 dark:text-slate-200">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold">Reconnexion…</span>
-              {!isHost && (
-                <button
-                  type="button"
-                  onClick={leaveGame}
-                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                >
-                  Quitter
-                </button>
-              )}
-            </div>
-          </div>
+          <ReconnectBanner
+            attempt={reconnectAttempt}
+            error={reconnectError}
+            onLeave={!isHost ? leaveGame : undefined}
+          />
         )}
 
         {errorBanner && (
