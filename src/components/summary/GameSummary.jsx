@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -15,10 +16,12 @@ import {
   TileLayer,
   Polyline,
   Circle,
+  CircleMarker,
   Marker,
   Popup,
   useMap,
 } from "react-leaflet";
+import L from "leaflet";
 import "../../lib/map/leafletFix.js";
 import { BASEMAPS, resolveBasemap } from "../../lib/map/basemaps.js";
 import { getOsmApiKey } from "../../lib/map/osmKey.js";
@@ -49,11 +52,23 @@ function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
       onAnimationEnd={onExitAnimationEnd}
     >
       <div
-        className={`sheet-panel w-full max-w-md rounded-[8px] bg-white p-6 shadow-2xl dark:bg-slate-900${leave}`}
+        className={`sheet-panel w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl dark:bg-slate-900${leave}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Partager le récap</h3>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <div className="bg-gradient-to-br from-[#172554] via-[#2563EB] to-[#7C3AED] p-6 text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-blue-100">Souvenir de partie</p>
+              <h3 className="mt-2 text-2xl font-black">Partager le récap</h3>
+            </div>
+            <span className="rounded-2xl bg-white/15 px-3 py-2 text-xl" aria-hidden="true">✦</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-blue-100">
+            Une page publique en lecture seule avec le podium, la carte et le replay.
+          </p>
+        </div>
+        <div className="p-6">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Lien public (lecture seule). Les données restent sur ce serveur tant qu&apos;il tourne.
         </p>
         {publicRecapUrl ? (
@@ -66,7 +81,7 @@ function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
               <button
                 type="button"
                 onClick={onCopy}
-                className="mt-3 w-full rounded-[8px] bg-[#2563EB] py-2.5 text-sm font-semibold text-white sm:w-auto sm:px-5"
+                className="mt-3 w-full rounded-2xl bg-[#2563EB] py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 sm:w-auto sm:px-5"
               >
                 {copied ? "Copié" : "Copier le lien"}
               </button>
@@ -80,10 +95,44 @@ function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
         <button
           type="button"
           onClick={requestClose}
-          className="mt-6 w-full rounded-[8px] border border-slate-200 py-3 text-sm font-semibold dark:border-slate-600"
+          className="mt-6 w-full rounded-2xl border border-slate-200 py-3 text-sm font-bold transition hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
         >
           Fermer
         </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExportModal({ onClose, onExportJson, onExportCsv, onExportAll }) {
+  const { leaving, requestClose, onExitAnimationEnd } = useAnimatedClose(onClose);
+  return (
+    <div
+      className={`sheet-overlay fixed inset-0 z-[12000] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm${leaving ? " is-leaving" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      onClick={requestClose}
+      onAnimationEnd={onExitAnimationEnd}
+    >
+      <div className="sheet-panel w-full max-w-sm rounded-[28px] bg-white p-6 shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-blue-600">Données de la partie</p>
+        <h3 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">Exporter le souvenir</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Téléchargez le replay complet ou un tableau exploitable de tous les joueurs.
+        </p>
+        <div className="mt-5 grid gap-2">
+          <button type="button" onClick={onExportAll} className="rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-3 text-left text-sm font-bold text-white shadow-lg shadow-blue-500/20">
+            Tout exporter <span className="float-right opacity-75">JSON + CSV</span>
+          </button>
+          <button type="button" onClick={onExportJson} className="rounded-2xl bg-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+            Replay complet <span className="float-right text-xs font-medium text-slate-500">.json</span>
+          </button>
+          <button type="button" onClick={onExportCsv} className="rounded-2xl bg-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+            Tableau des joueurs <span className="float-right text-xs font-medium text-slate-500">.csv</span>
+          </button>
+        </div>
+        <button type="button" onClick={requestClose} className="mt-5 w-full rounded-2xl border border-slate-200 py-3 text-sm font-bold dark:border-slate-700">Annuler</button>
       </div>
     </div>
   );
@@ -165,6 +214,12 @@ const CONFETTI_KEYFRAMES = `
   15% { opacity: 1; }
   100% { transform: translate3d(calc(var(--x,0) + var(--drift,0) * 20vw), 110vh, 0) rotate(540deg); opacity: 0; }
 }
+`;
+
+const RECAP_MAP_KEYFRAMES = `
+.recap-capture-pulse-wrapper { background: transparent; border: 0; }
+.recap-capture-pulse { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 999px; color: white; background: #ef4444; border: 3px solid white; box-shadow: 0 0 0 0 rgba(239,68,68,.7); animation: recapCapturePulse 1.35s ease-out infinite; font-size: 18px; }
+@keyframes recapCapturePulse { 0% { transform: scale(.55); box-shadow: 0 0 0 0 rgba(239,68,68,.7); } 65% { transform: scale(1); box-shadow: 0 0 0 18px rgba(239,68,68,0); } 100% { transform: scale(.8); box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
 `;
 
 function ConfettiField({ seed }) {
@@ -397,6 +452,23 @@ function SummaryPodiumView({
     <div className="relative flex h-screen flex-col bg-gradient-to-br from-[#FFF5D7] via-white to-[#FDECF4] dark:from-slate-950 dark:via-slate-900 dark:to-slate-900 overflow-hidden">
       <ConfettiField seed={summary?.code} />
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-4 sm:pb-4">
+        <header className="mb-2 flex shrink-0 items-end justify-between gap-3 px-1">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400">Mission terminée</p>
+            <h1 className="mt-1 text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">Le grand récapitulatif</h1>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Partie {summary?.code || "—"} · {players.length} joueurs</p>
+          </div>
+          <div className="hidden items-center gap-2 text-right sm:flex">
+            <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Durée</p>
+              <p className="text-sm font-black text-slate-900 dark:text-white">{formatDurationMs(gameAnalytics.durationMs)}</p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Captures</p>
+              <p className="text-sm font-black text-red-500">{gameAnalytics.totalCaptures || 0}</p>
+            </div>
+          </div>
+        </header>
         {/* Main ranking area - 75% of screen */}
         <main className="flex-1 flex flex-col justify-center min-h-0 overflow-auto">
           {gameMode === "infection" ? (
@@ -660,6 +732,15 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
+function capturePulseIcon() {
+  return L.divIcon({
+    className: "recap-capture-pulse-wrapper",
+    html: '<span class="recap-capture-pulse"><span>✦</span></span>',
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+  });
+}
+
 function jamAt(jamHistory, sessionId, absT) {
   let last = null;
   for (const j of jamHistory || []) {
@@ -778,6 +859,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   const [showJam, setShowJam] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [publicRecapUrl, setPublicRecapUrl] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
   const publishOnce = useRef(false);
@@ -943,6 +1025,25 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     return out;
   }, [summary, players, visible, absT]);
 
+  const capturePulses = useMemo(() => {
+    if (!summary) return [];
+    const byId = Object.fromEntries(players.map((p) => [p.sessionId, p]));
+    return timelineSorted
+      .filter((event) => event.type === "captured" && event.t <= absT)
+      .slice(-3)
+      .map((event) => {
+        const target = positionAt(summary.paths?.[event.sessionId], event.t);
+        if (!target) return null;
+        return {
+          key: `${event.sessionId}-${event.t}`,
+          position: [target.lat, target.lng],
+          nickname: byId[event.sessionId]?.nickname || event.nickname || "Joueur",
+          time: event.t,
+        };
+      })
+      .filter(Boolean);
+  }, [summary, players, timelineSorted, absT]);
+
   const replayPathFeatures = useMemo(
     () => polylines.map((pl) => ({
       type: "Feature",
@@ -1001,6 +1102,23 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   }, [publicRecapUrl]);
 
   const analytics = summary?.analytics || { players: {}, game: {} };
+  const movementSnapshot = useMemo(() => {
+    const rows = players.map((player) => ({
+      ...player,
+      stats: analytics.players?.[player.sessionId] || {},
+    }));
+    const fastest = rows.reduce((best, row) =>
+      (row.stats.maxSpeedKmh || 0) > (best?.stats.maxSpeedKmh || 0) ? row : best, null);
+    const moving = rows.filter((row) => Number.isFinite(row.stats.distanceMeters));
+    const averageSpeed = moving.length
+      ? moving.reduce((sum, row) => sum + (Number(row.stats.maxSpeedKmh) || 0), 0) / moving.length
+      : 0;
+    return {
+      fastest,
+      averageSpeed,
+      captures: timelineSorted.filter((event) => event.type === "captured").length,
+    };
+  }, [players, analytics, timelineSorted]);
 
   const downloadStats = useCallback(() => {
     if (!summary) return;
@@ -1026,6 +1144,40 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       console.error("Téléchargement statistiques échoué", e);
     }
   }, [summary, analytics]);
+
+  const downloadPlayersCsv = useCallback(() => {
+    if (!summary) return;
+    const rows = players.map((player) => {
+      const stats = analytics.players?.[player.sessionId] || {};
+      return [
+        player.nickname,
+        player.role || "",
+        stats.distanceMeters ?? player.distanceMeters ?? 0,
+        stats.maxSpeedKmh ?? 0,
+        stats.catTimeMs ?? player.totalCatTimeMs ?? 0,
+        stats.coins ?? player.coins ?? 0,
+      ];
+    });
+    const csv = [
+      ["Joueur", "Role", "Distance (m)", "Vitesse max (km/h)", "Temps chat (ms)", "Pieces"],
+      ...rows,
+    ].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `joueurs_${summary.code || "partie"}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [summary, players, analytics]);
+
+  const downloadAll = useCallback(() => {
+    downloadStats();
+    window.setTimeout(downloadPlayersCsv, 180);
+    setExportOpen(false);
+  }, [downloadStats, downloadPlayersCsv]);
 
   if (!summary) return null;
 
@@ -1057,7 +1209,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               <button type="button" onClick={() => setActiveView("podium")} className="rounded-full bg-[#FDE68A] px-3 py-1 text-[10px] font-bold text-amber-900">Podium</button>
               <button type="button" onClick={() => setShowPanel((v) => !v)} className="rounded-full bg-[#BFDBFE] px-3 py-1 text-[10px] font-bold text-blue-900">{showPanel ? "Masquer" : "Détails"}</button>
               <button type="button" onClick={() => setShareOpen(true)} disabled={!publicRecapUrl && !shareBusy} className="rounded-full bg-[#2563EB] px-3 py-1 text-[10px] font-bold text-white disabled:opacity-50">Partager</button>
-              <button type="button" onClick={downloadStats} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">JSON</button>
+              <button type="button" onClick={() => setExportOpen(true)} className="rounded-full bg-slate-200 px-3 py-1 text-[10px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-200">Exporter</button>
               <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">Quitter</button>
               <button type="button" onClick={() => navigate("/settings")} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700" title="Paramètres" aria-label="Paramètres"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
             </div>
@@ -1072,6 +1224,30 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             markerFeatures={replayMarkerFeatures}
             follow={Boolean(selectedSessionId)}
           />
+          <style>{RECAP_MAP_KEYFRAMES}</style>
+          <div className="pointer-events-none absolute left-3 top-3 z-[1000] max-w-[calc(100%-1.5rem)]">
+            <div className="rounded-3xl border border-white/60 bg-slate-950/75 p-3 text-white shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-200">Vision globale</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">
+                <span className="rounded-full bg-white/10 px-2.5 py-1">{players.length} joueurs</span>
+                <span className="rounded-full bg-red-400/20 px-2.5 py-1 text-red-100">{movementSnapshot.captures} captures</span>
+                <span className="rounded-full bg-blue-400/20 px-2.5 py-1 text-blue-100">Vmax moy. {formatSpeedKmh(movementSnapshot.averageSpeed)}</span>
+              </div>
+              {movementSnapshot.fastest && (
+                <p className="mt-2 text-[11px] text-slate-300">
+                  Plus rapide : <strong className="text-white">{movementSnapshot.fastest.nickname}</strong> · {formatSpeedKmh(movementSnapshot.fastest.stats.maxSpeedKmh)}
+                </p>
+              )}
+            </div>
+          </div>
+          {capturePulses.length > 0 && (
+            <div className="pointer-events-none absolute right-3 top-3 z-[1000] hidden rounded-2xl border border-red-200/30 bg-red-950/80 px-3 py-2 text-[10px] font-bold text-red-100 shadow-xl backdrop-blur sm:block">
+              ✦ Capture en replay · {capturePulses[capturePulses.length - 1].nickname}
+            </div>
+          )}
           <MapContainer
             center={center}
             zoom={15}
@@ -1131,6 +1307,18 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                   {m.cap ? " — capturé·e" : ""}
                 </Popup>
               </Marker>
+            ))}
+            {capturePulses.map((pulse) => (
+              <Fragment key={pulse.key}>
+                <CircleMarker
+                  center={pulse.position}
+                  radius={18}
+                  pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.08, weight: 2, opacity: 0.45 }}
+                />
+                <Marker position={pulse.position} icon={capturePulseIcon()}>
+                  <Popup>Capture de {pulse.nickname} · {formatClock(pulse.time)}</Popup>
+                </Marker>
+              </Fragment>
             ))}
           </MapContainer>
 
@@ -1332,6 +1520,14 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
           copied={copied}
           onCopy={copyRecap}
           onClose={() => setShareOpen(false)}
+        />
+      )}
+      {exportOpen && (
+        <ExportModal
+          onClose={() => setExportOpen(false)}
+          onExportJson={() => { downloadStats(); setExportOpen(false); }}
+          onExportCsv={() => { downloadPlayersCsv(); setExportOpen(false); }}
+          onExportAll={downloadAll}
         />
       )}
     </>
