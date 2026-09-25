@@ -1,4 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
+import { getPublicUrl } from "../../lib/appConfig.js";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 
 export default function ShareQRModal({ sessionId, onClose }) {
@@ -7,7 +8,7 @@ export default function ShareQRModal({ sessionId, onClose }) {
   const leave = leaving ? " is-leaving" : "";
 
   const handleCopyLink = async () => {
-    const url = `${window.location.origin}/?code=${sessionId}`;
+    const url = getPublicUrl(`?code=${encodeURIComponent(sessionId)}`);
     try {
       await navigator.clipboard.writeText(url);
     } catch (err) {
@@ -38,7 +39,7 @@ export default function ShareQRModal({ sessionId, onClose }) {
     }
   };
 
-  const invitationUrl = `${window.location.origin}/?code=${sessionId}`;
+  const invitationUrl = getPublicUrl(`?code=${encodeURIComponent(sessionId)}`);
 
   return (
     <div
