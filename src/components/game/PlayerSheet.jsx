@@ -1,15 +1,8 @@
 import { useEffect } from "react";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
 import { formatCoins } from "../../lib/format";
+import { roleBadgeText } from "../../lib/player.js";
 import RoleIcon from "../ui/RoleIcon.jsx";
-
-function roleBadgeText(p) {
-  if (p.spectator) return "Spectateur";
-  if (p.role === "cat" && p.originalRole === "player") return "Chat (devenu chat)";
-  if (p.role === "cat") return "Chat";
-  if (p.role === "player" && p.originalRole === "cat") return "Souris (ex-chat)";
-  return "Souris";
-}
 
 export default function PlayerSheet({
   player,
