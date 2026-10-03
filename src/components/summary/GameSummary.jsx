@@ -871,6 +871,13 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
+function timestampMs(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 function pathForPlayer(paths, player) {
   if (!paths || !player) return [];
   const direct = paths[player.sessionId] || paths[String(player.sessionId)];
@@ -915,10 +922,75 @@ function circlePolygon(center, radiusM, steps = 64) {
   return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coordinates] } };
 }
 
-function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, follow, mode = "follow" }) {
+function replayPlayerIcon(properties) {
+  const background = properties.role === "cat" ? "#7f1d1d" : "#d97706";
+  const captured = properties.captured;
+  const icon = properties.role === "cat"
+    ? `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 10.2 4.3 4.4l4.6 2.8a7.1 7.1 0 0 1 6.2 0l4.6-2.8-.9 5.8"/><path d="M5.5 11.5c0-3.1 2.9-5.2 6.5-5.2s6.5 2.1 6.5 5.2v2.3c0 3.4-2.9 5.7-6.5 5.7s-6.5-2.3-6.5-5.7z"/><circle cx="9.3" cy="12.7" r="1" fill="#fff" stroke="none"/><circle cx="14.7" cy="12.7" r="1" fill="#fff" stroke="none"/></svg>`
+    : `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="6.8"/><circle cx="7.1" cy="6.8" r="3.1"/><circle cx="16.9" cy="6.8" r="3.1"/><circle cx="9.7" cy="12.8" r="1" fill="#fff" stroke="none"/><circle cx="14.3" cy="12.8" r="1" fill="#fff" stroke="none"/></svg>`;
+  return `<span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;border-radius:50%;background:${captured ? "#64748b" : background};border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.55)">${captured ? "✕" : icon}</span>`;
+}
+
+function syncReplayDomMarkers(map, markerStore, features) {
+  if (!map || !markerStore) return;
+  const active = new Set();
+  for (const feature of features || []) {
+    const coordinates = feature?.geometry?.coordinates;
+    const properties = feature?.properties || {};
+    if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
+    const id = String(properties.sessionId || `${coordinates[0]}:${coordinates[1]}`);
+    active.add(id);
+    let marker = markerStore.get(id);
+    if (!marker) {
+      const element = document.createElement("div");
+      element.className = "recap-player-dom-marker";
+      element.style.cssText = [
+        "width:38px",
+        "height:38px",
+        "position:relative",
+        "pointer-events:auto",
+        "cursor:pointer",
+      ].join(";");
+      const label = document.createElement("span");
+      label.className = "recap-player-dom-label";
+      label.style.cssText = "position:absolute;left:50%;top:23px;transform:translateX(-50%);white-space:nowrap;color:white;font:700 12px system-ui;text-shadow:0 1px 3px #000";
+      element.appendChild(label);
+      marker = new mapboxgl.Marker({ element, anchor: "center" }).addTo(map);
+      markerStore.set(id, marker);
+    }
+    const element = marker.getElement();
+    element.innerHTML = replayPlayerIcon(properties) + element.querySelector(".recap-player-dom-label")?.outerHTML;
+    element.style.background = "transparent";
+    const label = element.querySelector(".recap-player-dom-label");
+    if (label) label.textContent = properties.nickname || "Joueur";
+    element.onclick = (event) => {
+      event.stopPropagation();
+      const popup = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = String(properties.nickname || "Joueur");
+      const details = document.createElement("small");
+      details.textContent = `\n${properties.role === "cat" ? "Chat" : "Joueur"}${properties.captured ? " · capturé" : ""}`;
+      popup.append(title, document.createElement("br"), details);
+      new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+        .setLngLat(coordinates)
+        .setDOMContent(popup)
+        .addTo(map);
+    };
+    marker.setLngLat(coordinates);
+  }
+  for (const [id, marker] of markerStore) {
+    if (!active.has(id)) {
+      marker.remove();
+      markerStore.delete(id);
+    }
+  }
+}
+
+function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, eventFeatures, follow, mode = "follow" }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const loadedRef = useRef(false);
+  const domMarkersRef = useRef(new Map());
   const token = getMapboxToken();
 
   useEffect(() => {
@@ -949,9 +1021,30 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
       map.addSource("recap-zone", { type: "geojson", data: zoneFeature || { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "recap-zone-fill", type: "fill", source: "recap-zone", paint: { "fill-color": "#60a5fa", "fill-opacity": 0.08 } });
       map.addLayer({ id: "recap-zone-line", type: "line", source: "recap-zone", paint: { "line-color": "#93c5fd", "line-width": 2, "line-dasharray": [2, 2] } });
+      map.addSource("recap-events", { type: "geojson", data: { type: "FeatureCollection", features: eventFeatures } });
+      map.addLayer({ id: "recap-events", type: "circle", source: "recap-events", paint: { "circle-radius": 7, "circle-color": "#f97316", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addLayer({ id: "recap-event-labels", type: "symbol", source: "recap-events", layout: { "text-field": ["get", "label"], "text-size": 10, "text-offset": [0, 1.2], "text-anchor": "top", "text-allow-overlap": false }, paint: { "text-color": "#fff", "text-halo-color": "#431407", "text-halo-width": 1.5 } });
       map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
       syncSciFiTowers(map, beaconTowers, mode === "follow");
+      syncReplayDomMarkers(map, domMarkersRef.current, markerFeatures);
+      const onEventClick = (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const popup = document.createElement("div");
+        const label = document.createElement("strong");
+        label.textContent = String(feature.properties?.label || "Événement");
+        const time = document.createElement("small");
+        time.textContent = `\n${String(feature.properties?.time || "")}`;
+        popup.append(label, document.createElement("br"), time);
+        new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(feature.geometry.coordinates)
+          .setDOMContent(popup)
+          .addTo(map);
+      };
+      map.on("click", "recap-events", onEventClick);
+      map.on("mouseenter", "recap-events", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "recap-events", () => { map.getCanvas().style.cursor = ""; });
       map.addLayer({
         id: "recap-buildings",
         type: "fill-extrusion",
@@ -966,7 +1059,13 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
         },
       });
     });
-    return () => { loadedRef.current = false; map.remove(); mapRef.current = null; };
+    return () => {
+      loadedRef.current = false;
+      for (const marker of domMarkersRef.current.values()) marker.remove();
+      domMarkersRef.current.clear();
+      map.remove();
+      mapRef.current = null;
+    };
   }, [token]);
 
   useEffect(() => {
@@ -974,9 +1073,11 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
     if (!map || !loadedRef.current || !map.isStyleLoaded()) return;
     map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
     map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
+    syncReplayDomMarkers(map, domMarkersRef.current, markerFeatures);
     map.getSource("recap-player-headings")?.setData({ type: "FeatureCollection", features: playerHeadingFeatures });
     map.getSource("recap-balises")?.setData({ type: "FeatureCollection", features: baliseFeatures });
     map.getSource("recap-zone")?.setData(zoneFeature || { type: "FeatureCollection", features: [] });
+    map.getSource("recap-events")?.setData({ type: "FeatureCollection", features: eventFeatures });
     if (follow && selectedPosition && mode === "follow") {
       map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 62, bearing: selectedHeading, duration: 450, essential: true });
     } else if (mode === "global") {
@@ -986,7 +1087,7 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
     }
     syncSciFiTowers(map, beaconTowers, mode === "follow");
-  }, [center, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, selectedPosition, selectedHeading, follow, mode]);
+  }, [center, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, eventFeatures, selectedPosition, selectedHeading, follow, mode]);
 
   if (!token) {
     return (
@@ -1024,6 +1125,25 @@ function timelineLabel(ev) {
       return `${ev.nickname} s'est déconnecté·e`;
     case "player_reconnected":
       return `${ev.nickname} s'est reconnecté·e`;
+    case "balise_spawned":
+      return `Balise ${ev.baliseId || ""} apparue`;
+    case "balise_captured":
+      return `${ev.nickname || "Un joueur"} a capturé une balise`;
+    case "balise_capture_started":
+      return `${ev.nickname || "Un joueur"} commence à capturer une balise`;
+    case "balise_capture_progress":
+      return `Capture de balise : ${Math.round(Number(ev.progress || 0) * 100)}%`;
+    case "balise_expired":
+      return `Balise ${ev.baliseId || ""} expirée`;
+    case "party_chat":
+      return `${ev.nickname || "Un joueur"} a envoyé un message`;
+    case "suspicious_movement":
+      return `Mouvement suspect détecté pour ${ev.nickname || "un joueur"}`;
+    case "coins_lost_out_of_bounds":
+      return `${ev.nickname || "Un joueur"} a perdu des pièces hors zone`;
+    case "zone_shrink_started":
+    case "zone_shrink_completed":
+      return ev.message || "La zone évolue";
     case "game_over":
       return ev.message || "Fin de partie";
     default:
@@ -1276,13 +1396,53 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     () => markers.map((m) => ({
       type: "Feature",
       properties: {
+        sessionId: m.sessionId,
         color: m.cap ? "#64748b" : (summary.colors?.[m.sessionId] || "#2563eb"),
         nickname: m.nickname,
+        role: players.find((player) => player.sessionId === m.sessionId)?.role,
+        captured: m.cap,
       },
       geometry: { type: "Point", coordinates: [m.position[1], m.position[0]] },
     })),
     [markers, players, summary?.colors]
   );
+  const replayEventFeatures = useMemo(() => {
+    const byId = Object.fromEntries(players.map((player) => [player.sessionId, player]));
+    const features = [];
+    for (const event of timelineSorted) {
+      const eventTime = Number(event?.t);
+      if (!Number.isFinite(eventTime) || eventTime > absT) continue;
+      const playerId = event.sessionId || event.targetSessionId || event.bySessionId;
+      const player = byId[playerId];
+      const position = player
+        ? positionAt(pathForPlayer(summary.paths, player), eventTime)
+        : null;
+      if (!position) continue;
+      features.push({
+        type: "Feature",
+        properties: {
+          label: timelineLabel(event),
+          time: formatClock(eventTime),
+          eventType: event.type,
+        },
+        geometry: { type: "Point", coordinates: [position.lng, position.lat] },
+      });
+    }
+    for (const message of summary.partyChat || []) {
+      const eventTime = timestampMs(message.t ?? message.createdAt ?? message.timestamp);
+      if (!Number.isFinite(eventTime) || eventTime > absT || message.lat == null || message.lng == null) continue;
+      features.push({
+        type: "Feature",
+        properties: {
+          label: `${message.nickname || "Joueur"} · chat`,
+          time: formatClock(eventTime),
+          eventType: "party_chat",
+        },
+        geometry: { type: "Point", coordinates: [Number(message.lng), Number(message.lat)] },
+      });
+    }
+    return features;
+  }, [summary, players, timelineSorted, absT]);
   const replayPlayerHeadingFeatures = useMemo(
     () => markers.map((m) => {
       const length = 0.00012;
@@ -1483,6 +1643,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             baliseFeatures={replayBaliseFeatures}
             beaconTowers={replayBeaconTowers}
             zoneFeature={replayZoneFeature}
+            eventFeatures={replayEventFeatures}
             selectedHeading={selectedHeading}
             follow={Boolean(selectedSessionId)}
             mode={mapMode}
