@@ -361,6 +361,155 @@ function SummaryPodiumView({
   onShare,
   shareBusy,
   publicRecapUrl,
+}) {
+  const players = summary?.players || [];
+  const analyticsPlayers = analytics?.players || {};
+  const game = analytics?.game || {};
+  const [criterion, setCriterion] = useState("survival");
+  const [selectedSessionId, setSelectedSessionId] = useState(() => summary?.mySessionId || players[0]?.sessionId || null);
+
+  const criteria = [
+    { id: "survival", label: "Survie", icon: "◷", description: "Temps resté joueur" },
+    { id: "distance", label: "Distance", icon: "↗", description: "Distance parcourue" },
+    { id: "speed", label: "Vitesse", icon: "⌁", description: "Vitesse maximale" },
+    { id: "coins", label: "Pièces", icon: "✦", description: "Pièces collectées" },
+  ];
+  const activeCriterion = criteria.find((item) => item.id === criterion) || criteria[0];
+
+  const ranking = useMemo(() => {
+    const rows = players.map((player) => {
+      const stats = analyticsPlayers[player.sessionId] || {};
+      return {
+        ...player,
+        stats,
+        value: Number(
+          criterion === "distance"
+            ? stats.distanceMeters ?? player.distanceMeters ?? 0
+            : criterion === "speed"
+              ? stats.maxSpeedKmh ?? 0
+              : criterion === "coins"
+                ? stats.coins ?? player.coins ?? 0
+                : stats.timeAsPlayerMs ?? Math.max(0, (game.durationMs || 0) - (stats.catTimeMs ?? player.totalCatTimeMs ?? 0))
+        ) || 0,
+      };
+    });
+    return rows.sort((a, b) => b.value - a.value);
+  }, [players, analyticsPlayers, criterion, game.durationMs]);
+
+  const selected = ranking.find((player) => player.sessionId === selectedSessionId) || ranking[0];
+  const valueLabel = (player) => {
+    if (!player) return "—";
+    if (criterion === "distance") return formatDistance(player.value);
+    if (criterion === "speed") return formatSpeedKmh(player.value);
+    if (criterion === "coins") return formatCoins(player.value);
+    return formatDurationMs(player.value);
+  };
+  const colors = ["#f7c948", "#b7c4d6", "#e6a36b"];
+  const places = [ranking[1], ranking[0], ranking[2]];
+
+  return (
+    <div className="relative flex h-screen flex-col overflow-hidden bg-[#f7f8fb] text-slate-950 dark:bg-[#090d16] dark:text-white">
+      <div className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-blue-300/25 blur-3xl dark:bg-blue-600/10" />
+      <div className="pointer-events-none absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-violet-300/20 blur-3xl dark:bg-violet-600/10" />
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-600 dark:text-blue-400">Partie terminée</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-4xl">Bien joué.</h1>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {summary.code || "—"} · {players.length} joueurs · {formatDurationMs(game.durationMs)}
+            </p>
+          </div>
+          <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+            Menu
+          </button>
+        </header>
+
+        <main className="flex min-h-0 flex-1 flex-col justify-center gap-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Podium de la partie</p>
+              <p className="text-sm font-semibold">{activeCriterion.description}</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1.5 text-[10px] font-bold text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-400">
+              {game.totalCaptures || 0} capture{game.totalCaptures === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="rounded-[28px] border border-white/80 bg-white/80 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:p-6">
+            <div className="mb-4 flex snap-x gap-2 overflow-x-auto pb-1">
+              {criteria.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCriterion(item.id)}
+                  className={`flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition ${
+                    criterion === item.id
+                      ? "bg-slate-950 text-white shadow-lg dark:bg-white dark:text-slate-950"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                  }`}
+                >
+                  <span aria-hidden="true">{item.icon}</span>{item.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 items-end gap-2 sm:gap-5">
+              {places.map((player, index) => {
+                const place = [2, 1, 3][index];
+                return (
+                  <button
+                    key={player?.sessionId || `empty-${place}`}
+                    type="button"
+                    disabled={!player}
+                    onClick={() => player && setSelectedSessionId(player.sessionId)}
+                    className={`group flex min-w-0 flex-col items-center text-center ${place === 1 ? "order-2" : place === 2 ? "order-1" : "order-3"}`}
+                  >
+                    <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full text-lg font-black text-slate-900 shadow-lg ring-4 ring-white/70 dark:ring-slate-800/70 sm:h-16 sm:w-16 sm:text-2xl" style={{ background: player ? colors[place - 1] : "#dbe1ea" }}>
+                      {player?.nickname?.slice(0, 1).toUpperCase() || "—"}
+                    </span>
+                    <span className="max-w-full truncate text-xs font-bold sm:text-sm">{player?.nickname || "—"}</span>
+                    <span className="mt-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">{valueLabel(player)}</span>
+                    <span className={`mt-3 flex w-full items-end justify-center rounded-t-2xl bg-gradient-to-b from-slate-100 to-slate-200 text-2xl font-black text-slate-500 dark:from-slate-800 dark:to-slate-700 ${place === 1 ? "h-36 sm:h-48" : place === 2 ? "h-24 sm:h-36" : "h-20 sm:h-28"}`}>
+                      {place}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {selected && (
+            <button type="button" onClick={() => onShowStats()} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 text-left shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+              <span className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Profil sélectionné</span>
+                <span className="mt-1 block truncate text-sm font-black">{selected.nickname}</span>
+              </span>
+              <span className="grid shrink-0 grid-cols-3 gap-3 text-right text-[10px] text-slate-500 dark:text-slate-400">
+                <span><b className="block text-sm text-slate-900 dark:text-white">{formatDistance(selected.stats.distanceMeters)}</b>distance</span>
+                <span><b className="block text-sm text-slate-900 dark:text-white">{formatSpeedKmh(selected.stats.maxSpeedKmh)}</b>vitesse</span>
+                <span><b className="block text-sm text-slate-900 dark:text-white">{formatCoins(selected.stats.coins ?? selected.coins ?? 0)}</b>pièces</span>
+              </span>
+            </button>
+          )}
+        </main>
+
+        <footer className="flex items-center justify-between gap-2">
+          <button type="button" onClick={onShowStats} className="rounded-full bg-slate-950 px-4 py-2.5 text-xs font-bold text-white shadow-lg dark:bg-white dark:text-slate-950">Voir la carte & le replay</button>
+          <button type="button" onClick={onShare} disabled={shareBusy || !publicRecapUrl} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{shareBusy ? "Préparation…" : "Partager"}</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function LegacySummaryPodiumView({
+  summary,
+  analytics,
+  onLeave,
+  onShowStats,
+  onShare,
+  shareBusy,
+  publicRecapUrl,
   copied,
   copyRecap,
 }) {
