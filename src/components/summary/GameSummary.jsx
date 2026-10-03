@@ -1051,6 +1051,14 @@ function ToggleRow({ label, checked, onChange }) {
 const SPEED_CYCLE = [1, 2, 4];
 const SPEED_MULTIPLIERS = { 1: 6, 2: 12, 4: 24 };
 
+function isStandalonePwa() {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    window.navigator.standalone === true
+  );
+}
+
 export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   const navigate = useNavigate();
   const [offsetMs, setOffsetMs] = useState(0);
@@ -1444,7 +1452,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         onExport={() => setExportOpen(true)}
       />
     ) : (
-      <div className="flex h-full min-h-0 flex-col bg-slate-950 text-white">
+      <div className={`relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-slate-950 pb-[env(safe-area-inset-bottom)] text-white ${isStandalonePwa() ? "recap-pwa" : "recap-browser"}`}>
         {/* Stats band */}
         <div className="hidden">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
@@ -1480,13 +1488,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             mode={mapMode}
           />
           <style>{RECAP_MAP_KEYFRAMES}</style>
-          <div className="pointer-events-none absolute left-3 top-3 z-[1000] max-w-[calc(100%-1.5rem)]">
+          <div className="pointer-events-none absolute left-3 top-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))] z-[1000] max-w-[calc(100%-1.5rem)]">
             <div className="rounded-3xl border border-white/60 bg-slate-950/75 p-3 text-white shadow-2xl backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                 <span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-200">Vision globale</span>
               </div>
-              <div className="absolute right-3 top-3 z-[1000] flex gap-2">
+              <div className="absolute right-3 top-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))] z-[1000] flex gap-2">
                 <button
                   type="button"
                   onClick={() => setMapMode((value) => value === "follow" ? "global" : "follow")}

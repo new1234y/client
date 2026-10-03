@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { SOCKET_URL } from './lib/appConfig.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
@@ -20,13 +21,30 @@ if (supabaseKey && supabaseKey.length > 200) {
 export const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 export async function getGameByCode(code) {
+  const normalizedCode = String(code || '').trim().toUpperCase();
+  const backendUrl = `${SOCKET_URL.replace(/\/$/, '')}/api/game/${encodeURIComponent(normalizedCode)}/summary`;
+  try {
+    // The backend owns the authoritative in-memory/game summary and may have
+    // fields that are not available in the public Supabase row yet.
+    const backendResponse = await fetch(backendUrl, { cache: 'no-store' });
+    if (backendResponse.ok) {
+      const summary = await backendResponse.json();
+      if (summary?.code) {
+        console.log('[getGameByCode] Loaded complete summary from backend:', summary.code);
+        return summary;
+      }
+    }
+  } catch (error) {
+    console.warn('[getGameByCode] Backend summary unavailable, falling back to Supabase:', error);
+  }
+
   if (!supabase) return null;
   try {
-    console.log('[getGameByCode] Fetching game with code:', code);
+    console.log('[getGameByCode] Fetching game with code:', normalizedCode);
     const { data, error } = await supabase
       .from('game_history')
       .select('*')
-      .eq('code', code)
+      .eq('code', normalizedCode)
       .maybeSingle(); // Use maybeSingle instead of single to handle 0 rows gracefully
 
     if (error) {
