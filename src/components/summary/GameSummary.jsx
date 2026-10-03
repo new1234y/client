@@ -871,6 +871,16 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
+function pathForPlayer(paths, player) {
+  if (!paths || !player) return [];
+  const direct = paths[player.sessionId] || paths[String(player.sessionId)];
+  if (Array.isArray(direct)) return direct;
+  const fallbackKey = Object.keys(paths).find(
+    (key) => String(key) === String(player.id) || String(key) === String(player.playerId)
+  );
+  return fallbackKey ? paths[fallbackKey] || [] : [];
+}
+
 function positionAndHeadingAt(pts, absT) {
   const point = positionAt(pts, absT);
   if (!point) return null;
@@ -930,7 +940,8 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
     map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
       map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
       map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
-      map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 10, "circle-color": ["get", "color"], "circle-opacity": 1, "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
+      map.addLayer({ id: "recap-marker-labels", type: "symbol", source: "recap-markers", layout: { "text-field": ["get", "nickname"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top", "text-allow-overlap": true }, paint: { "text-color": "#fff", "text-halo-color": "#0f172a", "text-halo-width": 2 } });
       map.addSource("recap-player-headings", { type: "geojson", data: { type: "FeatureCollection", features: playerHeadingFeatures } });
       map.addLayer({ id: "recap-player-headings", type: "line", source: "recap-player-headings", layout: { "line-cap": "round" }, paint: { "line-color": ["get", "color"], "line-width": 3, "line-opacity": 0.9 } });
       map.addSource("recap-balises", { type: "geojson", data: { type: "FeatureCollection", features: baliseFeatures } });
@@ -1106,8 +1117,29 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       .finally(() => setShareBusy(false));
   }, [summary, readOnlyRecap]);
 
-  const t0 = summary?.huntStartedAt ?? 0;
-  const t1 = summary?.endedAt ?? t0;
+  const pathTimes = useMemo(
+    () => Object.values(summary?.paths || {})
+      .flatMap((points) => (Array.isArray(points) ? points : []))
+      .map((point) => Number(point?.t))
+      .filter(Number.isFinite),
+    [summary]
+  );
+  const timelineTimes = useMemo(
+    () => (summary?.timeline || [])
+      .map((event) => Number(event?.t))
+      .filter(Number.isFinite),
+    [summary]
+  );
+  const fallbackStart = Math.min(...pathTimes, ...timelineTimes);
+  const fallbackEnd = Math.max(...pathTimes, ...timelineTimes);
+  const requestedStart = Number(summary?.huntStartedAt);
+  const requestedEnd = Number(summary?.endedAt);
+  const t0 = Number.isFinite(requestedStart) && requestedStart > 0
+    ? requestedStart
+    : (Number.isFinite(fallbackStart) ? fallbackStart : 0);
+  const t1 = Number.isFinite(requestedEnd) && requestedEnd >= t0
+    ? requestedEnd
+    : (Number.isFinite(fallbackEnd) ? fallbackEnd : t0);
   const duration = Math.max(1, t1 - t0);
   const absT = t0 + offsetMs;
 
@@ -1166,7 +1198,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     const out = [];
     for (const p of players) {
       if (!visible[p.sessionId]) continue;
-      const pts = paths[p.sessionId];
+      const pts = pathForPlayer(paths, p);
       const seg = segmentUntil(pts, absT);
       if (seg.length < 2) continue;
       out.push({
@@ -1185,7 +1217,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     const out = [];
     for (const p of players) {
       if (!visible[p.sessionId]) continue;
-      const sample = positionAndHeadingAt(paths[p.sessionId], absT);
+      const sample = positionAndHeadingAt(pathForPlayer(paths, p), absT);
       if (!sample) continue;
       const cap = capturedAt(p.sessionId, tl, absT);
       let icon = p.role === "cat" ? iconCat : iconAlly;
@@ -1209,7 +1241,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       .filter((event) => event.type === "captured" && event.t <= absT)
       .slice(-3)
       .map((event) => {
-        const target = positionAt(summary.paths?.[event.sessionId], event.t);
+        const target = positionAt(
+          pathForPlayer(summary.paths, byId[event.sessionId] || { sessionId: event.sessionId }),
+          event.t
+        );
         if (!target) return null;
         return {
           key: `${event.sessionId}-${event.t}`,
@@ -1232,7 +1267,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   const replayMarkerFeatures = useMemo(
     () => markers.map((m) => ({
       type: "Feature",
-      properties: { color: m.cap ? "#64748b" : m.nickname === players.find((p) => p.sessionId === m.sessionId)?.nickname ? (summary.colors?.[m.sessionId] || "#2563eb") : "#94a3b8" },
+      properties: {
+        color: m.cap ? "#64748b" : (summary.colors?.[m.sessionId] || "#2563eb"),
+        nickname: m.nickname,
+      },
       geometry: { type: "Point", coordinates: [m.position[1], m.position[0]] },
     })),
     [markers, players, summary?.colors]
