@@ -855,20 +855,24 @@ function LegacySummaryPodiumView({
 
 function segmentUntil(pts, absT) {
   const out = [];
-  for (const p of pts || []) {
-    if (p.t > absT) break;
+  for (const p of replayPoints(pts)) {
+    if (replayPointTime(p) > absT) break;
     out.push([p.lat, p.lng]);
   }
   return out.length >= 2 ? out : [];
 }
 
 function positionAt(pts, absT) {
+  const points = replayPoints(pts);
+  if (!points.length) return null;
+  let first = points[0];
   let last = null;
-  for (const p of pts || []) {
-    if (p.t > absT) break;
+  for (const p of points) {
+    if (replayPointTime(p) > absT) break;
     last = p;
   }
-  return last ? { lat: last.lat, lng: last.lng } : null;
+  const point = last || first;
+  return { lat: Number(point.lat), lng: Number(point.lng) };
 }
 
 function timestampMs(value) {
@@ -876,6 +880,24 @@ function timestampMs(value) {
   if (Number.isFinite(numeric)) return numeric;
   const parsed = Date.parse(String(value || ""));
   return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function replayPointTime(point) {
+  if (!point) return NaN;
+  const direct = Number(point.t);
+  if (Number.isFinite(direct)) return direct;
+  return timestampMs(point.timestamp ?? point.createdAt ?? point.time);
+}
+
+function replayPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .filter((point) => (
+      Number.isFinite(Number(point?.lat))
+      && Number.isFinite(Number(point?.lng))
+      && Number.isFinite(replayPointTime(point))
+    ))
+    .slice()
+    .sort((a, b) => replayPointTime(a) - replayPointTime(b));
 }
 
 function pathForPlayer(paths, player) {
@@ -891,21 +913,23 @@ function pathForPlayer(paths, player) {
 function positionAndHeadingAt(pts, absT) {
   const point = positionAt(pts, absT);
   if (!point) return null;
+  const points = replayPoints(pts);
   let previous = null;
-  for (const p of pts || []) {
-    if (p.t > absT) break;
+  for (const p of points) {
+    if (replayPointTime(p) > absT) break;
     previous = p;
   }
-  const index = (pts || []).indexOf(previous);
-  const next = index > 0 ? pts[index - 1] : null;
+  previous = previous || points[0];
+  const index = points.indexOf(previous);
+  const next = index < points.length - 1 ? points[index + 1] : null;
   const heading = Number.isFinite(previous?.heading)
     ? previous.heading
     : Number.isFinite(previous?.bearing)
       ? previous.bearing
       : next && (next.lat !== previous.lat || next.lng !== previous.lng)
         ? ((Math.atan2(
-            (previous.lng - next.lng) * Math.cos(((previous.lat + next.lat) * Math.PI) / 360),
-            previous.lat - next.lat
+            (next.lng - previous.lng) * Math.cos(((previous.lat + next.lat) * Math.PI) / 360),
+            next.lat - previous.lat
           ) * 180) / Math.PI + 360) % 360
         : 0;
   return { ...point, heading };
@@ -1248,7 +1272,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   const pathTimes = useMemo(
     () => Object.values(summary?.paths || {})
       .flatMap((points) => (Array.isArray(points) ? points : []))
-      .map((point) => Number(point?.t))
+      .map((point) => replayPointTime(point))
       .filter(Number.isFinite),
     [summary]
   );
