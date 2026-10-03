@@ -915,10 +915,54 @@ function circlePolygon(center, radiusM, steps = 64) {
   return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coordinates] } };
 }
 
+function syncReplayDomMarkers(map, markerStore, features) {
+  if (!map || !markerStore) return;
+  const active = new Set();
+  for (const feature of features || []) {
+    const coordinates = feature?.geometry?.coordinates;
+    const properties = feature?.properties || {};
+    if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
+    const id = String(properties.sessionId || `${coordinates[0]}:${coordinates[1]}`);
+    active.add(id);
+    let marker = markerStore.get(id);
+    if (!marker) {
+      const element = document.createElement("div");
+      element.className = "recap-player-dom-marker";
+      element.style.cssText = [
+        "width:22px",
+        "height:22px",
+        "border:3px solid white",
+        "border-radius:9999px",
+        "box-shadow:0 2px 8px rgba(0,0,0,.65)",
+        "position:relative",
+        "pointer-events:auto",
+      ].join(";");
+      const label = document.createElement("span");
+      label.className = "recap-player-dom-label";
+      label.style.cssText = "position:absolute;left:50%;top:23px;transform:translateX(-50%);white-space:nowrap;color:white;font:700 12px system-ui;text-shadow:0 1px 3px #000";
+      element.appendChild(label);
+      marker = new mapboxgl.Marker({ element, anchor: "center" }).addTo(map);
+      markerStore.set(id, marker);
+    }
+    const element = marker.getElement();
+    element.style.background = properties.color || "#2563eb";
+    const label = element.querySelector(".recap-player-dom-label");
+    if (label) label.textContent = properties.nickname || "Joueur";
+    marker.setLngLat(coordinates);
+  }
+  for (const [id, marker] of markerStore) {
+    if (!active.has(id)) {
+      marker.remove();
+      markerStore.delete(id);
+    }
+  }
+}
+
 function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, follow, mode = "follow" }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const loadedRef = useRef(false);
+  const domMarkersRef = useRef(new Map());
   const token = getMapboxToken();
 
   useEffect(() => {
@@ -952,6 +996,7 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
       map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
       syncSciFiTowers(map, beaconTowers, mode === "follow");
+      syncReplayDomMarkers(map, domMarkersRef.current, markerFeatures);
       map.addLayer({
         id: "recap-buildings",
         type: "fill-extrusion",
@@ -966,7 +1011,13 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
         },
       });
     });
-    return () => { loadedRef.current = false; map.remove(); mapRef.current = null; };
+    return () => {
+      loadedRef.current = false;
+      for (const marker of domMarkersRef.current.values()) marker.remove();
+      domMarkersRef.current.clear();
+      map.remove();
+      mapRef.current = null;
+    };
   }, [token]);
 
   useEffect(() => {
@@ -974,6 +1025,7 @@ function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatu
     if (!map || !loadedRef.current || !map.isStyleLoaded()) return;
     map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
     map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
+    syncReplayDomMarkers(map, domMarkersRef.current, markerFeatures);
     map.getSource("recap-player-headings")?.setData({ type: "FeatureCollection", features: playerHeadingFeatures });
     map.getSource("recap-balises")?.setData({ type: "FeatureCollection", features: baliseFeatures });
     map.getSource("recap-zone")?.setData(zoneFeature || { type: "FeatureCollection", features: [] });
@@ -1276,6 +1328,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     () => markers.map((m) => ({
       type: "Feature",
       properties: {
+        sessionId: m.sessionId,
         color: m.cap ? "#64748b" : (summary.colors?.[m.sessionId] || "#2563eb"),
         nickname: m.nickname,
       },
