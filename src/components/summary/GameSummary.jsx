@@ -16,6 +16,10 @@ import {
   iconAlly,
   iconCaptured,
 } from "../../lib/map/icons.js";
+import {
+  effectiveGlobalRadiusAtTime,
+  effectiveZoneCenterAtTime,
+} from "../../lib/recapZone.js";
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken } from "../../lib/map/mapboxKey.js";
 import { resolveMapboxStyleUrl } from "../../lib/map/mapPrefs.js";
@@ -388,6 +392,7 @@ function SummaryPodiumView({
   };
   const colors = ["#f7c948", "#b7c4d6", "#e6a36b"];
   const places = [ranking[1], ranking[0], ranking[2]];
+  const others = ranking.slice(3);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-[#f7f8fb] text-slate-950 dark:bg-[#090d16] dark:text-white">
@@ -402,9 +407,10 @@ function SummaryPodiumView({
               {summary.code || "—"} · {players.length} joueurs · {formatDurationMs(game.durationMs)}
             </p>
           </div>
-          <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-            Menu
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={onExport} className="rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">Exporter</button>
+            <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">Menu</button>
+          </div>
         </header>
 
         <main className="flex min-h-0 flex-1 flex-col justify-center gap-4 py-4">
@@ -417,6 +423,20 @@ function SummaryPodiumView({
               {game.totalCaptures || 0} capture{game.totalCaptures === 1 ? "" : "s"}
             </span>
           </div>
+
+          {others.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Classement suivant</p>
+              <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {others.map((player, index) => (
+                  <button key={player.sessionId} type="button" onClick={() => { setSelectedSessionId(player.sessionId); onSelectPlayer(player.sessionId); }} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-left text-xs shadow-sm dark:bg-slate-800">
+                    <span className="truncate font-bold">{index + 4}. {player.nickname}</span>
+                    <span className="ml-2 shrink-0 text-blue-600 dark:text-blue-400">{valueLabel(player)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-[28px] border border-white/80 bg-white/80 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:p-6">
             <div className="mb-4 flex snap-x gap-2 overflow-x-auto pb-1">
@@ -443,7 +463,11 @@ function SummaryPodiumView({
                     key={player?.sessionId || `empty-${place}`}
                     type="button"
                     disabled={!player}
-                    onClick={() => player && setSelectedSessionId(player.sessionId)}
+                    onClick={() => {
+                      if (!player) return;
+                      setSelectedSessionId(player.sessionId);
+                      onSelectPlayer(player.sessionId);
+                    }}
                     className={`group flex min-w-0 flex-col items-center text-center ${place === 1 ? "order-2" : place === 2 ? "order-1" : "order-3"}`}
                   >
                     <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full text-lg font-black text-slate-900 shadow-lg ring-4 ring-white/70 dark:ring-slate-800/70 sm:h-16 sm:w-16 sm:text-2xl" style={{ background: player ? colors[place - 1] : "#dbe1ea" }}>
@@ -494,6 +518,8 @@ function LegacySummaryPodiumView({
   publicRecapUrl,
   copied,
   copyRecap,
+  onSelectPlayer,
+  onExport,
 }) {
   const players = summary?.players || [];
   const [selectedSessionId, setSelectedSessionId] = useState(() => players[0]?.sessionId || null);
@@ -843,7 +869,18 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
-function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow, mode = "follow" }) {
+function circlePolygon(center, radiusM, steps = 64) {
+  if (!center || !Number.isFinite(radiusM)) return null;
+  const latRadius = radiusM / 111320;
+  const lngRadius = radiusM / (111320 * Math.max(0.2, Math.cos((center.lat * Math.PI) / 180)));
+  const coordinates = Array.from({ length: steps + 1 }, (_, index) => {
+    const angle = (index / steps) * Math.PI * 2;
+    return [center.lng + Math.cos(angle) * lngRadius, center.lat + Math.sin(angle) * latRadius];
+  });
+  return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coordinates] } };
+}
+
+function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, baliseFeatures, zoneFeature, follow, mode = "follow" }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const loadedRef = useRef(false);
@@ -869,6 +906,11 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
       map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
       map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
       map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addSource("recap-balises", { type: "geojson", data: { type: "FeatureCollection", features: baliseFeatures } });
+      map.addLayer({ id: "recap-balises", type: "circle", source: "recap-balises", paint: { "circle-radius": 7, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addSource("recap-zone", { type: "geojson", data: zoneFeature || { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "recap-zone-fill", type: "fill", source: "recap-zone", paint: { "fill-color": "#60a5fa", "fill-opacity": 0.08 } });
+      map.addLayer({ id: "recap-zone-line", type: "line", source: "recap-zone", paint: { "line-color": "#93c5fd", "line-width": 2, "line-dasharray": [2, 2] } });
       map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
       map.addLayer({
@@ -893,12 +935,17 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
     if (!map || !loadedRef.current || !map.isStyleLoaded()) return;
     map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
     map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
+    map.getSource("recap-balises")?.setData({ type: "FeatureCollection", features: baliseFeatures });
+    map.getSource("recap-zone")?.setData(zoneFeature || { type: "FeatureCollection", features: [] });
     if (follow && selectedPosition && mode === "follow") {
       map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 62, bearing: map.getBearing(), duration: 450, essential: true });
     } else if (mode === "global") {
+      map.setTerrain(null);
       map.easeTo({ center: [center[1], center[0]], pitch: 18, bearing: 0, duration: 500, essential: true });
+    } else {
+      map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
     }
-  }, [center, pathFeatures, markerFeatures, selectedPosition, follow, mode]);
+  }, [center, pathFeatures, markerFeatures, baliseFeatures, zoneFeature, selectedPosition, follow, mode]);
 
   if (!token) {
     return (
@@ -908,40 +955,6 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
     );
   }
   return <div ref={containerRef} className="absolute inset-0 z-10" aria-label="Replay 3D Mapbox de la partie" />;
-}
-
-function SummaryStatsView({ summary, analytics, onLeave }) {
-  const players = summary?.players || [];
-  const stats = analytics?.players || {};
-  const rows = players
-    .map((player) => ({ ...player, stats: stats[player.sessionId] || {} }))
-    .sort((a, b) => (b.stats.distanceMeters || 0) - (a.stats.distanceMeters || 0));
-
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[#f7f8fb] px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] text-slate-950 dark:bg-[#090d16] dark:text-white sm:px-6">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-600 dark:text-blue-400">Performance</p>
-            <h1 className="mt-1 text-2xl font-black">Stats de la partie</h1>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{players.length} joueurs · {formatDurationMs(analytics?.game?.durationMs)}</p>
-          </div>
-          <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Menu</button>
-        </div>
-        <div className="mt-6 space-y-2">
-          {rows.map((player, index) => (
-            <div key={player.sessionId} className="grid grid-cols-[2rem_minmax(0,1fr)_repeat(3,auto)] items-center gap-2 rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/75">
-              <span className="text-center text-sm font-black text-slate-400">{index + 1}</span>
-              <span className="min-w-0 truncate text-sm font-bold">{player.nickname}</span>
-              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatDistance(player.stats.distanceMeters)}</b>distance</span>
-              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatSpeedKmh(player.stats.maxSpeedKmh)}</b>vitesse</span>
-              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatCoins(player.stats.coins ?? player.coins ?? 0)}</b>pièces</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function capturedAt(sessionId, timeline, absT) {
@@ -1193,6 +1206,23 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     })),
     [markers, players, summary?.colors]
   );
+  const replayBaliseFeatures = useMemo(
+    () => (summary.balises || [])
+      .filter((balise) => balise?.lat != null && balise?.lng != null)
+      .filter((balise) => balise.expiresAt == null || Number(balise.expiresAt) >= absT)
+      .map((balise) => ({
+        type: "Feature",
+        properties: { color: balise.capturedBy ? "#22c55e" : balise.isDecoy ? "#a855f7" : "#f59e0b" },
+        geometry: { type: "Point", coordinates: [Number(balise.lng), Number(balise.lat)] },
+      })),
+    [summary.balises, absT]
+  );
+  const replayZoneFeature = useMemo(() => {
+    const zoneCenter = effectiveZoneCenterAtTime(summary, absT) || summary.gameCenter;
+    const radius = effectiveGlobalRadiusAtTime(summary, absT);
+    const feature = circlePolygon(zoneCenter, radius);
+    return feature ? { type: "FeatureCollection", features: [feature] } : { type: "FeatureCollection", features: [] };
+  }, [summary, absT]);
   const selectedPosition = useMemo(
     () => markers.find((m) => m.sessionId === selectedSessionId)?.position
       ? (() => { const p = markers.find((m) => m.sessionId === selectedSessionId).position; return { lat: p[0], lng: p[1] }; })()
@@ -1305,13 +1335,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         publicRecapUrl={publicRecapUrl}
         copied={copied}
         copyRecap={copyRecap}
+        onSelectPlayer={setSelectedSessionId}
+        onExport={() => setExportOpen(true)}
       />
-    ) : activeView === "stats" ? (
-      <SummaryStatsView summary={summary} analytics={analytics} onLeave={onLeave} />
     ) : (
       <div className="flex h-full min-h-0 flex-col bg-slate-950 text-white">
         {/* Stats band */}
-        <div className="shrink-0 border-b border-amber-100/80 bg-white/90 px-2 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="hidden">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Récap · {summary.code}</p>
@@ -1336,6 +1366,8 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             selectedPosition={selectedPosition}
             pathFeatures={replayPathFeatures}
             markerFeatures={replayMarkerFeatures}
+            baliseFeatures={replayBaliseFeatures}
+            zoneFeature={replayZoneFeature}
             follow={Boolean(selectedSessionId)}
             mode={mapMode}
           />
@@ -1365,7 +1397,20 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                   Plus rapide : <strong className="text-white">{movementSnapshot.fastest.nickname}</strong> · {formatSpeedKmh(movementSnapshot.fastest.stats.maxSpeedKmh)}
                 </p>
               )}
+              <div className="pointer-events-auto mt-3 max-h-40 space-y-1 overflow-y-auto pr-1">
+                {players.map((player) => (
+                  <button key={player.sessionId} type="button" onClick={() => { setSelectedSessionId(player.sessionId); setMapMode("follow"); }} className={`flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] ${selectedSessionId === player.sessionId && mapMode === "follow" ? "bg-blue-500/30 text-white" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}>
+                    <span className="flex min-w-0 items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: summary.colors?.[player.sessionId] || "#94a3b8" }} /><span className="truncate">{player.nickname}</span></span>
+                    {selectedSessionId === player.sessionId && mapMode === "follow" && <span className="text-[9px] font-black uppercase tracking-wider text-blue-200">suivi</span>}
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
+          <div className="absolute right-3 top-3 z-[1000] flex gap-2">
+            <button type="button" onClick={() => setMapMode((value) => value === "follow" ? "global" : "follow")} className="rounded-full border border-white/20 bg-slate-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-xl backdrop-blur">{mapMode === "follow" ? "Globale 2D" : "Suivi 3D"}</button>
+            <button type="button" onClick={() => setExportOpen(true)} className="rounded-full border border-white/20 bg-slate-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-xl backdrop-blur">Exporter</button>
+            <button type="button" onClick={onLeave} className="rounded-full border border-white/20 bg-slate-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-xl backdrop-blur">Menu</button>
           </div>
           {capturePulses.length > 0 && (
             <div className="pointer-events-none absolute right-3 top-3 z-[1000] hidden rounded-2xl border border-red-200/30 bg-red-950/80 px-3 py-2 text-[10px] font-bold text-red-100 shadow-xl backdrop-blur sm:block">
@@ -1467,7 +1512,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
 
         {/* ═══ BOTTOM TRANSPORT BAR ═══ */}
-        <div className="shrink-0 border-t border-amber-100/80 bg-white/95 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="relative z-[1050] shrink-0 border-t border-amber-100/80 bg-white/95 px-3 py-2 pb-20 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1533,7 +1578,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       <nav className="fixed bottom-3 left-1/2 z-[11000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/70 bg-white/90 p-1.5 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/90" aria-label="Navigation du récapitulatif">
         {[
           ["podium", "Podium", "♛"],
-          ["stats", "Stats", "≡"],
           ["map", "Carte", "⌖"],
         ].map(([view, label, icon]) => (
           <button
