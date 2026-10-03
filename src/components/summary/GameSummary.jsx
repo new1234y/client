@@ -347,6 +347,8 @@ function SummaryPodiumView({
   onShare,
   shareBusy,
   publicRecapUrl,
+  onSelectPlayer,
+  onExport,
 }) {
   const players = summary?.players || [];
   const analyticsPlayers = analytics?.players || {};
