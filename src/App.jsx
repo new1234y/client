@@ -2553,21 +2553,21 @@ export default function App() {
             // Transform Supabase data to match expected format
             const summary = {
               code: data.code,
-              huntStartedAt: data.hunt_started_at ? new Date(data.hunt_started_at).getTime() : null,
-              endedAt: data.ended_at ? new Date(data.ended_at).getTime() : null,
-              gameCenter: data.game_center,
-              globalRadiusM: data.global_radius_m,
-              jamRadiusM: data.jam_radius_m,
-              settingsSnapshot: data.settings_snapshot,
+              huntStartedAt: data.huntStartedAt ?? (data.hunt_started_at ? new Date(data.hunt_started_at).getTime() : null),
+              endedAt: data.endedAt ?? (data.ended_at ? new Date(data.ended_at).getTime() : null),
+              gameCenter: data.gameCenter ?? data.game_center,
+              globalRadiusM: data.globalRadiusM ?? data.global_radius_m,
+              jamRadiusM: data.jamRadiusM ?? data.jam_radius_m,
+              settingsSnapshot: data.settingsSnapshot ?? data.settings_snapshot,
               players: data.players,
               colors: data.colors,
-              partyChat: data.party_chat,
-              shrinkPhasesList: data.shrink_phases_list,
+              partyChat: data.partyChat ?? data.party_chat,
+              shrinkPhasesList: data.shrinkPhasesList ?? data.shrink_phases_list,
               balises: data.balises,
               analytics: data.analytics,
-              timeline: data.analytics?.timeline || [],
-              paths: data.analytics?.paths || {},
-              jamHistory: data.analytics?.jamHistory || [],
+              timeline: data.timeline || data.analytics?.timeline || [],
+              paths: data.paths || data.analytics?.paths || {},
+              jamHistory: data.jamHistory || data.analytics?.jamHistory || [],
             };
             setRecapData(summary);
             setRecapErr(false);
