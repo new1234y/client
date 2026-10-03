@@ -24,6 +24,7 @@ import mapboxgl from "mapbox-gl";
 import { getMapboxToken } from "../../lib/map/mapboxKey.js";
 import { resolveMapboxStyleUrl } from "../../lib/map/mapPrefs.js";
 import { getPublicUrl } from "../../lib/appConfig.js";
+import { syncSciFiTowers } from "../../lib/map/SciFiTowerLayer.js";
 
 
 function RecapShareModal({ publicRecapUrl, copied, onCopy, onClose }) {
@@ -501,8 +502,7 @@ function SummaryPodiumView({
           )}
         </main>
 
-        <footer className="flex items-center justify-between gap-2">
-          <button type="button" onClick={onShowStats} className="rounded-full bg-slate-950 px-4 py-2.5 text-xs font-bold text-white shadow-lg dark:bg-white dark:text-slate-950">Voir la carte & le replay</button>
+        <footer className="flex justify-end">
           <button type="button" onClick={onShare} disabled={shareBusy || !publicRecapUrl} className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">{shareBusy ? "Préparation…" : "Partager"}</button>
         </footer>
       </div>
@@ -871,6 +871,29 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
+function positionAndHeadingAt(pts, absT) {
+  const point = positionAt(pts, absT);
+  if (!point) return null;
+  let previous = null;
+  for (const p of pts || []) {
+    if (p.t > absT) break;
+    previous = p;
+  }
+  const index = (pts || []).indexOf(previous);
+  const next = index > 0 ? pts[index - 1] : null;
+  const heading = Number.isFinite(previous?.heading)
+    ? previous.heading
+    : Number.isFinite(previous?.bearing)
+      ? previous.bearing
+      : next && (next.lat !== previous.lat || next.lng !== previous.lng)
+        ? ((Math.atan2(
+            (previous.lng - next.lng) * Math.cos(((previous.lat + next.lat) * Math.PI) / 360),
+            previous.lat - next.lat
+          ) * 180) / Math.PI + 360) % 360
+        : 0;
+  return { ...point, heading };
+}
+
 function circlePolygon(center, radiusM, steps = 64) {
   if (!center || !Number.isFinite(radiusM)) return null;
   const latRadius = radiusM / 111320;
@@ -882,7 +905,7 @@ function circlePolygon(center, radiusM, steps = 64) {
   return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coordinates] } };
 }
 
-function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, baliseFeatures, zoneFeature, follow, mode = "follow" }) {
+function ReplayMapbox({ center, selectedPosition, selectedHeading = 0, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, follow, mode = "follow" }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const loadedRef = useRef(false);
@@ -908,6 +931,8 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
       map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
       map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
       map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      map.addSource("recap-player-headings", { type: "geojson", data: { type: "FeatureCollection", features: playerHeadingFeatures } });
+      map.addLayer({ id: "recap-player-headings", type: "line", source: "recap-player-headings", layout: { "line-cap": "round" }, paint: { "line-color": ["get", "color"], "line-width": 3, "line-opacity": 0.9 } });
       map.addSource("recap-balises", { type: "geojson", data: { type: "FeatureCollection", features: baliseFeatures } });
       map.addLayer({ id: "recap-balises", type: "circle", source: "recap-balises", paint: { "circle-radius": 7, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       map.addSource("recap-zone", { type: "geojson", data: zoneFeature || { type: "FeatureCollection", features: [] } });
@@ -915,6 +940,7 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
       map.addLayer({ id: "recap-zone-line", type: "line", source: "recap-zone", paint: { "line-color": "#93c5fd", "line-width": 2, "line-dasharray": [2, 2] } });
       map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
+      syncSciFiTowers(map, beaconTowers, mode === "follow");
       map.addLayer({
         id: "recap-buildings",
         type: "fill-extrusion",
@@ -937,17 +963,19 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
     if (!map || !loadedRef.current || !map.isStyleLoaded()) return;
     map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
     map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
+    map.getSource("recap-player-headings")?.setData({ type: "FeatureCollection", features: playerHeadingFeatures });
     map.getSource("recap-balises")?.setData({ type: "FeatureCollection", features: baliseFeatures });
     map.getSource("recap-zone")?.setData(zoneFeature || { type: "FeatureCollection", features: [] });
     if (follow && selectedPosition && mode === "follow") {
-      map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 62, bearing: map.getBearing(), duration: 450, essential: true });
+      map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 62, bearing: selectedHeading, duration: 450, essential: true });
     } else if (mode === "global") {
       map.setTerrain(null);
       map.easeTo({ center: [center[1], center[0]], pitch: 18, bearing: 0, duration: 500, essential: true });
     } else {
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
     }
-  }, [center, pathFeatures, markerFeatures, baliseFeatures, zoneFeature, selectedPosition, follow, mode]);
+    syncSciFiTowers(map, beaconTowers, mode === "follow");
+  }, [center, pathFeatures, markerFeatures, playerHeadingFeatures, baliseFeatures, beaconTowers, zoneFeature, selectedPosition, selectedHeading, follow, mode]);
 
   if (!token) {
     return (
@@ -1157,15 +1185,16 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     const out = [];
     for (const p of players) {
       if (!visible[p.sessionId]) continue;
-      const pos = positionAt(paths[p.sessionId], absT);
-      if (!pos) continue;
+      const sample = positionAndHeadingAt(paths[p.sessionId], absT);
+      if (!sample) continue;
       const cap = capturedAt(p.sessionId, tl, absT);
       let icon = p.role === "cat" ? iconCat : iconAlly;
       if (cap) icon = iconCaptured;
       out.push({
         sessionId: p.sessionId,
         nickname: p.nickname,
-        position: [pos.lat, pos.lng],
+        position: [sample.lat, sample.lng],
+        heading: sample.heading,
         icon,
         cap,
       });
@@ -1208,14 +1237,46 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     })),
     [markers, players, summary?.colors]
   );
+  const replayPlayerHeadingFeatures = useMemo(
+    () => markers.map((m) => {
+      const length = 0.00012;
+      const angle = (m.heading * Math.PI) / 180;
+      const end = [
+        m.position[1] + Math.sin(angle) * length,
+        m.position[0] + Math.cos(angle) * length,
+      ];
+      return {
+        type: "Feature",
+        properties: { color: summary.colors?.[m.sessionId] || "#e2e8f0" },
+        geometry: { type: "LineString", coordinates: [[m.position[1], m.position[0]], end] },
+      };
+    }),
+    [markers, summary?.colors]
+  );
   const replayBaliseFeatures = useMemo(
     () => (summary.balises || [])
       .filter((balise) => balise?.lat != null && balise?.lng != null)
       .filter((balise) => balise.expiresAt == null || Number(balise.expiresAt) >= absT)
       .map((balise) => ({
         type: "Feature",
-        properties: { color: balise.capturedBy ? "#22c55e" : balise.isDecoy ? "#a855f7" : "#f59e0b" },
+        properties: {
+          color: balise.capturedBy ? "#22c55e" : balise.isDecoy ? "#a855f7" : "#f59e0b",
+          captureTime: balise.captureDurationMs || 0,
+        },
         geometry: { type: "Point", coordinates: [Number(balise.lng), Number(balise.lat)] },
+      })),
+    [summary.balises, absT]
+  );
+  const replayBeaconTowers = useMemo(
+    () => (summary.balises || [])
+      .filter((balise) => balise?.lat != null && balise?.lng != null)
+      .filter((balise) => balise.expiresAt == null || Number(balise.expiresAt) >= absT)
+      .map((balise) => ({
+        id: balise.id,
+        lat: Number(balise.lat),
+        lng: Number(balise.lng),
+        type: balise.type === "circular" ? "circular" : balise.type || "normal",
+        color: balise.capturedBy ? "#22c55e" : balise.isDecoy ? "#a855f7" : "#f59e0b",
       })),
     [summary.balises, absT]
   );
@@ -1229,6 +1290,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     () => markers.find((m) => m.sessionId === selectedSessionId)?.position
       ? (() => { const p = markers.find((m) => m.sessionId === selectedSessionId).position; return { lat: p[0], lng: p[1] }; })()
       : null,
+    [markers, selectedSessionId]
+  );
+  const selectedHeading = useMemo(
+    () => markers.find((m) => m.sessionId === selectedSessionId)?.heading || 0,
     [markers, selectedSessionId]
   );
 
@@ -1368,8 +1433,11 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             selectedPosition={selectedPosition}
             pathFeatures={replayPathFeatures}
             markerFeatures={replayMarkerFeatures}
+            playerHeadingFeatures={replayPlayerHeadingFeatures}
             baliseFeatures={replayBaliseFeatures}
+            beaconTowers={replayBeaconTowers}
             zoneFeature={replayZoneFeature}
+            selectedHeading={selectedHeading}
             follow={Boolean(selectedSessionId)}
             mode={mapMode}
           />
@@ -1428,6 +1496,21 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               <div className="rounded-2xl bg-[#FECACA] p-2"><span className="text-slate-500">Brouillages</span><p className="font-bold">{analytics.game?.totalJamEvents ?? 0}</p></div>
               <div className="rounded-2xl bg-[#D1FAE5] p-2"><span className="text-slate-500">Captures</span><p className="font-bold">{timelineSorted.filter((e) => e.type === "captured").length}</p></div>
             </div>
+            {(summary.balises || []).length > 0 && (
+              <>
+                <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Balises</p>
+                <div className="mb-3 space-y-1.5">
+                  {summary.balises.map((balise) => (
+                    <div key={balise.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] dark:border-slate-700 dark:bg-slate-800">
+                      <span className="font-medium">{balise.rarity || balise.type || "Balise"}</span>
+                      <span className="text-slate-500">
+                        Capture: {formatDurationMs(balise.captureDurationMs || 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             {/* Players */}
             <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Joueurs</p>
             <div className="mb-3 space-y-1.5">
@@ -1514,7 +1597,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         </div>
 
         {/* ═══ BOTTOM TRANSPORT BAR ═══ */}
-        <div className="relative z-[1050] shrink-0 border-t border-amber-100/80 bg-white/95 px-3 py-2 pb-20 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="pointer-events-none absolute bottom-20 left-1/2 z-[1050] w-[min(94vw,760px)] -translate-x-1/2 rounded-3xl border border-white/20 bg-slate-950/45 px-3 py-2 shadow-2xl backdrop-blur-xl">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1523,7 +1606,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                 setPlaying(true);
               }}
               disabled={playing}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#60A5FA] to-[#2563EB] text-white shadow disabled:opacity-40"
+              className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-white shadow disabled:opacity-40"
               title="Lecture"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1535,7 +1618,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               type="button"
               onClick={() => setPlaying(false)}
               disabled={!playing}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-slate-200 text-slate-700 shadow disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200"
+              className="pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white shadow disabled:opacity-40"
               title="Pause"
             >
               <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
@@ -1544,7 +1627,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             </button>
 
             {/* Timeline slider */}
-            <div className="min-w-0 flex-1">
+            <div className="pointer-events-auto min-w-0 flex-1">
               <SliderWithParticles
                 type="range"
                 min={0}
@@ -1560,13 +1643,13 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             <button
               type="button"
               onClick={cycleSpeed}
-              className="flex h-10 shrink-0 items-center justify-center rounded-[8px] bg-[#FBBF24] px-3 text-sm font-bold text-slate-900 shadow"
+              className="pointer-events-auto flex h-9 shrink-0 items-center justify-center rounded-full bg-white/15 px-3 text-xs font-bold text-white shadow"
               title="Vitesse de lecture"
             >
               x{displaySpeed}
             </button>
           </div>
-          <div className="mt-0.5 flex justify-between px-1 font-mono text-[10px] text-slate-500">
+          <div className="flex justify-between px-1 font-mono text-[10px] text-white/65">
             <span>{formatClock(absT)}</span>
             <span>{formatDur(offsetMs)} / {formatDur(duration)}</span>
           </div>
