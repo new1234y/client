@@ -8,32 +8,14 @@ import {
 } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
-import { useTheme } from "../../context/ThemeContext.jsx";
 import SliderWithParticles from "../ui/SliderWithParticles.jsx";
 import useAnimatedClose from "../../hooks/useAnimatedClose.js";
-import {
-  MapContainer,
-  TileLayer,
-  Polyline,
-  Circle,
-  CircleMarker,
-  Marker,
-  Popup,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
 import "../../lib/map/leafletFix.js";
-import { BASEMAPS, resolveBasemap } from "../../lib/map/basemaps.js";
-import { getOsmApiKey } from "../../lib/map/osmKey.js";
 import {
   iconCat,
   iconAlly,
   iconCaptured,
 } from "../../lib/map/icons.js";
-import {
-  effectiveGlobalRadiusAtTime,
-  effectiveZoneCenterAtTime,
-} from "../../lib/recapZone.js";
 import mapboxgl from "mapbox-gl";
 import { getMapboxToken } from "../../lib/map/mapboxKey.js";
 import { resolveMapboxStyleUrl } from "../../lib/map/mapPrefs.js";
@@ -843,26 +825,6 @@ function LegacySummaryPodiumView({
   );
 }
 
-function RecapFitBounds({ paths, center }) {
-  const map = useMap();
-  useEffect(() => {
-    const pts = [];
-    for (const track of Object.values(paths || {})) {
-      for (const p of track || []) {
-        if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) pts.push([p.lat, p.lng]);
-      }
-    }
-    if (center?.lat != null && center?.lng != null) pts.push([center.lat, center.lng]);
-    if (pts.length < 2) return;
-    try {
-      map.fitBounds(pts, { padding: [48, 48], maxZoom: 17 });
-    } catch {
-      /* ignore */
-    }
-  }, [map, paths, center]);
-  return null;
-}
-
 function segmentUntil(pts, absT) {
   const out = [];
   for (const p of pts || []) {
@@ -881,28 +843,10 @@ function positionAt(pts, absT) {
   return last ? { lat: last.lat, lng: last.lng } : null;
 }
 
-function capturePulseIcon() {
-  return L.divIcon({
-    className: "recap-capture-pulse-wrapper",
-    html: '<span class="recap-capture-pulse"><span>✦</span></span>',
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-  });
-}
-
-function jamAt(jamHistory, sessionId, absT) {
-  let last = null;
-  for (const j of jamHistory || []) {
-    if (j.sessionId !== sessionId) continue;
-    if (j.t > absT) break;
-    last = j;
-  }
-  return last;
-}
-
-function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow }) {
+function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, follow, mode = "follow" }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const loadedRef = useRef(false);
   const token = getMapboxToken();
 
   useEffect(() => {
@@ -920,28 +864,84 @@ function ReplayMapbox({ center, selectedPosition, pathFeatures, markerFeatures, 
     });
     mapRef.current = map;
     map.on("load", () => {
-      map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
+    loadedRef.current = true;
+    map.addSource("recap-paths", { type: "geojson", data: { type: "FeatureCollection", features: pathFeatures } });
       map.addLayer({ id: "recap-paths", type: "line", source: "recap-paths", paint: { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1] } });
       map.addSource("recap-markers", { type: "geojson", data: { type: "FeatureCollection", features: markerFeatures } });
       map.addLayer({ id: "recap-markers", type: "circle", source: "recap-markers", paint: { "circle-radius": 8, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       map.addSource("recap-terrain", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
       map.setTerrain({ source: "recap-terrain", exaggeration: 1.1 });
+      map.addLayer({
+        id: "recap-buildings",
+        type: "fill-extrusion",
+        source: "composite",
+        "source-layer": "building",
+        minzoom: 14,
+        paint: {
+          "fill-extrusion-color": "#94a3b8",
+          "fill-extrusion-height": ["get", "height"],
+          "fill-extrusion-base": ["get", "min_height"],
+          "fill-extrusion-opacity": 0.42,
+        },
+      });
     });
-    return () => { map.remove(); mapRef.current = null; };
+    return () => { loadedRef.current = false; map.remove(); mapRef.current = null; };
   }, [token]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !loadedRef.current || !map.isStyleLoaded()) return;
     map.getSource("recap-paths")?.setData({ type: "FeatureCollection", features: pathFeatures });
     map.getSource("recap-markers")?.setData({ type: "FeatureCollection", features: markerFeatures });
-    if (follow && selectedPosition) {
-      map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 58, duration: 450, essential: true });
+    if (follow && selectedPosition && mode === "follow") {
+      map.easeTo({ center: [selectedPosition.lng, selectedPosition.lat], pitch: 62, bearing: map.getBearing(), duration: 450, essential: true });
+    } else if (mode === "global") {
+      map.easeTo({ center: [center[1], center[0]], pitch: 18, bearing: 0, duration: 500, essential: true });
     }
-  }, [pathFeatures, markerFeatures, selectedPosition, follow]);
+  }, [center, pathFeatures, markerFeatures, selectedPosition, follow, mode]);
 
-  if (!token) return null;
+  if (!token) {
+    return (
+      <div className="absolute inset-0 z-10 grid place-items-center bg-slate-900 p-6 text-center text-sm text-white">
+        Ajoutez une clé Mapbox pour afficher le replay 3D.
+      </div>
+    );
+  }
   return <div ref={containerRef} className="absolute inset-0 z-10" aria-label="Replay 3D Mapbox de la partie" />;
+}
+
+function SummaryStatsView({ summary, analytics, onLeave }) {
+  const players = summary?.players || [];
+  const stats = analytics?.players || {};
+  const rows = players
+    .map((player) => ({ ...player, stats: stats[player.sessionId] || {} }))
+    .sort((a, b) => (b.stats.distanceMeters || 0) - (a.stats.distanceMeters || 0));
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[#f7f8fb] px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))] text-slate-950 dark:bg-[#090d16] dark:text-white sm:px-6">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-blue-600 dark:text-blue-400">Performance</p>
+            <h1 className="mt-1 text-2xl font-black">Stats de la partie</h1>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{players.length} joueurs · {formatDurationMs(analytics?.game?.durationMs)}</p>
+          </div>
+          <button type="button" onClick={onLeave} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Menu</button>
+        </div>
+        <div className="mt-6 space-y-2">
+          {rows.map((player, index) => (
+            <div key={player.sessionId} className="grid grid-cols-[2rem_minmax(0,1fr)_repeat(3,auto)] items-center gap-2 rounded-2xl border border-slate-200 bg-white/85 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/75">
+              <span className="text-center text-sm font-black text-slate-400">{index + 1}</span>
+              <span className="min-w-0 truncate text-sm font-bold">{player.nickname}</span>
+              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatDistance(player.stats.distanceMeters)}</b>distance</span>
+              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatSpeedKmh(player.stats.maxSpeedKmh)}</b>vitesse</span>
+              <span className="text-right text-[10px] text-slate-500"><b className="block text-xs text-slate-900 dark:text-white">{formatCoins(player.stats.coins ?? player.coins ?? 0)}</b>pièces</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function capturedAt(sessionId, timeline, absT) {
@@ -998,15 +998,12 @@ const SPEED_CYCLE = [1, 2, 4];
 const SPEED_MULTIPLIERS = { 1: 6, 2: 12, 4: 24 };
 
 export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
-  const { theme } = useTheme();
   const navigate = useNavigate();
-  const [basemapId, setBasemapId] = useState(() => (theme === "dark" ? "dark" : "light"));
   const [offsetMs, setOffsetMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(0);
-  const [showZone, setShowZone] = useState(true);
-  const [showJam, setShowJam] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
+  const [mapMode, setMapMode] = useState("follow");
   const [shareOpen, setShareOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [publicRecapUrl, setPublicRecapUrl] = useState("");
@@ -1066,8 +1063,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
       .finally(() => setShareBusy(false));
   }, [summary, readOnlyRecap]);
 
-  const osmKey = getOsmApiKey();
-  const bm = resolveBasemap(basemapId, osmKey);
   const t0 = summary?.huntStartedAt ?? 0;
   const t1 = summary?.endedAt ?? t0;
   const duration = Math.max(1, t1 - t0);
@@ -1080,17 +1075,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     if (first?.length) return [first[0].lat, first[0].lng];
     return [46.8, 2.5];
   }, [summary]);
-
-  const zoneR = useMemo(() => {
-    if (!summary) return 0;
-    const r = effectiveGlobalRadiusAtTime(summary, absT);
-    return r > 0 ? r : 0;
-  }, [summary, absT]);
-
-  const zoneCenter = useMemo(() => {
-    if (!summary) return null;
-    return effectiveZoneCenterAtTime(summary, absT) || summary.gameCenter;
-  }, [summary, absT]);
 
   const timelineSorted = useMemo(
     () => [...(summary?.timeline || [])].sort((a, b) => a.t - b.t),
@@ -1216,27 +1200,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
     [markers, selectedSessionId]
   );
 
-  const jamCircles = useMemo(() => {
-    if (!summary || !showJam) return [];
-    const jam = summary.jamHistory || [];
-    const colors = summary.colors || {};
-    const out = [];
-    for (const p of players) {
-      if (!visible[p.sessionId]) continue;
-      if (p.role === "cat") continue;
-      const j = jamAt(jam, p.sessionId, absT);
-      if (!j) continue;
-      out.push({
-        key: `${p.sessionId}-${j.t}`,
-        center: j.center,
-        radius: j.radiusM,
-        nickname: p.nickname,
-        color: colors[p.sessionId] || "#f97316",
-      });
-    }
-    return out;
-  }, [summary, players, visible, absT, showJam]);
-
   const [activeView, setActiveView] = useState("podium");
   const [copied, setCopied] = useState(false);
   const copyRecap = useCallback(async () => {
@@ -1343,8 +1306,10 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
         copied={copied}
         copyRecap={copyRecap}
       />
+    ) : activeView === "stats" ? (
+      <SummaryStatsView summary={summary} analytics={analytics} onLeave={onLeave} />
     ) : (
-      <div className="flex h-full min-h-0 flex-col bg-gradient-to-b from-[#FFF5D7]/30 via-white to-[#FDECF4]/30 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
+      <div className="flex h-full min-h-0 flex-col bg-slate-950 text-white">
         {/* Stats band */}
         <div className="shrink-0 border-b border-amber-100/80 bg-white/90 px-2 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
@@ -1372,6 +1337,7 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
             pathFeatures={replayPathFeatures}
             markerFeatures={replayMarkerFeatures}
             follow={Boolean(selectedSessionId)}
+            mode={mapMode}
           />
           <style>{RECAP_MAP_KEYFRAMES}</style>
           <div className="pointer-events-none absolute left-3 top-3 z-[1000] max-w-[calc(100%-1.5rem)]">
@@ -1379,6 +1345,15 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                 <span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-200">Vision globale</span>
+              </div>
+              <div className="absolute right-3 top-3 z-[1000] flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMapMode((value) => value === "follow" ? "global" : "follow")}
+                  className="rounded-full border border-white/20 bg-slate-950/80 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-xl backdrop-blur"
+                >
+                  {mapMode === "follow" ? "Suivi 3D" : "Vue globale 2D"}
+                </button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-bold">
                 <span className="rounded-full bg-white/10 px-2.5 py-1">{players.length} joueurs</span>
@@ -1397,80 +1372,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               ✦ Capture en replay · {capturePulses[capturePulses.length - 1].nickname}
             </div>
           )}
-          <MapContainer
-            center={center}
-            zoom={15}
-            className="h-full w-full"
-            zoomControl={false}
-            scrollWheelZoom
-            attributionControl
-          >
-            <TileLayer key={`${basemapId}-${osmKey ? "keyed" : "osm"}`} attribution={bm.attribution} url={bm.url} />
-            <RecapFitBounds paths={summary.paths} center={summary.gameCenter} />
-            {showZone && zoneCenter && zoneR > 0 && (
-                <Circle
-                  center={[zoneCenter.lat, zoneCenter.lng]}
-                  radius={zoneR}
-                  pathOptions={{
-                    color: "#5B7FA5",
-                    fillOpacity: 0.06,
-                    weight: 2,
-                    dashArray: "8 6",
-                  }}
-                />
-              )}
-            {jamCircles.map((c) => (
-              <Circle
-                key={c.key}
-                center={[c.center.lat, c.center.lng]}
-                radius={c.radius}
-                pathOptions={{
-                  color: c.color,
-                  fillColor: c.color,
-                  fillOpacity: 0.08,
-                  weight: 1,
-                  opacity: 0.5,
-                }}
-              >
-                <Popup>
-                  Brouillage {c.nickname} — {formatClock(absT)}
-                </Popup>
-              </Circle>
-            ))}
-            {polylines.map((pl) => (
-              <Polyline
-                key={pl.sessionId}
-                positions={pl.positions}
-                pathOptions={{
-                  color: pl.color,
-                  weight: 3,
-                  opacity: 0.88,
-                  dashArray: "10 8",
-                }}
-              />
-            ))}
-            {markers.map((m) => (
-              <Marker key={m.sessionId} position={m.position} icon={m.icon}>
-                <Popup>
-                  {m.nickname}
-                  {m.cap ? " — capturé·e" : ""}
-                </Popup>
-              </Marker>
-            ))}
-            {capturePulses.map((pulse) => (
-              <Fragment key={pulse.key}>
-                <CircleMarker
-                  center={pulse.position}
-                  radius={18}
-                  pathOptions={{ color: "#ef4444", fillColor: "#ef4444", fillOpacity: 0.08, weight: 2, opacity: 0.45 }}
-                />
-                <Marker position={pulse.position} icon={capturePulseIcon()}>
-                  <Popup>Capture de {pulse.nickname} · {formatClock(pulse.time)}</Popup>
-                </Marker>
-              </Fragment>
-            ))}
-          </MapContainer>
-
           {showPanel && (
             <div className="absolute bottom-24 left-3 right-3 z-[1000] max-h-[45vh] overflow-auto rounded-3xl bg-white/95 p-4 shadow-xl backdrop-blur dark:bg-slate-900/95 sm:left-auto sm:right-3 sm:w-96">
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#2563EB]">Détails de la partie</p>
@@ -1480,24 +1381,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
               <div className="rounded-2xl bg-[#FECACA] p-2"><span className="text-slate-500">Brouillages</span><p className="font-bold">{analytics.game?.totalJamEvents ?? 0}</p></div>
               <div className="rounded-2xl bg-[#D1FAE5] p-2"><span className="text-slate-500">Captures</span><p className="font-bold">{timelineSorted.filter((e) => e.type === "captured").length}</p></div>
             </div>
-            {/* Basemap selector */}
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {Object.entries(BASEMAPS).map(([id, b]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setBasemapId(id)}
-                  className={`rounded-[8px] px-2.5 py-1.5 text-xs font-medium ${
-                    basemapId === id
-                      ? "bg-[#5B7FA5] text-white"
-                      : "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-                  }`}
-                >
-                  {b.name}
-                </button>
-              ))}
-            </div>
-
             {/* Players */}
             <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Joueurs</p>
             <div className="mb-3 space-y-1.5">
@@ -1534,21 +1417,6 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
                   </span>
                 </label>
               );})}
-            </div>
-
-            {/* Layers */}
-            <p className="mb-1.5 text-xs font-semibold uppercase text-slate-500">Calques</p>
-            <div className="mb-3 space-y-1.5">
-              <ToggleRow
-                label="Zone (cercle + paliers)"
-                checked={showZone}
-                onChange={setShowZone}
-              />
-              <ToggleRow
-                label="Brouillage (cercle par joueur)"
-                checked={showJam}
-                onChange={setShowJam}
-              />
             </div>
 
             {/* Timeline */}
@@ -1662,6 +1530,26 @@ export default function GameSummary({ summary, onLeave, readOnlyRecap }) {
   return (
     <>
       {recapView}
+      <nav className="fixed bottom-3 left-1/2 z-[11000] flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/70 bg-white/90 p-1.5 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/90" aria-label="Navigation du récapitulatif">
+        {[
+          ["podium", "Podium", "♛"],
+          ["stats", "Stats", "≡"],
+          ["map", "Carte", "⌖"],
+        ].map(([view, label, icon]) => (
+          <button
+            key={view}
+            type="button"
+            onClick={() => setActiveView(view)}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider transition ${
+              activeView === view
+                ? "bg-slate-950 text-white shadow-lg dark:bg-white dark:text-slate-950"
+                : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            }`}
+          >
+            <span aria-hidden="true" className="text-sm">{icon}</span>{label}
+          </button>
+        ))}
+      </nav>
 
       {shareOpen && (
         <RecapShareModal
